@@ -113,3 +113,75 @@ def update_payment_mandate_status(razorpay_order_id: str, status: str, failure_r
         return pay_id
     finally:
         conn.close()
+
+def get_cart_state(cart_id: str) -> dict:
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM cart_mandates WHERE id = ?", (cart_id,))
+        cart = cursor.fetchone()
+        if not cart:
+            return None
+            
+        cursor.execute("SELECT * FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+        payment = cursor.fetchone()
+        
+        return {
+            "cart": dict(cart),
+            "payment": dict(payment) if payment else None
+        }
+    finally:
+        conn.close()
+
+def execute_refund(cart_id: str) -> dict:
+    """
+    Validates state and executes the Razorpay refund, then updates DB.
+    """
+    from backend.integrations.razorpay_client import refund_payment
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Get current state
+        state = get_cart_state(cart_id)
+        if not state or not state["payment"]:
+            raise ValueError("Cart or Payment Mandate not found")
+            
+        cart = state["cart"]
+        payment = state["payment"]
+        
+        if not cart["reversible"]:
+            raise ValueError("Cart is no longer reversible")
+            
+        if payment["status"] != "succeeded" or not payment["razorpay_payment_id"]:
+            raise ValueError("Payment is not in a refundable state (must be succeeded with a payment ID)")
+            
+        if payment["recovery_action"] == "refunded":
+            raise ValueError("Payment is already refunded")
+            
+        # Call Razorpay
+        refund_response = refund_payment(payment["razorpay_payment_id"], payment["amount_paise"])
+        
+        # Update Database
+        updated_at = datetime.utcnow().isoformat() + "Z"
+        
+        # 1. Update Payment Mandate
+        cursor.execute(
+            "UPDATE payment_mandates SET recovery_action = ?, updated_at = ? WHERE id = ?",
+            ("refunded", updated_at, payment["id"])
+        )
+        
+        # 2. Update Cart Mandate
+        cursor.execute(
+            "UPDATE cart_mandates SET reversible = 0 WHERE id = ?",
+            (cart["id"],)
+        )
+        
+        # 3. Log it
+        create_audit_log(cursor, "payment", payment["id"], "Payment Refunded", f"Refund ID: {refund_response.get('id')} for {payment['amount_paise']} paise")
+        create_audit_log(cursor, "cart", cart["id"], "Cart Cancelled", "Reversible flipped to false due to refund")
+        
+        conn.commit()
+        return refund_response
+    finally:
+        conn.close()

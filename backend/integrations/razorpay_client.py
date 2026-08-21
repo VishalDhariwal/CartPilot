@@ -50,3 +50,11 @@ def verify_webhook_signature(body: str, signature: str):
         signature,
         RAZORPAY_WEBHOOK_SECRET
     )
+
+def refund_payment(payment_id: str, amount_paise: int) -> dict:
+    """
+    Refunds a specific Razorpay payment.
+    amount_paise must match the amount captured exactly, or be less for a partial refund.
+    """
+    return client.payment.refund(payment_id, {"amount": amount_paise})
+
