@@ -1,0 +1,30 @@
+[
+  {
+    "sku": "ATTA-2KG",
+    "name": "Whole Wheat Atta 2kg",
+    "price_paise": 12000,
+    "stock": 50,
+    "category": "grocery"
+  },
+  {
+    "sku": "MIXER-WHISTLE",
+    "name": "Pressure Cooker Whistle",
+    "price_paise": 30000,
+    "stock": 15,
+    "category": "kitchenware"
+  },
+  {
+    "sku": "MILK-1L",
+    "name": "Fresh Milk 1L",
+    "price_paise": 6500,
+    "stock": 20,
+    "category": "grocery"
+  },
+  {
+    "sku": "KNIFE-SET",
+    "name": "Chef's Knife Set",
+    "price_paise": 150000,
+    "stock": 5,
+    "category": "kitchenware"
+  }
+]
