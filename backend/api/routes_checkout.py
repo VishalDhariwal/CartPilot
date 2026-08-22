@@ -21,9 +21,15 @@ from backend.db import get_db
 router = APIRouter()
 
 
+class ChatHistoryMessage(BaseModel):
+    role: str
+    content: str
+
 class AgentCheckoutRequest(BaseModel):
     query: str
     spend_cap_paise: Optional[int] = None
+    conversation_history: Optional[list[ChatHistoryMessage]] = None
+    current_cart: Optional[list[dict]] = None
 
 class FinalizeRequest(BaseModel):
     cart_id: str
@@ -77,14 +83,20 @@ def _record_upsell_event(cart_id: str, suggested_sku: str, accepted: bool,
 def agent_checkout(req: AgentCheckoutRequest):
     """
     Full agent checkout pipeline:
-      1. Buyer Agent parses NL request → structured cart (bounded by custom or global spend cap)
+      1. Buyer Agent parses NL request with conversation history & active cart → structured cart
       2. OOS detection → Substitution Agent (if needed) — returned before guardrail
       3. Guardrail Engine validates cart
       4. Growth Agent cross-sell (post-guardrail, pre-Razorpay)
     """
     try:
-        # ── Step 1: Buyer Agent ──────────────────────────────────────────
-        agent_output = generate_cart_proposal(req.query, custom_spend_cap_paise=req.spend_cap_paise)
+        # ── Step 1: Buyer Agent with Memory ──────────────────────────────
+        history_dicts = [m.model_dump() for m in req.conversation_history] if req.conversation_history else None
+        agent_output = generate_cart_proposal(
+            natural_language_request=req.query,
+            custom_spend_cap_paise=req.spend_cap_paise,
+            conversation_history=history_dicts,
+            current_cart=req.current_cart
+        )
 
 
         # ── Step 2: Create Intent Mandate ────────────────────────────────
@@ -93,6 +105,7 @@ def agent_checkout(req: AgentCheckoutRequest):
             goal=agent_output["goal"],
             spend_cap_paise=agent_output["spend_cap_paise"]
         )
+
 
         proposed_items = agent_output["proposed_items"]
         oos_items = agent_output.get("oos_items", [])
@@ -573,3 +586,128 @@ def finalize_checkout(req: FinalizeRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class PostPurchaseAddRequest(BaseModel):
+    parent_cart_id: str
+    sku: str
+    qty: int = 1
+    selected_size: Optional[str] = None
+
+
+@router.post("/post-purchase-add")
+def post_purchase_add(req: PostPurchaseAddRequest):
+    """
+    1-Click Post-Purchase Add-on:
+    When a customer accepts a complementary recommendation after completing their initial order,
+    this creates a companion add-on order mandate linked to the parent order, generates a Razorpay payment link,
+    and logs the post-purchase revenue expansion.
+    """
+    try:
+        parent_state = get_cart_state(req.parent_cart_id)
+        if not parent_state or not parent_state["cart"]:
+            raise HTTPException(status_code=404, detail="Parent order not found")
+
+        parent_cart = parent_state["cart"]
+        intent_id = parent_cart["intent_id"]
+
+        # Fetch product
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT sku, name, price_paise, category, stock, image_url, description, metadata FROM catalog WHERE sku = ?", (req.sku,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Product {req.sku} not found")
+
+        meta_obj = {}
+        if row["metadata"]:
+            try:
+                meta_obj = json.loads(row["metadata"])
+            except Exception:
+                meta_obj = {}
+
+        item_total_paise = row["price_paise"] * req.qty
+        addon_items = [{
+            "sku": row["sku"],
+            "name": row["name"],
+            "price_paise": row["price_paise"],
+            "qty": req.qty,
+            "category": row["category"],
+            "image_url": row["image_url"] or "",
+            "description": row["description"] or "",
+            "metadata": meta_obj,
+            "selected_size": req.selected_size
+        }]
+
+        # Validate through Guardrail
+        validation = validate_cart(intent_id, addon_items, item_total_paise)
+        if validation["status"] == "blocked":
+            return {
+                "status": "blocked",
+                "reason": validation["reason"],
+                "message": "Post-purchase add-on blocked by policy guardrails."
+            }
+
+        # Create companion cart mandate
+        addon_cart = create_cart_mandate(
+            intent_id=intent_id,
+            items=addon_items,
+            total_paise=item_total_paise,
+            status="approved",
+            reason=f"Post-purchase 1-click add-on to order {req.parent_cart_id}",
+            reversible=True
+        )
+
+        # Create Razorpay Order for add-on
+        order = create_order(
+            amount_paise=item_total_paise,
+            receipt_id=addon_cart["id"],
+            notes={"parent_cart_id": req.parent_cart_id, "type": "post_purchase_addon"}
+        )
+
+        # Create Payment Link
+        payment_link = create_payment_link(
+            amount_paise=item_total_paise,
+            order_id=order["id"],
+            description=f"Add-on: {row['name']}"
+        )
+
+        # Create Payment Mandate
+        payment_mandate = create_payment_mandate(
+            cart_id=addon_cart["id"],
+            razorpay_order_id=order["id"],
+            amount_paise=item_total_paise
+        )
+
+        append_audit_log(
+            "upsell", addon_cart["id"], "Post-Purchase Add-on Created",
+            f"Customer added {row['name']} (₹{item_total_paise/100:.0f}) as post-purchase companion to {req.parent_cart_id}."
+        )
+
+        _record_upsell_event(
+            cart_id=addon_cart["id"],
+            suggested_sku=req.sku,
+            accepted=True,
+            cart_total_before=parent_cart["total_paise"],
+            cart_total_after=parent_cart["total_paise"] + item_total_paise
+        )
+
+        return {
+            "status": "approved",
+            "cart_id": addon_cart["id"],
+            "parent_cart_id": req.parent_cart_id,
+            "items": addon_items,
+            "proposed_items": addon_items,
+            "total_paise": item_total_paise,
+            "payment_url": payment_link["short_url"],
+            "payment_link": payment_link["short_url"],
+            "payment_mandate_id": payment_mandate["id"],
+            "razorpay_order_id": order["id"],
+            "amount_paise": item_total_paise
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

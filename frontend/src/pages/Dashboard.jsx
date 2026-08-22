@@ -232,7 +232,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Group everything by intent
+  // Group everything by intent (Newest first at top)
   const orders = useMemo(() => {
     if (!data) return [];
     return data.intents.map(intent => {
@@ -241,10 +241,13 @@ export default function Dashboard() {
       const payments = data.payments.filter(p => cartIds.includes(p.cart_id));
       const payIds = payments.map(p => p.id);
       const refIds = [intent.id, ...cartIds, ...payIds];
-      const logs = data.audit_logs.filter(l => refIds.includes(l.ref_id));
+      const logs = data.audit_logs
+        .filter(l => refIds.includes(l.ref_id))
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)); // Newest logs first at top
       return { intent, carts, payments, logs };
-    }).reverse(); // Most recent first
+    }).sort((a, b) => new Date(b.intent.created_at || 0) - new Date(a.intent.created_at || 0)); // Newest orders first at top
   }, [data]);
+
 
   // Aggregate stats
   const stats = useMemo(() => {
@@ -258,10 +261,19 @@ export default function Dashboard() {
       if (lc?.status === 'approved') {
         totalPaise += (lc.total_paise || 0);
       }
-      if (lp?.status === 'succeeded' && lp?.recovery_action === 'refunded') refunded++;
-      else if (lp?.status === 'succeeded') completed++;
-      else if (lp?.status === 'failed') failed++;
-      else if (lc?.status === 'blocked') blocked++;
+      if (lp?.status === 'succeeded' && lp?.recovery_action === 'refunded') {
+        refunded++;
+      } else if (lp?.status === 'succeeded') {
+        completed++;
+      } else if (lp?.status === 'failed') {
+        failed++;
+      }
+      
+      const isBlocked = o.carts.some(c => c.status === 'blocked') ||
+        o.logs.some(l => l.event.toLowerCase().includes('blocked') || l.event.toLowerCase().includes('intercepted'));
+      if (isBlocked) {
+        blocked++;
+      }
     });
     return { total: orders.length, totalPaise, completed, blocked, failed, refunded };
   }, [orders]);
@@ -273,16 +285,18 @@ export default function Dashboard() {
       return orders.filter(o => o.payments.some(p => p.status === 'succeeded' && p.recovery_action !== 'refunded'));
     }
     if (filter === 'blocked') {
-      return orders.filter(o => o.carts.some(c => c.status === 'blocked'));
+      return orders.filter(o => o.carts.some(c => c.status === 'blocked') ||
+        o.logs.some(l => l.event.toLowerCase().includes('blocked') || l.event.toLowerCase().includes('intercepted')));
     }
     if (filter === 'refunded') {
       return orders.filter(o => o.payments.some(p => p.recovery_action === 'refunded'));
     }
     if (filter === 'upsell') {
-      return orders.filter(o => o.logs.some(l => l.event.includes('Upsell Accepted') || l.event.includes('Substitute Accepted')));
+      return orders.filter(o => o.logs.some(l => l.event.includes('Upsell Accepted') || l.event.includes('Substitute Accepted') || l.event.includes('Post-Purchase Add-on Created')));
     }
     return orders;
   }, [orders, filter]);
+
 
   return (
     <div className="dashboard-layout">
@@ -320,12 +334,15 @@ export default function Dashboard() {
             <Sparkles size={15} color="var(--accent-mustard)" />
           </div>
           <div className="kpi-value" style={{ color: '#8C5B14' }}>
-            {upsellStats?.total_revenue_lift_rupees ? `+₹${upsellStats.total_revenue_lift_rupees}` : '+₹0'}
+            {upsellStats?.total_revenue_lift_rupees != null && upsellStats.total_revenue_lift_rupees > 0
+              ? `+₹${Math.round(upsellStats.total_revenue_lift_rupees).toLocaleString('en-IN')}`
+              : '+₹0'}
           </div>
           <div className="kpi-badge mustard">
             <span>{upsellStats?.accepted_count || 0} upsells accepted ({upsellStats?.conversion_rate_pct || 0}% rate)</span>
           </div>
         </div>
+
 
         <div className="kpi-card">
           <div className="kpi-header">

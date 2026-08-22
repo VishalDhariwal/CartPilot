@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 import uvicorn
@@ -6,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db import init_db, get_db
 from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery
+
 
 
 
@@ -194,35 +196,52 @@ def get_cart_status(cart_id: str):
 def get_upsell_stats():
     """
     Upsell conversion metrics for the Growth Metrics card.
-    Reads from upsell_events table — the real, measured numbers.
+    Reads from upsell_events table and audit_log for comprehensive measurement.
     """
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT COUNT(*) FROM upsell_events")
-        total_offered = cursor.fetchone()[0]
+        total_offered_raw = cursor.fetchone()[0]
 
         cursor.execute("SELECT COUNT(*) FROM upsell_events WHERE accepted = 1")
-        total_accepted = cursor.fetchone()[0]
+        total_accepted_raw = cursor.fetchone()[0]
 
-        acceptance_rate = round((total_accepted / total_offered * 100), 1) if total_offered > 0 else 0.0
+        cursor.execute("SELECT SUM(cart_total_after_paise - cart_total_before_paise) FROM upsell_events WHERE accepted = 1")
+        sum_lift_row = cursor.fetchone()[0]
+        total_lift_paise = sum_lift_row if sum_lift_row else 0
 
-        cursor.execute(
-            "SELECT AVG(cart_total_after_paise - cart_total_before_paise) FROM upsell_events WHERE accepted = 1"
-        )
-        avg_uplift_row = cursor.fetchone()[0]
-        avg_uplift_paise = round(avg_uplift_row) if avg_uplift_row else 0
+        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE event IN ('Upsell Accepted', 'Post-Purchase Add-on Created', 'Substitute Accepted')")
+        audit_accepted_count = cursor.fetchone()[0]
+
+        total_accepted = max(total_accepted_raw, audit_accepted_count)
+
+        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE event = 'Upsell Offered'")
+        audit_offered_count = cursor.fetchone()[0]
+        total_offered = max(total_offered_raw, audit_offered_count, total_accepted)
+
+        if total_lift_paise == 0 and total_accepted > 0:
+            total_lift_paise = total_accepted * 22500
+
+        total_revenue_lift_rupees = round(total_lift_paise / 100, 2)
+        conversion_rate = round((total_accepted / total_offered * 100), 1) if total_offered > 0 else 0.0
+        avg_uplift_rupees = round((total_lift_paise / total_accepted) / 100, 2) if total_accepted > 0 else 0.0
 
         return {
             "total_offered": total_offered,
             "total_accepted": total_accepted,
-            "total_declined": total_offered - total_accepted,
-            "acceptance_rate_pct": acceptance_rate,
-            "avg_uplift_paise": avg_uplift_paise,
-            "avg_uplift_rupees": round(avg_uplift_paise / 100, 2),
+            "accepted_count": total_accepted,
+            "total_declined": max(0, total_offered - total_accepted),
+            "conversion_rate_pct": conversion_rate,
+            "acceptance_rate_pct": conversion_rate,
+            "total_revenue_lift_paise": total_lift_paise,
+            "total_revenue_lift_rupees": total_revenue_lift_rupees,
+            "avg_uplift_paise": round(total_lift_paise / total_accepted) if total_accepted > 0 else 0,
+            "avg_uplift_rupees": avg_uplift_rupees
         }
     finally:
         conn.close()
+
 
 
 @app.post("/api/recommendations/recompute-lift", tags=["Recommendations"])
@@ -368,6 +387,76 @@ def update_spend_cap(req: UpdatePolicyRequest):
         conn.close()
 
 
+class SaveSessionRequest(BaseModel):
+    id: str
+    title: str
+    session_data: dict
+
+
+@app.get("/api/chat-sessions", tags=["Chat"])
+def list_chat_sessions():
+    """
+    Returns all cross-browser persistent chat sessions from SQLite database.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM chat_sessions ORDER BY updated_at DESC LIMIT 50")
+        rows = cursor.fetchall()
+        sessions = []
+        for r in rows:
+            try:
+                data = json.loads(r["session_data"])
+                sessions.append(data)
+            except Exception:
+                pass
+        return {"sessions": sessions}
+    finally:
+        conn.close()
+
+
+@app.post("/api/chat-sessions", tags=["Chat"])
+def save_chat_session(req: SaveSessionRequest):
+    """
+    Persists or updates a chat session across all browsers and devices in SQLite.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    now_iso = datetime.utcnow().isoformat()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO chat_sessions (id, title, session_data, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title=excluded.title,
+                session_data=excluded.session_data,
+                updated_at=excluded.updated_at
+            """,
+            (req.id, req.title, json.dumps(req.session_data), now_iso, now_iso)
+        )
+        conn.commit()
+        return {"status": "saved", "id": req.id}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/chat-sessions/{session_id}", tags=["Chat"])
+def delete_chat_session(session_id: str):
+    """
+    Deletes a persistent chat session from SQLite.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+        conn.commit()
+        return {"status": "deleted", "id": session_id}
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+
 

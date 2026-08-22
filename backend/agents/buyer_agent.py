@@ -25,42 +25,81 @@ class AgentResponse(BaseModel):
 from backend.recommendations.embedding_engine import find_substitutes
 
 
-def get_catalog_str(client: OpenAI, query: str, spend_cap_paise: int) -> tuple[str, dict]:
+def get_catalog_str(
+    client: OpenAI,
+    query: str,
+    spend_cap_paise: int,
+    current_cart: Optional[list] = None,
+    conversation_history: Optional[list] = None
+) -> tuple[str, dict]:
     """
     Returns (catalog_str, {sku: item_dict}) using Hybrid Search:
       1. Dense Semantic Vector Search (SentenceTransformer all-MiniLM-L6-v2)
-      2. Tokenized keyword search directly from user tokens.
+      2. Tokenized keyword search across user query, current cart, and conversation context.
     Sorted cheapest-first so the LLM naturally picks lower-priced in-stock items.
     """
     sku_map = {}
+    conn = get_db()
+    cursor = conn.cursor()
 
-    # 1. Dense Semantic Vector Search across the entire catalog
+    # 1. Always load all current cart items into sku_map so the LLM can reference/retain them
+    if current_cart:
+        for cart_item in current_cart:
+            sku = cart_item.get("sku")
+            if sku:
+                cursor.execute(
+                    "SELECT sku, name, price_paise, stock, category, merchant, boosted, image_url, description, metadata FROM catalog WHERE sku = ?",
+                    (sku,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    item_dict = dict(row)
+                    if item_dict.get("metadata") and isinstance(item_dict["metadata"], str):
+                        try:
+                            item_dict["metadata"] = json.loads(item_dict["metadata"])
+                        except Exception:
+                            item_dict["metadata"] = {}
+                    sku_map[sku] = item_dict
+
+    # 2. Build multi-turn search context
+    search_queries = [query]
+    if conversation_history:
+        for msg in conversation_history[-3:]:
+            if msg.get("role") in ("user", "human"):
+                search_queries.append(msg.get("content", ""))
+    if current_cart:
+        for it in current_cart:
+            if it.get("name"):
+                search_queries.append(it["name"])
+
+    combined_search_text = " ".join(search_queries)
+
+    # 3. Dense Semantic Vector Search across the entire catalog
     try:
-        sem_matches = find_substitutes(query, budget_remaining_paise=spend_cap_paise, top_k=35, min_similarity=0.40)
+        sem_matches = find_substitutes(combined_search_text, budget_remaining_paise=spend_cap_paise, top_k=35, min_similarity=0.35)
         for m in sem_matches:
-            sku_map[m["sku"]] = {
-                "sku": m["sku"],
-                "name": m["name"],
-                "price_paise": m["price_paise"],
-                "stock": m.get("stock", 50),
-                "category": m["category"],
-                "boosted": m.get("boosted", 0),
-                "image_url": m.get("image_url", ""),
-                "description": m.get("description", ""),
-                "metadata": m.get("metadata", {})
-            }
+            if m["sku"] not in sku_map:
+                sku_map[m["sku"]] = {
+                    "sku": m["sku"],
+                    "name": m["name"],
+                    "price_paise": m["price_paise"],
+                    "stock": m.get("stock", 50),
+                    "category": m["category"],
+                    "boosted": m.get("boosted", 0),
+                    "image_url": m.get("image_url", ""),
+                    "description": m.get("description", ""),
+                    "metadata": m.get("metadata", {})
+                }
     except Exception as e:
         print(f"Semantic search fallback: {e}")
 
-
-    # 2. Tokenized Keyword Search directly from user tokens (zero hardcoded word lists)
-    conn = get_db()
-    cursor = conn.cursor()
-    words = [w.strip(".,!?'\"").lower() for w in query.split() if len(w.strip(".,!?'\"")) >= 3]
+    # 4. Tokenized Keyword Search directly from tokens
+    words = [w.strip(".,!?'\"").lower() for w in combined_search_text.split() if len(w.strip(".,!?'\"")) >= 3]
     stop_words = {
         "want", "need", "like", "order", "purchase", "item", "some", "with",
         "have", "please", "shop", "buy", "get", "give", "find", "show",
-        "take", "search", "look", "from", "the", "and", "for", "that", "this"
+        "take", "search", "look", "from", "the", "and", "for", "that", "this",
+        "also", "too", "more", "make", "change", "replace", "instead"
     }
     keywords = [w for w in words if w not in stop_words]
 
@@ -75,14 +114,14 @@ def get_catalog_str(client: OpenAI, query: str, spend_cap_paise: int) -> tuple[s
         )
         cursor.execute(sql, tuple(params))
         for row in cursor.fetchall():
-            item_dict = dict(row)
-            if item_dict.get("metadata") and isinstance(item_dict["metadata"], str):
-                try:
-                    item_dict["metadata"] = json.loads(item_dict["metadata"])
-                except Exception:
-                    item_dict["metadata"] = {}
-            sku_map[row["sku"]] = item_dict
-
+            if row["sku"] not in sku_map:
+                item_dict = dict(row)
+                if item_dict.get("metadata") and isinstance(item_dict["metadata"], str):
+                    try:
+                        item_dict["metadata"] = json.loads(item_dict["metadata"])
+                    except Exception:
+                        item_dict["metadata"] = {}
+                sku_map[row["sku"]] = item_dict
 
     conn.close()
 
@@ -103,7 +142,6 @@ def get_catalog_str(client: OpenAI, query: str, spend_cap_paise: int) -> tuple[s
     return "\n".join(catalog_lines), sku_map
 
 
-
 def get_current_policy_spend_cap() -> int:
     try:
         conn = get_db()
@@ -118,12 +156,16 @@ def get_current_policy_spend_cap() -> int:
     return 1000000
 
 
-def generate_cart_proposal(natural_language_request: str, custom_spend_cap_paise: Optional[int] = None) -> dict:
+def generate_cart_proposal(
+    natural_language_request: str,
+    custom_spend_cap_paise: Optional[int] = None,
+    conversation_history: Optional[list] = None,
+    current_cart: Optional[list] = None
+) -> dict:
     """
-    Calls the LLM to parse a natural language request into a structured cart.
-    Enforces that the LLM stays within the spend cap and picks cheapest adequate matches.
-    Crucially selects ONLY the requested items (single product -> 1 SKU with qty 1),
-    not every matching catalog item.
+    Calls the LLM to parse natural language requests with multi-turn conversation memory and active cart state.
+    Supports additions ("also add mascara"), replacements ("instead of shirt give me jacket"),
+    quantity adjustments ("make it 2"), and removals ("remove perfume").
     """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -133,7 +175,13 @@ def generate_cart_proposal(natural_language_request: str, custom_spend_cap_paise
 
     spend_cap_paise = custom_spend_cap_paise or get_current_policy_spend_cap()
 
-    catalog_str, sku_map = get_catalog_str(client, natural_language_request, spend_cap_paise)
+    catalog_str, sku_map = get_catalog_str(
+        client=client,
+        query=natural_language_request,
+        spend_cap_paise=spend_cap_paise,
+        current_cart=current_cart,
+        conversation_history=conversation_history
+    )
 
     if not sku_map or catalog_str == "No items found matching your request.":
         return {
@@ -143,35 +191,69 @@ def generate_cart_proposal(natural_language_request: str, custom_spend_cap_paise
             "oos_items": []
         }
 
+    # Format Current Cart context for the LLM
+    if current_cart and len(current_cart) > 0:
+        cart_lines = []
+        for it in current_cart:
+            cart_lines.append(
+                f"- SKU: {it['sku']}, Name: {it.get('name', it.get('sku'))}, Qty: {it.get('qty', 1)}, Price: ₹{it.get('price_paise', 0)/100:.0f}"
+            )
+        current_cart_text = "\n".join(cart_lines)
+    else:
+        current_cart_text = "Empty (no items in cart yet)"
 
     system_instruction = f"""
-    You are an AI Buyer Agent for an e-commerce store. Convert the user's natural language shopping request into a structured cart.
+    You are an AI Buyer Agent with conversational context and memory. Convert user shopping requests and conversational follow-ups into a structured cart.
 
-    Available catalog matches (sorted cheapest first):
+    CUSTOMER'S CURRENT CART:
+    {current_cart_text}
+
+    AVAILABLE CATALOG MATCHES (sorted cheapest first):
     {catalog_str}
 
-    STRICT RULES — violating any of these is a critical failure:
+    CONVERSATIONAL CONTEXT RULES:
+    1. ADDITIVE REQUESTS (e.g. "also add perfume", "and a smartwatch", "add running shoes"):
+       - Retain all existing items in the cart and ADD the newly requested items.
+    2. REPLACEMENT / CORRECTION (e.g. "instead of shoes give me boots", "change shirt to black one"):
+       - Remove the referenced item and replace it with the new choice.
+    3. QUANTITY ADJUSTMENT (e.g. "make it 2 shirts", "add 1 more"):
+       - Update the qty of the existing item in the cart.
+    4. REMOVAL (e.g. "remove the perfume"):
+       - Omit the removed item from the proposed items list.
+    5. BRAND NEW SHOPPING INTENT (e.g. "clear cart and buy laptops", "start new order with sneakers"):
+       - Discard prior cart items and create a fresh proposal for the new request.
+
+    STRICT RULES:
     1. ONLY use SKUs that appear in the catalog above. Never invent or guess SKUs.
-    2. RELEVANCE: ONLY pick items that match what the user actually asked for. Never pick unrelated items (e.g. do not select milk or eggs if user asked for shirts or sneakers).
+    2. RELEVANCE: ONLY pick items that match what the user actually asked for.
     3. The price_paise for each item MUST exactly match the catalog value shown above.
     4. The sum of (price_paise × qty) for ALL items MUST NOT exceed {spend_cap_paise} paise (₹{spend_cap_paise/100:.0f}).
     5. If multiple SKUs match a requested item type, prefer the CHEAPEST one unless the user explicitly asks for a premium/expensive variant.
-    6. QUANTITY & VARIETY SELECTION:
-       - If the user asks for a single product (e.g. 'i want to buy shirts', 'get me a smartwatch'), pick EXACTLY ONE best-matching SKU with quantity 1.
-       - NEVER dump multiple different varieties of the same product into the cart unless the user specifically asked for multiple varieties or brands.
-       - If the user specifies a quantity for a product (e.g. '2 packs of eggs'), pick ONE SKU and set qty = 2.
-       - If the user requests multiple distinct items (e.g. 't-shirt, jeans, and belt'), pick exactly one best SKU for each distinct requested item.
-    7. JSON OUTPUT:
-       Return ONLY JSON matching the required schema.
+    6. Pick EXACTLY ONE best-matching SKU for each distinct requested product with the appropriate quantity.
+    7. JSON OUTPUT: Return ONLY JSON matching the required schema.
     """
 
+    # Build multi-turn messages array
+    llm_messages = [{"role": "system", "content": system_instruction}]
+
+    if conversation_history:
+        # Include up to the last 6 turns of conversation history
+        for msg in conversation_history[-6:]:
+            role = "assistant" if msg.get("role") in ("agent", "assistant") else "user"
+            content = msg.get("content", "").strip()
+            # Omit huge UI messages or alerts
+            if content and not content.startswith("🛡️ **Spend Cap Updated"):
+                # Clean markdown headers if needed
+                clean_content = content.replace("🚫 **Guardrail Blocked**:", "Notice:").replace("🎉 **Payment Succeeded!**", "Payment completed.")
+                llm_messages.append({"role": role, "content": clean_content})
+
+    # Ensure the latest user query is the concluding turn
+    if not llm_messages or llm_messages[-1].get("content") != natural_language_request:
+        llm_messages.append({"role": "user", "content": natural_language_request})
 
     completion = client.beta.chat.completions.parse(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": natural_language_request}
-        ],
+        messages=llm_messages,
         response_format=AgentResponse,
         temperature=0.1
     )
@@ -207,8 +289,8 @@ def generate_cart_proposal(natural_language_request: str, custom_spend_cap_paise
             else:
                 validated_items.append(enriched_item)
 
-
     result["proposed_items"] = validated_items
     result["oos_items"] = oos_items
 
     return result
+

@@ -99,6 +99,16 @@ def init_db():
       PRIMARY KEY (sku_a, sku_b)
     );
 
+    -- Cross-browser persistent chat sessions table
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      session_data TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+
     -- Measurement table: every upsell/cross-sell offer, outcome, and AOV impact
     CREATE TABLE IF NOT EXISTS upsell_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -18,19 +18,25 @@ def decide_resolution(natural_language_request: str, order_state: dict) -> dict:
     client = OpenAI(api_key=api_key)
     
     system_instruction = f"""
-    You are an AI Resolution Agent for an e-commerce store.
-    A user is contacting you regarding an existing order.
+    You are the Autonomous AI Resolution & Refund Agent for CartPilot.
+    A customer is contacting you regarding an existing order.
     
-    Here is the current state of their order from the database:
+    Here is the exact live order state from the database:
     {json.dumps(order_state, indent=2)}
     
-    Rules:
-    1. Determine the appropriate action to take based on the user's request.
-    2. The valid actions are:
-       - 'cancel': If the user clearly wants to cancel the order and it is eligible for cancellation (cart is reversible, payment succeeded).
-       - 'escalate': If the user is asking for something complex, or wants to cancel an order that is no longer reversible.
-       - 'inform': If the user is just asking for status or policy, or we cannot fulfill the request.
-    3. Provide a short 'reason' explaining why you chose this action.
+    Decision Rules:
+    1. 'cancel':
+       - Choose 'cancel' whenever the user wants to cancel the order, request a refund, or reverse their purchase (e.g. "I would like to cancel my order and request a refund", "cancel order", "please refund").
+       - If `cart.reversible` is 1 (or true) AND `payment.status` is 'succeeded' AND `payment.recovery_action` is not 'refunded', this order is 100% ELIGIBLE for instant cancellation and automated refund. You MUST select 'cancel'.
+    
+    2. 'escalate':
+       - Choose 'escalate' ONLY if the order is no longer reversible (`cart.reversible` is 0), already refunded, or involves an unresolvable fraud/technical dispute.
+    
+    3. 'inform':
+       - Choose 'inform' ONLY if the user is asking a general question (e.g. "what is your refund policy?") without requesting an actual order cancellation or refund.
+    
+    4. Reason:
+       - Provide a concise 1-sentence confirmation (e.g. "Your cancellation request has been verified against merchant policy and approved for immediate Razorpay refund.").
     """
     
     completion = client.beta.chat.completions.parse(
@@ -40,7 +46,7 @@ def decide_resolution(natural_language_request: str, order_state: dict) -> dict:
             {"role": "user", "content": natural_language_request}
         ],
         response_format=ResolutionDecision,
-        temperature=0.1
+        temperature=0.0
     )
     
     data = completion.choices[0].message.parsed

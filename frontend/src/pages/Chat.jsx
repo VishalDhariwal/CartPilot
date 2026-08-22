@@ -2,71 +2,164 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Sparkles, Shield, AlertTriangle, CheckCircle, RefreshCcw,
   ExternalLink, Trash2, Plus, Minus, ArrowRight, CornerDownLeft,
-  RotateCcw, PackageCheck, ShoppingBag, DollarSign
+  RotateCcw, PackageCheck, ShoppingBag, DollarSign,
+  History, MessageSquare, PanelLeftClose, PanelLeft, BookOpen, ChevronRight, Search
 } from 'lucide-react';
 
+
 const BASE_URL = 'http://127.0.0.1:8000';
+const STORAGE_KEY = 'cartpilot_chat_sessions_v2';
+const ACTIVE_ID_KEY = 'cartpilot_active_session_id';
 
-/* ─── Initial Step Pipeline ─────────────────────────────────────────── */
-const initialSteps = () => [
-  { id: 'intent', label: 'Intent Parsing', subtext: 'Extracting items & budget', status: 'pending' },
-  { id: 'substitution', label: 'Semantic Discovery', subtext: 'Stock & similarity match', status: 'pending' },
-  { id: 'guardrail', label: 'Guardrail Engine', subtext: 'Spend cap & category policy', status: 'pending' },
-  { id: 'upsell', label: 'Growth Agent', subtext: 'Market basket lift mining', status: 'pending' },
-  { id: 'payment', label: 'Razorpay Mandate', subtext: 'Test-mode payment capture', status: 'pending' },
-];
+const createDefaultSession = (title = 'New Shopping Chat') => ({
+  id: 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+  title,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  messages: [
+    {
+      role: 'agent',
+      content: 'Hello! I am your CartPilot personal shopping agent. Tell me what you need (e.g. "I want a new perfume and body cream", "buy me an iPhone charger and sunglasses"), and I will curate your cart with live receipts, spend cap verification, and smart recommendations.'
+    }
+  ],
+  phase: 'idle',
+  activeCartData: null,
+  upsellCandidates: [],
+  substituteCandidates: [],
+  paymentData: null,
+  paymentStatus: null,
+  spendCapPaise: 1000000
+});
 
-/* ─── Dotted-Leader Receipt Line Component ───────────────────────────── */
-function ReceiptItemRow({ item, onSelectDetail }) {
-  const totalItemRupees = ((item.price_paise * (item.qty || 1)) / 100).toFixed(2);
+const loadSavedSessions = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (_) {}
+  const def = createDefaultSession();
+  return [def];
+};
 
-  return (
-    <div className="receipt-line-row product-card-clickable" onClick={() => onSelectDetail?.(item)} title="Click to view product details & sizing">
-      {item.image_url ? (
-        <img
-          src={item.image_url}
-          alt={item.name}
-          className="receipt-item-thumb"
-          onError={(e) => { e.target.style.display = 'none'; }}
-        />
-      ) : null}
-      <span className="receipt-item-label" title={item.name}>
-        {item.name || item.sku}
-      </span>
-      <span className="receipt-item-qty">×{item.qty || 1}</span>
-      <div className="receipt-dotted-leader" />
-      <span className="receipt-item-price">₹{totalItemRupees}</span>
-    </div>
-  );
-}
+/* ─── Unified Dotted-Leader & Interactive Receipt Card Component ────── */
+function ReceiptCard({
+  cartData,
+  spendCapPaise,
+  onSelectDetail,
+  isRefunded,
+  isInteractive,
+  onUpdateQty,
+  onRemoveItem,
+  onProceedPayment,
+  isUpdating
+}) {
+  if (!cartData || !cartData.proposed_items || cartData.proposed_items.length === 0) return null;
 
-/* ─── Dotted-Leader Receipt Card Component ───────────────────────────── */
-function ReceiptCard({ cartData, spendCapPaise, onSelectDetail }) {
-  if (!cartData || !cartData.proposed_items) return null;
-
-  const totalRupees = ((cartData.total_paise || 0) / 100).toFixed(2);
+  const totalPaise = cartData.proposed_items.reduce((sum, i) => sum + (i.price_paise * (i.qty || 1)), 0);
+  const totalRupees = ((totalPaise || cartData.total_paise || 0) / 100).toFixed(2);
   const capRupees = spendCapPaise ? (spendCapPaise / 100).toFixed(0) : '10,000';
 
   return (
-    <div className="receipt-card">
+    <div className={`receipt-card ${isRefunded ? 'refunded' : ''}`}>
       <div className="receipt-header">
-        <div className="receipt-merchant-title">CARTPILOT RECEIPT</div>
+        <div className="receipt-merchant-title">
+          CARTPILOT RECEIPT
+          {isRefunded && <span className="receipt-refunded-badge">REFUNDED</span>}
+        </div>
         <div className="receipt-submeta">
-          ID: {cartData.cart_id ? cartData.cart_id.slice(-8).toUpperCase() : 'PENDING'} • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          ID: {cartData.cart_id ? cartData.cart_id.slice(-8).toUpperCase() : 'PENDING'} • {cartData.proposed_items.length} item(s)
         </div>
       </div>
 
       <div className="receipt-items-list">
-        {cartData.proposed_items.map((item, idx) => (
-          <ReceiptItemRow key={item.sku + idx} item={item} onSelectDetail={onSelectDetail} />
-        ))}
+        {cartData.proposed_items.map((item, idx) => {
+          const totalItemRupees = ((item.price_paise * (item.qty || 1)) / 100).toFixed(2);
+
+          return (
+            <div key={item.sku + idx} className="receipt-line-row">
+              <div
+                className="receipt-item-info product-card-clickable"
+                onClick={() => onSelectDetail?.(item)}
+                title="Click to view product details & sizing"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}
+              >
+                {item.image_url && (
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    className="receipt-item-thumb"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <div className="receipt-item-label" title={item.name}>
+                    {item.name || item.sku}
+                  </div>
+                  {isInteractive && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>
+                      ₹{(item.price_paise / 100).toFixed(0)} each
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isInteractive ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <div className="cart-edit-qty-ctrl">
+                    <button
+                      className="qty-btn"
+                      onClick={() => onUpdateQty?.(item.sku, Math.max(0, (item.qty || 1) - 1))}
+                      disabled={isUpdating}
+                      title="Decrease quantity"
+                    >
+                      <Minus size={10} />
+                    </button>
+                    <span className="qty-val">{item.qty || 1}</span>
+                    <button
+                      className="qty-btn"
+                      onClick={() => onUpdateQty?.(item.sku, (item.qty || 1) + 1)}
+                      disabled={isUpdating}
+                      title="Increase quantity"
+                    >
+                      <Plus size={10} />
+                    </button>
+                  </div>
+
+                  <span className="receipt-item-price" style={{ minWidth: 50, textAlign: 'right' }}>
+                    ₹{totalItemRupees}
+                  </span>
+
+                  <button
+                    className="btn-remove-cart-item"
+                    onClick={() => onRemoveItem?.(item.sku)}
+                    disabled={isUpdating}
+                    title="Remove item"
+                    style={{ padding: '3px 4px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--ink-muted)' }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="receipt-item-qty">×{item.qty || 1}</span>
+                  <div className="receipt-dotted-leader" />
+                  <span className="receipt-item-price">₹{totalItemRupees}</span>
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="receipt-divider" />
 
       <div className="receipt-total-row">
-        <span className="receipt-total-label">Total Amount</span>
-        <span className="receipt-total-value">₹{totalRupees}</span>
+        <span className="receipt-total-label">{isRefunded ? 'Refunded Total' : 'Total Amount'}</span>
+        <span className="receipt-total-value" style={isRefunded ? { color: 'var(--alert-brick)', textDecoration: 'line-through' } : {}}>
+          ₹{totalRupees}
+        </span>
       </div>
 
       {cartData.guardrail_reason && (
@@ -75,9 +168,25 @@ function ReceiptCard({ cartData, spendCapPaise, onSelectDetail }) {
           <span>Guardrail: {cartData.guardrail_reason} (Spend Cap: ₹{capRupees})</span>
         </div>
       )}
+
+      {isInteractive && (
+        <div style={{ marginTop: '0.85rem' }}>
+          <button
+            className="btn-checkout-primary"
+            onClick={onProceedPayment}
+            disabled={isUpdating}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.65rem 1rem' }}
+          >
+            <span>Proceed to Payment</span>
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
+
+
 
 /* ─── Scroll-Snap Multi-Card Carousel Component ──────────────────────── */
 function ScrollSnapCarousel({ title, candidates, onAddItem, onSelectDetail, currentCartTotalPaise, spendCapPaise, addingSku }) {
@@ -252,6 +361,19 @@ function CartEditReviewCard({ cartData, onUpdateQty, onRemoveItem, onProceedPaym
 function ProductDetailModal({ product, isOpen, onClose, onAddToCart, currentCartTotalPaise, spendCapPaise, isAdding }) {
   if (!isOpen || !product) return null;
 
+  return (
+    <ProductDetailModalContent
+      product={product}
+      onClose={onClose}
+      onAddToCart={onAddToCart}
+      currentCartTotalPaise={currentCartTotalPaise}
+      spendCapPaise={spendCapPaise}
+      isAdding={isAdding}
+    />
+  );
+}
+
+function ProductDetailModalContent({ product, onClose, onAddToCart, currentCartTotalPaise, spendCapPaise, isAdding }) {
   const metadata = product.metadata || {};
   const sizes = metadata.sizes || ['Standard'];
   const [selectedSize, setSelectedSize] = useState(sizes[0]);
@@ -269,6 +391,7 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, currentCart
   return (
     <div className="product-detail-overlay" onClick={onClose}>
       <div className="product-detail-modal" onClick={e => e.stopPropagation()}>
+
         <div className="product-detail-header">
           <div className="product-detail-title-row">
             <span className="product-detail-category-tag">{product.category || 'Product'}</span>
@@ -419,20 +542,28 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, currentCart
 function RazorpayPaymentCard({ paymentData, paymentStatus, onCheckStatus, isChecking }) {
   if (!paymentData) return null;
 
+  const isRefunded = paymentStatus === 'refunded';
+
   return (
-    <div className="razorpay-pay-card">
+    <div className={`razorpay-pay-card ${isRefunded ? 'refunded' : ''}`}>
       <div className="pay-card-header">
-        <div className="pay-card-title">Razorpay Test Mandate Ready</div>
+        <div className="pay-card-title">
+          {isRefunded ? 'Razorpay Order Refunded & Reversed' : 'Razorpay Test Mandate Ready'}
+        </div>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
           Order: {paymentData.orderId}
         </span>
       </div>
 
       <p style={{ fontSize: '0.88rem', color: 'var(--ink-secondary)', marginBottom: '0.5rem' }}>
-        Complete test-mode payment for <strong>₹{(paymentData.amountPaise / 100).toFixed(2)}</strong>.
+        {isRefunded ? (
+          <>The payment of <strong>₹{(paymentData.amountPaise / 100).toFixed(2)}</strong> has been cancelled & refunded via test-mode API.</>
+        ) : (
+          <>Complete test-mode payment for <strong>₹{(paymentData.amountPaise / 100).toFixed(2)}</strong>.</>
+        )}
       </p>
 
-      {paymentData.paymentLink && paymentStatus !== 'succeeded' && (
+      {!isRefunded && paymentData.paymentLink && paymentStatus !== 'succeeded' && (
         <a
           href={paymentData.paymentLink}
           target="_blank"
@@ -445,13 +576,15 @@ function RazorpayPaymentCard({ paymentData, paymentStatus, onCheckStatus, isChec
       )}
 
       <div className="pay-poll-status">
-        <div className="live-indicator-dot" />
+        <div className="live-indicator-dot" style={isRefunded ? { background: 'var(--alert-brick)' } : {}} />
         <span>
-          {paymentStatus === 'succeeded'
+          {isRefunded
+            ? '✅ Refund completed and recorded in audit ledger'
+            : paymentStatus === 'succeeded'
             ? '✅ Payment confirmed & captured in Razorpay!'
             : 'Listening for Razorpay webhook / auto-polling…'}
         </span>
-        {paymentStatus !== 'succeeded' && (
+        {!isRefunded && paymentStatus !== 'succeeded' && (
           <button
             onClick={onCheckStatus}
             disabled={isChecking}
@@ -468,6 +601,7 @@ function RazorpayPaymentCard({ paymentData, paymentStatus, onCheckStatus, isChec
     </div>
   );
 }
+
 
 /* ─── Spend Cap Adjustment Modal Component ───────────────────────────── */
 function SpendCapModal({ isOpen, onClose, currentSpendCapPaise, onSaveSpendCap }) {
@@ -552,32 +686,146 @@ function SpendCapModal({ isOpen, onClose, currentSpendCapPaise, onSaveSpendCap }
   );
 }
 
+/* ─── Collapsible Chat History Sidebar Component ──────────────────────── */
+function ChatHistorySidebar({
+  sessions,
+  currentSessionId,
+  isOpen,
+  onClose,
+  onSelectSession,
+  onNewChat,
+  onDeleteSession,
+  searchQuery,
+  onSearchChange
+}) {
+  const filteredSessions = sessions.filter(s => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (s.title && s.title.toLowerCase().includes(q)) ||
+      (s.messages && s.messages.some(m => m.content && m.content.toLowerCase().includes(q)));
+  });
+
+  return (
+    <aside className={`chat-history-sidebar ${!isOpen ? 'collapsed' : ''}`} aria-label="Chat History">
+      <div className="history-header">
+        <div className="history-title">
+          <PanelLeft size={16} color="var(--accent-teal)" />
+          <span>Chat History</span>
+        </div>
+        <button
+          className="btn-close-history-sidebar"
+          onClick={onClose}
+          title="Collapse Chat History"
+        >
+          <PanelLeftClose size={16} />
+        </button>
+      </div>
+
+
+
+      <div className="history-actions-bar">
+        <button
+          type="button"
+          className="btn-new-chat-sidebar"
+          onClick={onNewChat}
+          title="Start a new shopping conversation"
+        >
+          <Plus size={15} color="var(--accent-teal)" />
+          <span>New Chat</span>
+        </button>
+
+        {sessions.length > 3 && (
+          <input
+            type="text"
+            className="history-search-input"
+            placeholder="Search past chats…"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        )}
+      </div>
+
+      <div className="history-sessions-list">
+        {filteredSessions.length === 0 ? (
+          <div className="history-empty-state">
+            {searchQuery ? 'No matching chats found.' : 'No previous chat sessions yet. Start shopping!'}
+          </div>
+        ) : (
+          filteredSessions.map((s) => {
+            const isActive = s.id === currentSessionId;
+            const itemCount = s.activeCartData?.proposed_items?.length || 0;
+            const totalRupees = s.activeCartData?.total_paise ? (s.activeCartData.total_paise / 100).toFixed(0) : null;
+            const timeStr = new Date(s.updatedAt || s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            return (
+              <div
+                key={s.id}
+                className={`history-session-item ${isActive ? 'active' : ''}`}
+                onClick={() => onSelectSession(s.id)}
+              >
+                <div className="history-session-info">
+                  <div className="history-session-title" title={s.title}>
+                    {s.title || 'Shopping Request'}
+                  </div>
+                  <div className="history-session-sub">
+                    <span>{timeStr}</span>
+                    {s.phase === 'resolved' ? (
+                      <span className="history-session-badge settled">Settled ✓</span>
+                    ) : totalRupees ? (
+                      <span className="history-session-badge pending">₹{totalRupees} ({itemCount})</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-delete-session"
+                  onClick={(e) => onDeleteSession(e, s.id)}
+                  title="Delete chat session"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </aside>
+  );
+}
+
 /* ─── Main Chat Component ────────────────────────────────────────────── */
 export default function Chat() {
-  const [messages, setMessages] = useState([
-    {
-      role: 'agent',
-      content: 'Hello! I am your CartPilot personal shopping agent. Tell me what you need (e.g. "I want a new perfume and body cream", "buy me an iPhone charger and sunglasses"), and I will curate your cart with live receipts, spend cap verification, and smart recommendations.'
+  const [sessions, setSessions] = useState(loadSavedSessions);
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    const savedActive = localStorage.getItem(ACTIVE_ID_KEY);
+    const initial = loadSavedSessions();
+    if (savedActive && initial.some(s => s.id === savedActive)) {
+      return savedActive;
     }
-  ]);
+    return initial[0]?.id || 'default_session';
+  });
+
+  const activeSession = sessions.find(s => s.id === currentSessionId) || sessions[0] || createDefaultSession();
+
+  const [messages, setMessages] = useState(activeSession.messages);
+  const [phase, setPhase] = useState(activeSession.phase || 'idle');
+  const [activeCartData, setActiveCartData] = useState(activeSession.activeCartData);
+  const [upsellCandidates, setUpsellCandidates] = useState(activeSession.upsellCandidates || []);
+  const [substituteCandidates, setSubstituteCandidates] = useState(activeSession.substituteCandidates || []);
+  const [paymentData, setPaymentData] = useState(activeSession.paymentData);
+  const [paymentStatus, setPaymentStatus] = useState(activeSession.paymentStatus);
+  const [spendCapPaise, setSpendCapPaise] = useState(activeSession.spendCapPaise || 1000000);
+
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [steps, setSteps] = useState(initialSteps());
-  const [phase, setPhase] = useState('idle'); // idle | proposal | pending-payment | resolved
-
-  // Active state objects
-  const [activeCartData, setActiveCartData] = useState(null);
-  const [upsellCandidates, setUpsellCandidates] = useState([]);
-  const [substituteCandidates, setSubstituteCandidates] = useState([]);
-  const [paymentData, setPaymentData] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState(null);
-  const [spendCapPaise, setSpendCapPaise] = useState(1000000);
   const [showSpendCapModal, setShowSpendCapModal] = useState(false);
   const [selectedProductForDetail, setSelectedProductForDetail] = useState(null);
   const [addingSku, setAddingSku] = useState(null);
   const [isUpdatingCart, setIsUpdatingCart] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
-
+  const [isHistoryOpen, setIsHistoryOpen] = useState(() => localStorage.getItem('cartpilot_history_open') !== 'false');
+  const [historySearch, setHistorySearch] = useState('');
 
   const streamEndRef = useRef(null);
   const pollRef = useRef(null);
@@ -590,7 +838,57 @@ export default function Chat() {
     scrollToBottom();
   }, [messages, activeCartData, upsellCandidates, substituteCandidates, paymentData]);
 
-  // Fetch initial spend cap from backend
+  // Sync active chat state changes back to sessions, localStorage & SQLite backend
+  useEffect(() => {
+    setSessions(prevSessions => {
+      const idx = prevSessions.findIndex(s => s.id === currentSessionId);
+      if (idx === -1) return prevSessions;
+
+      let updatedTitle = prevSessions[idx].title;
+      if (updatedTitle === 'New Shopping Chat' || !updatedTitle) {
+        const firstUserMsg = messages.find(m => m.role === 'user');
+        if (firstUserMsg && firstUserMsg.content) {
+          updatedTitle = firstUserMsg.content.slice(0, 32);
+          if (firstUserMsg.content.length > 32) updatedTitle += '…';
+        }
+      }
+
+      const updatedSession = {
+        ...prevSessions[idx],
+        title: updatedTitle,
+        updatedAt: Date.now(),
+        messages,
+        phase,
+        activeCartData,
+        upsellCandidates,
+        substituteCandidates,
+        paymentData,
+        paymentStatus,
+        spendCapPaise
+      };
+
+      const nextSessions = [...prevSessions];
+      nextSessions[idx] = updatedSession;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSessions));
+      } catch (_) {}
+
+      // Persist to backend SQLite for cross-browser synchronization
+      fetch(`${BASE_URL}/api/chat-sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: updatedSession.id,
+          title: updatedSession.title,
+          session_data: updatedSession
+        })
+      }).catch(() => {});
+
+      return nextSessions;
+    });
+  }, [messages, phase, activeCartData, upsellCandidates, substituteCandidates, paymentData, paymentStatus, spendCapPaise, currentSessionId]);
+
+  // Fetch initial spend cap and live-sync persistent sessions from backend SQLite
   useEffect(() => {
     fetch(`${BASE_URL}/api/policy`)
       .then(res => res.json())
@@ -600,14 +898,156 @@ export default function Chat() {
         }
       })
       .catch(() => {});
-  }, []);
 
-  const setStepStatus = (id, status, subtext) => {
-    setSteps(prev => prev.map(s => s.id === id ? { ...s, status, ...(subtext ? { subtext } : {}) } : s));
-  };
+    const syncSessions = () => {
+      // Do not sync/overwrite state if user is actively awaiting an agent response
+      if (loading) return;
+
+      fetch(`${BASE_URL}/api/chat-sessions`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
+            const serverSessions = data.sessions;
+            setSessions(serverSessions);
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(serverSessions));
+            } catch (_) {}
+
+            // If the currently open session was updated in another browser window
+            const serverActive = serverSessions.find(s => s.id === currentSessionId);
+            if (serverActive && !loading) {
+              if (
+                serverActive.messages &&
+                serverActive.messages.length > messages.length
+              ) {
+                setMessages(serverActive.messages);
+                if (serverActive.activeCartData) setActiveCartData(serverActive.activeCartData);
+                if (serverActive.phase) setPhase(serverActive.phase);
+                if (serverActive.paymentData) setPaymentData(serverActive.paymentData);
+                if (serverActive.paymentStatus) setPaymentStatus(serverActive.paymentStatus);
+                if (serverActive.upsellCandidates) setUpsellCandidates(serverActive.upsellCandidates);
+              }
+            }
+          }
+        })
+        .catch(() => {});
+    };
+
+
+    syncSessions();
+    const interval = setInterval(syncSessions, 2500);
+
+    const onStorage = (e) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSessions(parsed);
+            const active = parsed.find(s => s.id === currentSessionId);
+            if (active) {
+              setMessages(active.messages || []);
+              setActiveCartData(active.activeCartData || null);
+              setPhase(active.phase || 'idle');
+              setPaymentData(active.paymentData || null);
+              setPaymentStatus(active.paymentStatus || null);
+            }
+          }
+        } catch (_) {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [currentSessionId, messages.length, phase, paymentStatus]);
+
 
   const appendMessage = (role, content, extra = {}) => {
     setMessages(prev => [...prev, { role, content, ...extra }]);
+  };
+
+  const handleSelectSession = (sessionId) => {
+    if (sessionId === currentSessionId) return;
+    if (pollRef.current) clearInterval(pollRef.current);
+
+    const target = sessions.find(s => s.id === sessionId);
+    if (!target) return;
+
+    setCurrentSessionId(target.id);
+    localStorage.setItem(ACTIVE_ID_KEY, target.id);
+    setMessages(target.messages || []);
+    setPhase(target.phase || 'idle');
+    setActiveCartData(target.activeCartData || null);
+    setUpsellCandidates(target.upsellCandidates || []);
+    setSubstituteCandidates(target.substituteCandidates || []);
+    setPaymentData(target.paymentData || null);
+    setPaymentStatus(target.paymentStatus || null);
+    setSpendCapPaise(target.spendCapPaise || 1000000);
+
+    if (target.paymentData?.cartId && target.phase === 'pending-payment') {
+      startPolling(target.paymentData.cartId);
+    }
+  };
+
+  const handleNewChat = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    const newSession = createDefaultSession();
+    const updated = [newSession, ...sessions];
+    setSessions(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (_) {}
+    setCurrentSessionId(newSession.id);
+    localStorage.setItem(ACTIVE_ID_KEY, newSession.id);
+    setMessages(newSession.messages);
+    setPhase('idle');
+    setActiveCartData(null);
+    setUpsellCandidates([]);
+    setSubstituteCandidates([]);
+    setPaymentData(null);
+    setPaymentStatus(null);
+    setSpendCapPaise(1000000);
+
+    fetch(`${BASE_URL}/api/chat-sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: newSession.id,
+        title: newSession.title,
+        session_data: newSession
+      })
+    }).catch(() => {});
+  };
+
+  const handleDeleteSession = (e, sessionId) => {
+    e?.stopPropagation();
+    fetch(`${BASE_URL}/api/chat-sessions/${sessionId}`, { method: 'DELETE' }).catch(() => {});
+    const updated = sessions.filter(s => s.id !== sessionId);
+    if (updated.length === 0) {
+      const fresh = createDefaultSession();
+      setSessions([fresh]);
+      handleSelectSession(fresh.id);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([fresh]));
+      } catch (_) {}
+      return;
+    }
+    setSessions(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (_) {}
+    if (currentSessionId === sessionId) {
+      handleSelectSession(updated[0].id);
+    }
+  };
+
+
+  const handleToggleHistory = () => {
+    const next = !isHistoryOpen;
+    setIsHistoryOpen(next);
+    localStorage.setItem('cartpilot_history_open', String(next));
   };
 
   const handleSaveSpendCap = async (newCapPaise) => {
@@ -647,32 +1087,32 @@ export default function Chat() {
     setQuery('');
     appendMessage('user', userText);
     setLoading(true);
-    setSteps(initialSteps());
     setPaymentData(null);
     setPaymentStatus(null);
     setSubstituteCandidates([]);
     setUpsellCandidates([]);
 
     try {
-      setStepStatus('intent', 'active', 'Analyzing request & catalog…');
-
       const res = await fetch(`${BASE_URL}/checkout/agent-checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userText, spend_cap_paise: spendCapPaise })
+        body: JSON.stringify({
+          query: userText,
+          spend_cap_paise: spendCapPaise,
+          conversation_history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
+          current_cart: (phase === 'proposal' && activeCartData?.proposed_items) ? activeCartData.proposed_items : []
+        })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Server error');
 
-      setStepStatus('intent', 'success', data.intent ? data.intent.goal : 'Intent extracted');
       if (data.intent?.spend_cap_paise) {
         setSpendCapPaise(data.intent.spend_cap_paise);
       }
 
       // Handle Substitution offer
       if (data.status === 'substitute_offered') {
-        setStepStatus('substitution', 'active', `OOS item detected: ${data.oos_item.name}`);
         const cands = data.substitute?.candidates || (data.substitute ? [data.substitute] : []);
         setSubstituteCandidates(cands);
         setActiveCartData(data);
@@ -684,7 +1124,6 @@ export default function Chat() {
 
       // Handle Guardrail Blocked
       if (data.status === 'blocked') {
-        setStepStatus('guardrail', 'error', data.reason);
         appendMessage('agent', `🚫 **Guardrail Blocked**: ${data.reason}`, { isAlert: true });
         setPhase('idle');
         setLoading(false);
@@ -692,19 +1131,21 @@ export default function Chat() {
       }
 
       // Cart Approved
-      setStepStatus('guardrail', 'success', data.guardrail_reason || 'Spend cap & category policy verified ✓');
       setActiveCartData(data);
 
       // Handle Upsell Candidates
-      if (data.upsell) {
-        setStepStatus('upsell', 'success', `${data.upsell.name} (Lift: ${data.upsell.lift?.toFixed(1) || 1.2}x)`);
-        const cands = data.upsell.candidates || [data.upsell];
-        setUpsellCandidates(cands);
-        appendMessage('agent', `I itemized your cart below! Customers who purchased these items also frequently added:`);
-      } else {
-        setStepStatus('upsell', 'pending', 'No matching market basket pairs');
-        appendMessage('agent', `I itemized your cart below:`);
-      }
+      const cands = data.upsell ? (data.upsell.candidates || [data.upsell]) : [];
+      setUpsellCandidates(cands);
+
+      const msgText = data.upsell
+        ? `I itemized your cart below! Customers who purchased these items also frequently added:`
+        : `I itemized your cart below:`;
+
+      appendMessage('agent', msgText, {
+        cartData: data,
+        upsellCandidates: cands,
+        phase: 'proposal'
+      });
 
       setPhase('proposal');
     } catch (err) {
@@ -721,6 +1162,57 @@ export default function Chat() {
     setAddingSku(candidate.sku);
 
     try {
+      // ── SCENARIO 1: POST-PURCHASE 1-CLICK ADD-ON (Initial order already paid) ──
+      if (phase === 'resolved' || paymentStatus === 'succeeded') {
+        const res = await fetch(`${BASE_URL}/checkout/post-purchase-add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            parent_cart_id: activeCartData.cart_id,
+            sku: candidate.sku,
+            qty: 1,
+            selected_size: candidate.selectedSize
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(extractErrorMessage(data, 'Failed to add post-purchase item'));
+
+        if (data.status === 'blocked') {
+          appendMessage('agent', `🚫 Guardrail Blocked: ${data.reason}`, { isAlert: true });
+          return;
+        }
+
+        const addOnPayInfo = {
+          cartId: data.cart_id,
+          orderId: data.razorpay_order_id,
+          paymentLink: data.payment_link || data.payment_url,
+          amountPaise: data.amount_paise
+        };
+
+        // Set up new Razorpay checkout for the add-on
+        setPaymentData(addOnPayInfo);
+        setPaymentStatus('created');
+        setPhase('pending-payment');
+        setActiveCartData(data); // Display the add-on item receipt
+
+        const sizeNote = candidate.selectedSize ? ` (${candidate.selectedSize})` : '';
+        appendMessage(
+          'agent',
+          `📦 **Post-Purchase Add-on Added!** Added **${candidate.name}${sizeNote}** (₹${(data.total_paise / 100).toFixed(0)}) to your dispatch shipment.\nComplete 1-click test checkout below:`,
+          {
+            cartData: data,
+            paymentData: addOnPayInfo,
+            paymentStatus: 'created',
+            phase: 'pending-payment'
+          }
+        );
+
+        startPolling(data.cart_id);
+        return;
+      }
+
+      // ── SCENARIO 2: PRE-PURCHASE CART EXPANSION (During proposal phase) ──
       const currentItems = activeCartData.proposed_items || [];
       const exists = currentItems.find(i => i.sku === candidate.sku);
       let updatedItems;
@@ -730,39 +1222,17 @@ export default function Chat() {
       } else {
         updatedItems = [...currentItems, {
           sku: candidate.sku,
-          qty: 1,
           name: candidate.name,
           price_paise: candidate.price_paise,
+          qty: 1,
           category: candidate.category,
-          image_url: candidate.image_url,
-          description: candidate.description,
-          metadata: candidate.metadata
+          image_url: candidate.image_url || '',
+          metadata: candidate.metadata || {},
+          selected_size: candidate.selectedSize
         }];
       }
 
-      const res = await fetch(`${BASE_URL}/checkout/update-cart`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cart_id: activeCartData.cart_id,
-          items: updatedItems.map(i => ({ sku: i.sku, qty: i.qty }))
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to update cart');
-
-      if (data.status === 'blocked') {
-        appendMessage('agent', `🚫 Guardrail Blocked: ${data.reason}`, { isAlert: true });
-        return;
-      }
-
-      setActiveCartData(data);
-      if (data.upsell?.candidates) {
-        setUpsellCandidates(data.upsell.candidates);
-      }
-      const sizeNote = candidate.selectedSize ? ` (${candidate.selectedSize})` : '';
-      appendMessage('agent', `Added **${candidate.name}${sizeNote}** (₹${(candidate.price_paise / 100).toFixed(0)}) to your receipt!`);
+      await syncCartUpdate(updatedItems);
     } catch (err) {
       appendMessage('agent', `❌ Error: ${err.message}`, { isAlert: true });
     } finally {
@@ -772,41 +1242,91 @@ export default function Chat() {
   };
 
 
-  /* ─── Modify Cart Quantities / Remove ──────────────────────────────── */
-  const handleUpdateQty = async (sku, delta) => {
-    if (!activeCartData) return;
-    const currentItems = activeCartData.proposed_items || [];
-    const updated = currentItems.map(i => i.sku === sku ? { ...i, qty: Math.max(1, (i.qty || 1) + delta) } : i);
-    await syncCartUpdate(updated);
-  };
+  /* ─── Update Item Quantity directly from Receipt ─────────────────────── */
+  const handleUpdateQty = (sku, newQty) => {
+    if (!activeCartData?.proposed_items) return;
+    const currentItems = activeCartData.proposed_items;
+    let updatedItems;
+    if (newQty <= 0) {
+      updatedItems = currentItems.filter(i => i.sku !== sku);
+    } else {
+      updatedItems = currentItems.map(i => i.sku === sku ? { ...i, qty: newQty } : i);
+    }
 
-  const handleRemoveItem = async (sku) => {
-    if (!activeCartData) return;
-    const currentItems = activeCartData.proposed_items || [];
-    const updated = currentItems.filter(i => i.sku !== sku);
-    if (updated.length === 0) {
+    if (updatedItems.length === 0) {
       appendMessage('agent', 'Cart cannot be empty. Please keep at least one item.', { isAlert: true });
       return;
     }
-    await syncCartUpdate(updated);
+    syncCartUpdate(updatedItems);
   };
 
-  const syncCartUpdate = async (updatedItems) => {
+  /* ─── Remove Item from Cart ─────────────────────────────────────────── */
+  const handleRemoveItem = (sku) => {
+    if (!activeCartData?.proposed_items) return;
+    const currentItems = activeCartData.proposed_items;
+    const updatedItems = currentItems.filter(i => i.sku !== sku);
+    if (updatedItems.length === 0) {
+      appendMessage('agent', 'Cart cannot be empty. Please keep at least one item.', { isAlert: true });
+      return;
+    }
+    syncCartUpdate(updatedItems);
+  };
+
+  /* ─── Synchronize Cart Updates with Backend Guardrail Engine ────────── */
+  const syncCartUpdate = async (items) => {
+    if (!activeCartData?.cart_id) return;
     setIsUpdatingCart(true);
+
+    // Optimistic local update for instant UI responsiveness
+    const optimisticTotal = items.reduce((sum, i) => sum + ((i.price_paise || 0) * (i.qty || 1)), 0);
+    const optimisticCart = {
+      ...activeCartData,
+      proposed_items: items,
+      total_paise: optimisticTotal
+    };
+    setActiveCartData(optimisticCart);
+    setMessages(prev => {
+      const lastIdx = prev.reduce((acc, m, idx) => (m.role === 'agent' && m.cartData) ? idx : acc, -1);
+      if (lastIdx !== -1) {
+        const next = [...prev];
+        next[lastIdx] = { ...next[lastIdx], cartData: optimisticCart };
+        return next;
+      }
+      return prev;
+    });
+
     try {
       const res = await fetch(`${BASE_URL}/checkout/update-cart`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cart_id: activeCartData.cart_id,
-          items: updatedItems.map(i => ({ sku: i.sku, qty: i.qty }))
+          items: items.map(i => ({ sku: i.sku, qty: i.qty }))
         })
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Update failed');
+      if (!res.ok) throw new Error(extractErrorMessage(data, 'Cart update error'));
+
+      if (data.status === 'blocked') {
+        appendMessage('agent', `🚫 Guardrail Blocked: ${data.reason}`, { isAlert: true });
+        return;
+      }
+
       setActiveCartData(data);
-      if (data.upsell?.candidates) {
-        setUpsellCandidates(data.upsell.candidates);
+      setMessages(prev => {
+        const lastIdx = prev.reduce((acc, m, idx) => (m.role === 'agent' && m.cartData) ? idx : acc, -1);
+        if (lastIdx !== -1) {
+          const next = [...prev];
+          next[lastIdx] = { ...next[lastIdx], cartData: data };
+          return next;
+        }
+        return prev;
+      });
+
+      if (data.upsell) {
+        const cands = data.upsell.candidates || [data.upsell];
+        setUpsellCandidates(cands);
       }
     } catch (err) {
       appendMessage('agent', `❌ ${err.message}`, { isAlert: true });
@@ -815,21 +1335,21 @@ export default function Chat() {
     }
   };
 
-const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
-  if (!data) return defaultMsg;
-  if (typeof data.detail === 'string') return data.detail;
-  if (Array.isArray(data.detail)) return data.detail.map(d => d.msg || JSON.stringify(d)).join(', ');
-  if (typeof data.detail === 'object' && data.detail !== null) return JSON.stringify(data.detail);
-  if (data.message) return data.message;
-  if (data.reason) return data.reason;
-  return defaultMsg;
-};
 
-  /* ─── Finalize Cart & Generate Razorpay Mandate Link ───────────────── */
+  const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
+    if (!data) return defaultMsg;
+    if (typeof data.detail === 'string') return data.detail;
+    if (Array.isArray(data.detail)) return data.detail.map(d => d.msg || JSON.stringify(d)).join(', ');
+    if (typeof data.detail === 'object' && data.detail !== null) return JSON.stringify(data.detail);
+    if (data.message) return data.message;
+    if (data.reason) return data.reason;
+    return defaultMsg;
+  };
+
+  /* ─── Lock & Finalize Order (Proceed to Razorpay Checkout) ───────────── */
   const handleProceedPayment = async () => {
     if (!activeCartData) return;
     setLoading(true);
-    setStepStatus('payment', 'active', 'Creating Razorpay payment link…');
 
     try {
       const res = await fetch(`${BASE_URL}/checkout/finalize`, {
@@ -843,26 +1363,31 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
       const data = await res.json();
       if (!res.ok) throw new Error(extractErrorMessage(data, 'Finalization error'));
 
-      setPaymentData({
+      const payData = {
         cartId: data.cart_id,
         orderId: data.razorpay_order_id,
         paymentLink: data.payment_link || data.payment_url,
         amountPaise: data.amount_paise
-      });
+      };
 
+      setPaymentData(payData);
+      setPaymentStatus('created');
       setPhase('pending-payment');
-      setStepStatus('payment', 'active', 'Awaiting payment on Razorpay…');
-      appendMessage('agent', `Your order is locked and ready for payment. Click below to complete test checkout on Razorpay:`);
+
+      appendMessage('agent', `Your order is locked and ready for payment. Click below to complete test checkout on Razorpay:`, {
+        cartData: activeCartData,
+        paymentData: payData,
+        paymentStatus: 'created',
+        phase: 'pending-payment'
+      });
 
       startPolling(data.cart_id);
     } catch (err) {
       appendMessage('agent', `❌ Payment creation failed: ${err.message}`, { isAlert: true });
-      setStepStatus('payment', 'error', err.message);
     } finally {
       setLoading(false);
     }
   };
-
 
   /* ─── Polling for Payment Capture ──────────────────────────────────── */
   const checkPaymentStatus = useCallback(async (cartId) => {
@@ -875,9 +1400,15 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
         setPaymentStatus(data.status);
         if (data.status === 'succeeded') {
           clearInterval(pollRef.current);
-          setStepStatus('payment', 'success', 'Payment captured in Razorpay ✓');
-          appendMessage('agent', `🎉 **Payment Succeeded!** Your order is confirmed. A live receipt has been logged to the immutable audit trail.`, { isSuccess: true });
           setPhase('resolved');
+          appendMessage('agent', `🎉 **Payment Succeeded!** Your order is confirmed. A live receipt has been logged to the immutable audit trail.`, {
+            isSuccess: true,
+            cartData: activeCartData,
+            paymentData: paymentData,
+            paymentStatus: 'succeeded',
+            upsellCandidates: upsellCandidates,
+            phase: 'resolved'
+          });
         }
       }
     } catch (_) {
@@ -885,7 +1416,7 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
     } finally {
       setIsCheckingStatus(false);
     }
-  }, []);
+  }, [activeCartData, paymentData, upsellCandidates]);
 
   const startPolling = useCallback((cartId) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -920,8 +1451,16 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
       if (!res.ok) throw new Error(data.detail || 'Refund failed');
 
       if (data.status === 'refunded') {
-        appendMessage('agent', `✅ **Refund Processed**: ${data.reason}\nRazorpay Refund ID: \`${data.refund_id}\``, { isSuccess: true });
-        setStepStatus('payment', 'success', `Refunded (${data.refund_id})`);
+        setPaymentStatus('refunded');
+        setPhase('refunded');
+        appendMessage('agent', `✅ **Refund Processed**: ${data.reason}\nRazorpay Refund ID: \`${data.refund_id}\``, {
+          isSuccess: true,
+          isRefunded: true,
+          refundId: data.refund_id,
+          cartData: activeCartData,
+          paymentStatus: 'refunded',
+          phase: 'refunded'
+        });
       } else {
         appendMessage('agent', `⚠️ Resolution Decision: ${data.reason}`, { isAlert: true });
       }
@@ -932,28 +1471,37 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
     }
   };
 
-  /* ─── Reset / New Order ────────────────────────────────────────────── */
-  const handleReset = () => {
-    clearInterval(pollRef.current);
-    setPhase('idle');
-    setActiveCartData(null);
-    setPaymentData(null);
-    setPaymentStatus(null);
-    setUpsellCandidates([]);
-    setSubstituteCandidates([]);
-    setSteps(initialSteps());
-    appendMessage('agent', 'Ready for a new shopping request! What can I help you find today?');
-  };
-
   return (
     <div className="chat-layout">
+      {/* ── Left Side: ChatGPT-Style Collapsible Chat History Sidebar ── */}
+      <ChatHistorySidebar
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        isOpen={isHistoryOpen}
+        onClose={() => handleToggleHistory()}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
+        searchQuery={historySearch}
+        onSearchChange={setHistorySearch}
+      />
+
       {/* ── Main Chat Stream Column ── */}
       <div className="chat-window">
         <div className="chat-header">
           <div className="chat-header-left">
+            <button
+              type="button"
+              className={`btn-history-book-toggle ${isHistoryOpen ? 'active' : ''}`}
+              onClick={handleToggleHistory}
+              title={isHistoryOpen ? 'Collapse Chat History' : 'Open Chat History'}
+            >
+              <PanelLeftClose size={16} />
+            </button>
             <div className="live-indicator-dot" />
             <div className="chat-header-title">CartPilot Personal Shopper</div>
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
@@ -965,112 +1513,119 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
               <span>Spend Cap: ₹{(spendCapPaise / 100).toFixed(0)}</span>
               <span style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>✎</span>
             </button>
-            {(phase === 'resolved' || phase === 'pending-payment') && (
-              <button
-                onClick={handleReset}
-                style={{
-                  background: 'none', border: '1px solid var(--hairline-dark)',
-                  borderRadius: 'var(--radius-sm)', padding: '0.3rem 0.6rem',
-                  fontSize: '0.78rem', cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', gap: 4, color: 'var(--ink)'
-                }}
-              >
-                <RefreshCcw size={12} /> New Order
-              </button>
-            )}
-          </div>
 
+            <button
+              type="button"
+              className="btn-history-toggle"
+              onClick={handleNewChat}
+              title="Start a new shopping conversation"
+            >
+              <Plus size={13} />
+              <span>New Chat</span>
+            </button>
+          </div>
         </div>
 
         <div className="chat-stream">
-          {messages.map((msg, i) => (
-            <div key={i} className={`msg-row ${msg.role}`}>
-              {msg.role === 'user' ? (
-                <div className="user-bubble">{msg.content}</div>
-              ) : (
-                <div className={`agent-bubble ${msg.isAlert ? 'alert-bubble' : msg.isSuccess ? 'success-bubble' : ''}`}>
-                  <p style={{ whiteSpace: 'pre-line' }}>{msg.content}</p>
+          {(() => {
+            const lastAgentIdx = messages.reduce((acc, m, idx) => m.role === 'agent' ? idx : acc, -1);
+            return messages.map((msg, i) => {
+              const isLatestAgent = i === lastAgentIdx;
+              const messageCartData = msg.cartData || (isLatestAgent ? activeCartData : null);
+              const messagePaymentData = msg.paymentData || (isLatestAgent ? paymentData : null);
+              const messagePaymentStatus = msg.paymentStatus || (isLatestAgent ? paymentStatus : null);
+              const messageUpsells = msg.upsellCandidates || (isLatestAgent ? upsellCandidates : []);
+              const messageSubstitutes = msg.substituteCandidates || (isLatestAgent ? substituteCandidates : []);
+              const isRefundedMsg = msg.isRefunded || messagePaymentStatus === 'refunded' || (isLatestAgent && (phase === 'refunded' || paymentStatus === 'refunded'));
 
-                  {/* Render inline receipt card if this was the proposal moment */}
-                  {i === messages.length - 1 && activeCartData && (
-                    <>
-                      <ReceiptCard
-                        cartData={activeCartData}
-                        spendCapPaise={spendCapPaise}
-                        onSelectDetail={setSelectedProductForDetail}
-                      />
+              const isInteractiveProposal = isLatestAgent && phase === 'proposal' && !messagePaymentData;
+              const canRequestRefund = !isRefundedMsg && (messagePaymentStatus === 'succeeded' || (isLatestAgent && phase === 'resolved')) && phase !== 'refunded' && paymentStatus !== 'refunded';
 
-                      {/* Render Substitution Multi-Card Carousel if OOS */}
-                      {substituteCandidates.length > 0 && (
-                        <ScrollSnapCarousel
-                          title="In-Stock Semantic Alternatives"
-                          candidates={substituteCandidates}
-                          onAddItem={handleAddCarouselItem}
-                          onSelectDetail={setSelectedProductForDetail}
-                          currentCartTotalPaise={activeCartData.total_paise || 0}
-                          spendCapPaise={spendCapPaise}
-                          addingSku={addingSku}
-                        />
-                      )}
+              return (
+                <div key={i} className={`msg-row ${msg.role}`}>
+                  {msg.role === 'user' ? (
+                    <div className="user-bubble">{msg.content}</div>
+                  ) : (
+                    <div className={`agent-bubble ${msg.isAlert ? 'alert-bubble' : msg.isSuccess ? 'success-bubble' : ''}`}>
+                      <p style={{ whiteSpace: 'pre-line' }}>{msg.content}</p>
 
-                      {/* Render Cross-Sell Multi-Card Carousel */}
-                      {upsellCandidates.length > 0 && (
-                        <ScrollSnapCarousel
-                          title="Growth Agent Complementary Picks"
-                          candidates={upsellCandidates}
-                          onAddItem={handleAddCarouselItem}
-                          onSelectDetail={setSelectedProductForDetail}
-                          currentCartTotalPaise={activeCartData.total_paise || 0}
-                          spendCapPaise={spendCapPaise}
-                          addingSku={addingSku}
-                        />
-                      )}
+                      {messageCartData && (
+                        <>
+                          <ReceiptCard
+                            cartData={messageCartData}
+                            spendCapPaise={spendCapPaise}
+                            onSelectDetail={setSelectedProductForDetail}
+                            isRefunded={isRefundedMsg}
+                            isInteractive={isInteractiveProposal}
+                            onUpdateQty={handleUpdateQty}
+                            onRemoveItem={handleRemoveItem}
+                            onProceedPayment={handleProceedPayment}
+                            isUpdating={isUpdatingCart}
+                          />
 
-                      {/* Render Interactive Cart Review & Edit component */}
-                      {phase === 'proposal' && (
-                        <CartEditReviewCard
-                          cartData={activeCartData}
-                          onUpdateQty={handleUpdateQty}
-                          onRemoveItem={handleRemoveItem}
-                          onProceedPayment={handleProceedPayment}
-                          onSelectDetail={setSelectedProductForDetail}
-                          isUpdating={isUpdatingCart}
-                        />
-                      )}
+                          {/* Substitution Carousel on active proposal */}
+                          {messageSubstitutes.length > 0 && isInteractiveProposal && (
+                            <ScrollSnapCarousel
+                              title="In-Stock Semantic Alternatives"
+                              candidates={messageSubstitutes}
+                              onAddItem={handleAddCarouselItem}
+                              onSelectDetail={setSelectedProductForDetail}
+                              currentCartTotalPaise={messageCartData.total_paise || 0}
+                              spendCapPaise={spendCapPaise}
+                              addingSku={addingSku}
+                            />
+                          )}
+
+                          {/* Cross-Sell Carousel (only if not refunded) */}
+                          {messageUpsells.length > 0 && !isRefundedMsg && (isInteractiveProposal || (isLatestAgent && phase === 'resolved')) && (
+                            <ScrollSnapCarousel
+                              title={phase === 'resolved' ? '🎁 Post-Purchase 1-Click Add-on Recommendations' : 'Growth Agent Complementary Picks'}
+                              candidates={messageUpsells}
+                              onAddItem={handleAddCarouselItem}
+                              onSelectDetail={setSelectedProductForDetail}
+                              currentCartTotalPaise={messageCartData.total_paise || 0}
+                              spendCapPaise={spendCapPaise}
+                              addingSku={addingSku}
+                            />
+                          )}
+
+                          {/* Razorpay Payment Card */}
+                          {messagePaymentData && (
+                            <RazorpayPaymentCard
+                              paymentData={messagePaymentData}
+                              paymentStatus={isRefundedMsg ? 'refunded' : messagePaymentStatus}
+                              onCheckStatus={() => checkPaymentStatus(messagePaymentData.cartId)}
+                              isChecking={isCheckingStatus}
+                            />
+                          )}
 
 
-                      {/* Render Razorpay Payment Card */}
-                      {paymentData && (
-                        <RazorpayPaymentCard
-                          paymentData={paymentData}
-                          paymentStatus={paymentStatus}
-                          onCheckStatus={() => checkPaymentStatus(paymentData.cartId)}
-                          isChecking={isCheckingStatus}
-                        />
-                      )}
+                        {/* Refund button (hidden once refunded) */}
+                        {canRequestRefund && (
+                          <div style={{ marginTop: '0.85rem', display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={handleRequestRefund}
+                              style={{
+                                background: 'var(--alert-brick-bg)', color: 'var(--alert-brick)',
+                                border: '1px solid var(--alert-brick-border)', borderRadius: 'var(--radius-sm)',
+                                padding: '0.45rem 0.85rem', fontSize: '0.8rem', fontWeight: 600,
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
+                              }}
+                            >
+                              <RotateCcw size={13} /> Request AI Resolution / Refund
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          });
+        })()}
 
-                      {/* Render Refund action after successful payment */}
-                      {phase === 'resolved' && (
-                        <div style={{ marginTop: '0.85rem', display: 'flex', gap: 8 }}>
-                          <button
-                            onClick={handleRequestRefund}
-                            style={{
-                              background: 'var(--alert-brick-bg)', color: 'var(--alert-brick)',
-                              border: '1px solid var(--alert-brick-border)', borderRadius: 'var(--radius-sm)',
-                              padding: '0.45rem 0.85rem', fontSize: '0.8rem', fontWeight: 600,
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
-                            }}
-                          >
-                            <RotateCcw size={13} /> Request AI Resolution / Refund
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+
 
           {loading && (
             <div className="msg-row agent">
@@ -1113,41 +1668,6 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
         </form>
       </div>
 
-      {/* ── Side Pipeline / Explainability Tracker ── */}
-      <div className="side-tracker">
-        <div className="tracker-title">Agent Pipeline Status</div>
-        <div className="step-list">
-          {steps.map((st) => (
-            <div key={st.id} className="step-row">
-              <div className={`step-icon-wrap ${st.status}`}>
-                {st.status === 'success' ? (
-                  <CheckCircle size={14} />
-                ) : st.status === 'error' ? (
-                  <AlertTriangle size={14} />
-                ) : st.status === 'active' ? (
-                  <Sparkles size={13} />
-                ) : (
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-                )}
-              </div>
-              <div className="step-content">
-                <div className="step-label">{st.label}</div>
-                <div className="step-subtext">{st.subtext}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--hairline)' }}>
-          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '0.92rem', fontWeight: 600, marginBottom: '0.4rem' }}>
-            Explainability Engine
-          </div>
-          <p style={{ fontSize: '0.76rem', color: 'var(--ink-muted)', lineHeight: 1.4 }}>
-            Every product recommendation is scored via 384-dimensional dense semantic vectors or mined market basket lift rules.
-          </p>
-        </div>
-      </div>
-
       {/* ── Spend Cap Policy Modal ── */}
       <SpendCapModal
         isOpen={showSpendCapModal}
@@ -1169,5 +1689,7 @@ const extractErrorMessage = (data, defaultMsg = 'An error occurred') => {
     </div>
   );
 }
+
+
 
 
