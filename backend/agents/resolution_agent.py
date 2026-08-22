@@ -1,50 +1,47 @@
 import os
 import json
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
+from openai import OpenAI
 
-class ResolutionResponse(BaseModel):
+class ResolutionDecision(BaseModel):
     action: str
     reason: str
 
-def decide_resolution(natural_language_request: str, cart_state: dict) -> dict:
+def decide_resolution(natural_language_request: str, order_state: dict) -> dict:
     """
-    Calls Gemini to decide if a cancellation request is valid and actionable.
-    Returns a dict with 'action' ("refund" or "deny") and 'reason'.
+    Calls ChatGPT to determine what action to take (e.g. cancel, escalate) based on the user's request and order state.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key or api_key == "yourgeminikeyhere":
-        raise ValueError("GEMINI_API_KEY is not set in .env")
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set in .env")
         
-    client = genai.Client(api_key=api_key)
+    client = OpenAI(api_key=api_key)
     
     system_instruction = f"""
-    You are an AI Resolution Agent. Your job is to process a user's cancellation/refund request.
+    You are an AI Resolution Agent for an e-commerce store.
+    A user is contacting you regarding an existing order.
     
-    Here is the current state of the order:
-    {json.dumps(cart_state, indent=2)}
+    Here is the current state of their order from the database:
+    {json.dumps(order_state, indent=2)}
     
     Rules:
-    1. If the user is asking to cancel or refund, and the cart is `reversible: true`, and the payment `status: succeeded`, you MUST approve the refund. Set action="refund".
-    2. If the user is asking to cancel but `reversible: false` or the payment has not succeeded, you MUST deny the request. Set action="deny".
-    3. If the user's request is completely unrelated to cancellation or refunds, set action="deny".
-    4. Provide a polite 'reason' explaining your decision based on the order state.
+    1. Determine the appropriate action to take based on the user's request.
+    2. The valid actions are:
+       - 'cancel': If the user clearly wants to cancel the order and it is eligible for cancellation (cart is reversible, payment succeeded).
+       - 'escalate': If the user is asking for something complex, or wants to cancel an order that is no longer reversible.
+       - 'inform': If the user is just asking for status or policy, or we cannot fulfill the request.
+    3. Provide a short 'reason' explaining why you chose this action.
     """
     
-    response = client.models.generate_content(
-        model='gemini-3.6-flash',
-        contents=natural_language_request,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            response_mime_type="application/json",
-            response_schema=ResolutionResponse,
-            temperature=0.1
-        )
+    completion = client.beta.chat.completions.parse(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": natural_language_request}
+        ],
+        response_format=ResolutionDecision,
+        temperature=0.1
     )
     
-    try:
-        data = json.loads(response.text)
-        return data
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Agent returned invalid JSON: {response.text}") from e
+    data = completion.choices[0].message.parsed
+    return data.model_dump()

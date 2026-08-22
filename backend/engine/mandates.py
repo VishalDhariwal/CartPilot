@@ -88,21 +88,31 @@ def create_payment_mandate(cart_id: str, razorpay_order_id: str, amount_paise: i
     finally:
         conn.close()
 
-def update_payment_mandate_status(razorpay_order_id: str, status: str, failure_reason: str = None, payment_id: str = None):
+def update_payment_mandate_status(razorpay_order_id: str = None, cart_id: str = None, status: str = "succeeded", failure_reason: str = None, payment_id: str = None, recovery_action: str = None):
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT id FROM payment_mandates WHERE razorpay_order_id = ?", (razorpay_order_id,))
-        row = cursor.fetchone()
+        row = None
+        if razorpay_order_id:
+            cursor.execute("SELECT id, status FROM payment_mandates WHERE razorpay_order_id = ?", (razorpay_order_id,))
+            row = cursor.fetchone()
+        if not row and cart_id:
+            cursor.execute("SELECT id, status FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+            row = cursor.fetchone()
+            
         if not row:
             return None
         
         pay_id = row["id"]
+        # If already in desired status with same payment_id, don't duplicate audit log
+        if row["status"] == status and status == "succeeded":
+            return pay_id
+            
         updated_at = datetime.utcnow().isoformat() + "Z"
         
         cursor.execute(
-            "UPDATE payment_mandates SET status = ?, failure_reason = ?, razorpay_payment_id = ?, updated_at = ? WHERE id = ?",
-            (status, failure_reason, payment_id, updated_at, pay_id)
+            "UPDATE payment_mandates SET status = ?, failure_reason = ?, razorpay_payment_id = COALESCE(?, razorpay_payment_id), recovery_action = COALESCE(?, recovery_action), updated_at = ? WHERE id = ?",
+            (status, failure_reason, payment_id, recovery_action, updated_at, pay_id)
         )
         
         event_name = f"Payment {status.capitalize()}"
@@ -113,6 +123,7 @@ def update_payment_mandate_status(razorpay_order_id: str, status: str, failure_r
         return pay_id
     finally:
         conn.close()
+
 
 def get_cart_state(cart_id: str) -> dict:
     conn = get_db()
@@ -130,6 +141,27 @@ def get_cart_state(cart_id: str) -> dict:
             "cart": dict(cart),
             "payment": dict(payment) if payment else None
         }
+    finally:
+        conn.close()
+
+def get_recovery_message(cart_id: str) -> dict:
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT status, failure_reason, recovery_action FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+        payment = cursor.fetchone()
+        if not payment:
+            return None
+        return dict(payment)
+    finally:
+        conn.close()
+
+def append_audit_log(ref_type: str, ref_id: str, event_name: str, detail: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        create_audit_log(cursor, ref_type, ref_id, event_name, detail)
+        conn.commit()
     finally:
         conn.close()
 

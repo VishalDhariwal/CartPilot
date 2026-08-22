@@ -25,28 +25,42 @@ async def razorpay_webhook(request: Request):
     payload = await request.json()
     event = payload.get("event")
 
-    if event in ["payment.captured", "payment.failed"]:
-        payment_entity = payload['payload']['payment']['entity']
+    if event in ["payment.captured", "payment.failed", "payment_link.paid", "order.paid"]:
+        payment_entity = payload.get('payload', {}).get('payment', {}).get('entity', {})
+        plink_entity = payload.get('payload', {}).get('payment_link', {}).get('entity', {})
+        
         order_id = payment_entity.get('order_id')
+        notes = payment_entity.get('notes', {}) or plink_entity.get('notes', {})
+        custom_order_id = notes.get('order_id')
+        cart_id = notes.get('cart_id') or plink_entity.get('reference_id')
         payment_id = payment_entity.get('id')
         
-        if event == "payment.captured":
-            print(f"✅ Webhook Event: payment.captured for order {order_id}")
+        target_order_id = custom_order_id or order_id
+
+        if event in ["payment.captured", "payment_link.paid", "order.paid"]:
+            print(f"✅ Webhook Event: {event} for order {target_order_id} / cart {cart_id}")
             update_payment_mandate_status(
-                razorpay_order_id=order_id,
+                razorpay_order_id=target_order_id,
+                cart_id=cart_id,
                 status="succeeded",
                 payment_id=payment_id
             )
             
         elif event == "payment.failed":
-            failure_reason = payment_entity.get('error_description')
-            print(f"❌ Webhook Event: payment.failed for order {order_id} - Reason: {failure_reason}")
+            failure_reason = payment_entity.get('error_description', 'Payment failed')
+            print(f"❌ Webhook Event: payment.failed for order {target_order_id} / cart {cart_id} - Reason: {failure_reason}")
+            
+            from backend.agents.recovery_agent import analyze_failure
+            recovery_data = analyze_failure(failure_reason)
+            recommendation = recovery_data["recommendation"]
+            
             update_payment_mandate_status(
-                razorpay_order_id=order_id,
+                razorpay_order_id=target_order_id,
+                cart_id=cart_id,
                 status="failed",
                 failure_reason=failure_reason,
-                payment_id=payment_id
+                payment_id=payment_id,
+                recovery_action=recommendation
             )
-            # Phase 6 will handle recovery action here
 
     return {"status": "ok"}

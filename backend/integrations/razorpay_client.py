@@ -22,11 +22,16 @@ def create_order(amount_paise: int, receipt_id: str, notes: dict) -> dict:
     }
     return client.order.create(data=order_data)
 
-def create_payment_link(amount_paise: int, order_id: str, description: str) -> dict:
+def create_payment_link(amount_paise: int, order_id: str, cart_id: str = None, description: str = "CartPilot Order") -> dict:
+    notes = {"order_id": order_id}
+    if cart_id:
+        notes["cart_id"] = cart_id
+
     payment_link_data = {
         "amount": amount_paise,
         "currency": "INR",
         "accept_partial": False,
+        "reference_id": cart_id or order_id,
         "description": description,
         "customer": {
             "name": "Test Customer",
@@ -38,9 +43,7 @@ def create_payment_link(amount_paise: int, order_id: str, description: str) -> d
             "email": False
         },
         "reminder_enable": False,
-        "notes": {
-            "order_id": order_id
-        }
+        "notes": notes
     }
     return client.payment_link.create(payment_link_data)
 
@@ -57,4 +60,3 @@ def refund_payment(payment_id: str, amount_paise: int) -> dict:
     amount_paise must match the amount captured exactly, or be less for a partial refund.
     """
     return client.payment.refund(payment_id, {"amount": amount_paise})
-

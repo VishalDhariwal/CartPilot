@@ -26,7 +26,7 @@ def cancel_order(req: CancelRequest):
         decision = decide_resolution(req.query, cart_state)
         
         # 3. Execute action if approved
-        if decision["action"] == "refund":
+        if decision["action"] == "cancel":
             refund_response = execute_refund(req.cart_id)
             return {
                 "status": "refunded",
