@@ -41,13 +41,33 @@ def startup_event():
             from backend.integrations.dummyjson_sync import sync_dummyjson_catalog
             sync_dummyjson_catalog()
         else:
-            # Refresh association lift pairs
+            # Check if basket pairs exist; if empty, seed AI priors
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM basket_pairs")
+            bp_count = cursor.fetchone()[0]
+            conn.close()
+            if bp_count == 0:
+                from backend.recommendations.lift_engine import generate_ai_priors
+                generate_ai_priors()
+            # Compute empirical rules for any pairs with >= 8 real orders
             from backend.recommendations.lift_engine import compute_lift_pairs
-            compute_lift_pairs()
+            compute_lift_pairs(min_co_occurrence=8)
+
+            # Check if category_compatibility graph exists; if empty, generate
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM category_compatibility")
+            cc_count = cursor.fetchone()[0]
+            conn.close()
+            if cc_count == 0:
+                from backend.recommendations.scalable_engine import generate_category_compatibility
+                generate_category_compatibility()
+
     except Exception as e:
         print(f"⚠️ Error during startup sync: {e}")
 
-    # Precompute missing catalog embeddings in background thread
+    # Precompute missing catalog embeddings & train item2vec in background thread
     import threading
     def _bg_embeddings():
         try:
@@ -55,6 +75,12 @@ def startup_event():
             precompute_catalog_embeddings(force=False)
         except Exception as e:
             print(f"⚠️ Error precomputing catalog embeddings: {e}")
+
+        try:
+            from backend.recommendations.scalable_engine import train_co_purchase_embeddings
+            train_co_purchase_embeddings(min_orders=50)
+        except Exception as e:
+            print(f"⚠️ Error training co-purchase embeddings: {e}")
 
     threading.Thread(target=_bg_embeddings, daemon=True).start()
 
@@ -130,56 +156,68 @@ def get_cart_status(cart_id: str):
         failure_reason = row["failure_reason"]
         recovery_action = row["recovery_action"]
 
-        # If still waiting in 'created' state, proactively check Razorpay API!
+        # If still waiting in 'created' state, proactively check Razorpay API or auto-settle in bypass mode!
         if status == "created" and order_id:
             try:
-                from backend.integrations.razorpay_client import client
+                from backend.integrations.razorpay_client import is_bypass_mode, client
                 from backend.engine.mandates import update_payment_mandate_status
+                import uuid
 
-                # Check payments for this order
-                payments_resp = client.order.payments(order_id)
-                items = payments_resp.get("items", [])
+                if is_bypass_mode() or str(order_id).startswith("order_mock_"):
+                    mock_payment_id = f"pay_mock_{uuid.uuid4().hex[:14]}"
+                    update_payment_mandate_status(
+                        razorpay_order_id=order_id,
+                        cart_id=cart_id,
+                        status="succeeded",
+                        payment_id=mock_payment_id
+                    )
+                    status = "succeeded"
+                    payment_id = mock_payment_id
+                elif client:
+                    # Check payments for this order
+                    payments_resp = client.order.payments(order_id)
+                    items = payments_resp.get("items", [])
 
-                # If not found directly on order, check recent payments for matching notes
-                if not items:
-                    recent = client.payment.all({"count": 10})
-                    for p in recent.get("items", []):
-                        p_notes = p.get("notes", {})
-                        if p_notes.get("order_id") == order_id or p_notes.get("cart_id") == cart_id:
-                            items.append(p)
+                    # If not found directly on order, check recent payments for matching notes
+                    if not items:
+                        recent = client.payment.all({"count": 10})
+                        for p in recent.get("items", []):
+                            p_notes = p.get("notes", {})
+                            if p_notes.get("order_id") == order_id or p_notes.get("cart_id") == cart_id:
+                                items.append(p)
+                                break
+
+                    for p in items:
+                        p_status = p.get("status")
+                        p_id = p.get("id")
+                        if p_status == "captured":
+                            update_payment_mandate_status(
+                                razorpay_order_id=order_id,
+                                cart_id=cart_id,
+                                status="succeeded",
+                                payment_id=p_id
+                            )
+                            status = "succeeded"
+                            payment_id = p_id
                             break
+                        elif p_status == "failed":
+                            p_error = p.get("error_description", "Payment failed")
+                            from backend.agents.recovery_agent import analyze_failure
+                            recovery_data = analyze_failure(p_error)
+                            rec = recovery_data.get("recommendation", "Please try another payment method.")
 
-                for p in items:
-                    p_status = p.get("status")
-                    p_id = p.get("id")
-                    if p_status == "captured":
-                        update_payment_mandate_status(
-                            razorpay_order_id=order_id,
-                            cart_id=cart_id,
-                            status="succeeded",
-                            payment_id=p_id
-                        )
-                        status = "succeeded"
-                        payment_id = p_id
-                        break
-                    elif p_status == "failed":
-                        p_error = p.get("error_description", "Payment failed")
-                        from backend.agents.recovery_agent import analyze_failure
-                        recovery_data = analyze_failure(p_error)
-                        rec = recovery_data.get("recommendation", "Please try another payment method.")
-
-                        update_payment_mandate_status(
-                            razorpay_order_id=order_id,
-                            cart_id=cart_id,
-                            status="failed",
-                            failure_reason=p_error,
-                            payment_id=p_id,
-                            recovery_action=rec
-                        )
-                        status = "failed"
-                        failure_reason = p_error
-                        recovery_action = rec
-                        break
+                            update_payment_mandate_status(
+                                razorpay_order_id=order_id,
+                                cart_id=cart_id,
+                                status="failed",
+                                failure_reason=p_error,
+                                payment_id=p_id,
+                                recovery_action=rec
+                            )
+                            status = "failed"
+                            failure_reason = p_error
+                            recovery_action = rec
+                            break
             except Exception as e:
                 print(f"Error querying Razorpay API for order {order_id}: {e}")
 

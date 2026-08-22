@@ -1,15 +1,216 @@
+import os
 import json
 from collections import defaultdict
 from datetime import datetime
+from pydantic import BaseModel
+from dotenv import load_dotenv
+from openai import OpenAI
 from backend.db import get_db
 
-def compute_lift_pairs(min_support_count: int = 2, min_lift: float = 1.0) -> int:
-    """
-    Computes market basket association rules (Support, Confidence, Lift)
-    across all orders in historical_orders and saves pairs with lift >= min_lift
-    to the basket_pairs table.
+load_dotenv()
 
-    Returns the number of association rules generated.
+# ── Structured Output Models for AI Priors ──────────────────────────────────
+class PriorPairing(BaseModel):
+    target_sku: str
+    suggested_sku: str
+    reasoning: str  # One-line explanation grounded in why these two pair well
+
+class CategoryPriorsResponse(BaseModel):
+    pairings: list[PriorPairing]
+
+
+# Complementary category affinity map to ensure rich, cross-category candidate pools
+COMPLEMENTARY_CATEGORY_MAP = {
+    "motorcycle": ["sunglasses", "mobile-accessories", "sports-accessories", "mens-watches", "mens-shoes"],
+    "smartphones": ["mobile-accessories", "laptops", "tablets", "sports-accessories"],
+    "laptops": ["mobile-accessories", "tablets", "smartphones"],
+    "tablets": ["mobile-accessories", "laptops", "smartphones"],
+    "mobile-accessories": ["smartphones", "laptops", "tablets", "sports-accessories"],
+    "beauty": ["skin-care", "fragrances", "sunglasses", "womens-jewellery"],
+    "skin-care": ["beauty", "fragrances", "sunglasses"],
+    "fragrances": ["beauty", "skin-care", "mens-watches", "womens-jewellery"],
+    "sunglasses": ["mens-shirts", "womens-dresses", "motorcycle", "sports-accessories", "beauty"],
+    "mens-shirts": ["mens-shoes", "mens-watches", "sunglasses"],
+    "mens-shoes": ["mens-shirts", "mens-watches", "sports-accessories"],
+    "mens-watches": ["mens-shirts", "mens-shoes", "fragrances", "sunglasses"],
+    "womens-dresses": ["womens-shoes", "womens-bags", "womens-jewellery", "beauty", "fragrances"],
+    "womens-shoes": ["womens-dresses", "womens-bags", "womens-jewellery"],
+    "womens-bags": ["womens-dresses", "womens-shoes", "womens-jewellery", "sunglasses"],
+    "womens-jewellery": ["womens-dresses", "womens-bags", "beauty", "fragrances"],
+    "tops": ["womens-shoes", "womens-bags", "sunglasses", "beauty"],
+    "groceries": ["kitchen-accessories", "home-decoration"],
+    "kitchen-accessories": ["groceries", "home-decoration", "furniture"],
+    "furniture": ["home-decoration", "kitchen-accessories"],
+    "home-decoration": ["furniture", "kitchen-accessories", "groceries"],
+    "sports-accessories": ["smartphones", "mobile-accessories", "sunglasses", "mens-shoes"],
+    "vehicle": ["mobile-accessories", "sunglasses", "sports-accessories"],
+}
+
+
+def generate_ai_priors(batch_size: int = 6) -> int:
+    """
+    Part 1: LLM-Seeded Priors (Cold-Start Bootstrap).
+    Replaces synthetic random orders entirely.
+    Uses GPT-4o-mini grounded strictly in catalog inventory to generate
+    high-quality, cross-category complementary associations with qualitative reasoning.
+    Sets lift, support, and confidence to NULL.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("⚠️ OPENAI_API_KEY is not set. Skipping AI priors generation.")
+        return 0
+
+    client = OpenAI(api_key=api_key)
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT sku, name, category, price_paise, merchant FROM catalog WHERE stock > 0")
+    all_catalog_rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    if not all_catalog_rows:
+        print("⚠️ No catalog items available to seed priors.")
+        return 0
+
+    # Build category indexing
+    catalog_by_sku = {item["sku"]: item for item in all_catalog_rows}
+    items_by_cat = defaultdict(list)
+    for item in all_catalog_rows:
+        items_by_cat[item["category"]].append(item)
+
+    all_categories = list(items_by_cat.keys())
+    now_iso = datetime.utcnow().isoformat() + "Z"
+    total_pairs_inserted = 0
+
+    print(f"🤖 Generating AI-seeded cold-start priors across {len(all_catalog_rows)} catalog items...")
+
+    # Build work batches
+    tasks = []
+    for cat in all_categories:
+        target_items = items_by_cat[cat]
+        adjacent_cats = COMPLEMENTARY_CATEGORY_MAP.get(cat, [c for c in all_categories if c != cat][:4])
+
+        # Build rich candidate pool (items from complementary & adjacent categories)
+        candidate_pool = []
+        for adj_cat in adjacent_cats:
+            candidate_pool.extend(items_by_cat.get(adj_cat, [])[:6])
+
+        # Add a few random items from other categories for variety
+        other_cats = [c for c in all_categories if c != cat and c not in adjacent_cats]
+        for oc in other_cats[:3]:
+            candidate_pool.extend(items_by_cat.get(oc, [])[:2])
+
+        if len(candidate_pool) < 6:
+            candidate_pool = [i for i in all_catalog_rows if i["category"] != cat][:25]
+
+        candidate_map = {c["sku"]: c for c in candidate_pool}
+        candidate_list_str = "\n".join(
+            f"- SKU: {c['sku']} | Name: {c['name']} | Category: {c['category']} | ₹{c['price_paise']/100:.0f}"
+            for c in candidate_pool
+        )
+
+        for i in range(0, len(target_items), batch_size):
+            batch = target_items[i:i+batch_size]
+            tasks.append((batch, candidate_pool, candidate_map, candidate_list_str))
+
+    print(f"🚀 Dispatching {len(tasks)} parallel prior-generation tasks across worker threads...", flush=True)
+
+    def _process_task(task):
+        batch, candidate_pool, candidate_map, candidate_list_str = task
+        targets_str = "\n".join(
+            f"- TARGET SKU: {t['sku']} | Name: {t['name']} | Category: {t['category']} | ₹{t['price_paise']/100:.0f}"
+            for t in batch
+        )
+
+        prompt = f"""
+You are an expert e-commerce merchandising intelligence system.
+For each TARGET item below, select 2 to 3 COMPLEMENTARY items from the CANDIDATE list that customers would naturally buy alongside it.
+
+TARGET ITEMS TO PAIR:
+{targets_str}
+
+AVAILABLE CANDIDATES (Choose ONLY from this list):
+{candidate_list_str}
+
+STRICT MERCHANDISING RULES:
+1. CROSS-CATEGORY COMPLEMENTS ONLY:
+   - Pair items across complementary categories (e.g. Motorcycle → Sunglasses / Gear / Phone Holder; Shirt → Watch / Shoes; Laptop → Accessories / Tablet).
+   - NEVER pair an item with another item of the exact same category or product type (e.g. NEVER pair Motorcycle with another Motorcycle).
+2. STRICT GROUNDING & ANTI-HALLUCINATION:
+   - You MUST ONLY select SKUs that explicitly exist in the AVAILABLE CANDIDATES list above. Never invent, truncate, or guess SKUs.
+3. CLEAR 1-LINE REASONING:
+   - Provide a concise, engaging, 1-line plain-language reason for each pairing (e.g. "Essential eye protection and road style for riding" or "Perfect matching footwear for this casual look").
+"""
+        try:
+            completion = client.beta.chat.completions.parse(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You generate grounded cross-category e-commerce merchandising pairs."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format=CategoryPriorsResponse,
+                temperature=0.2
+            )
+            data = completion.choices[0].message.parsed
+            valid_pairs = []
+
+            for pair in data.pairings:
+                t_sku = pair.target_sku.strip()
+                s_sku = pair.suggested_sku.strip()
+                reason = pair.reasoning.strip()
+
+                if (t_sku in catalog_by_sku and
+                    s_sku in catalog_by_sku and
+                    s_sku in candidate_map and
+                    t_sku != s_sku and
+                    reason):
+                    valid_pairs.append((
+                        t_sku, s_sku, None, None, None,
+                        'ai_suggested', reason, 0, now_iso, 0
+                    ))
+            return valid_pairs
+        except Exception as e:
+            print(f"⚠️ Error generating AI priors for batch: {e}", flush=True)
+            return []
+
+    from concurrent.futures import ThreadPoolExecutor
+    all_valid_pairs = []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = executor.map(_process_task, tasks)
+        for r in results:
+            all_valid_pairs.extend(r)
+
+    if all_valid_pairs:
+        conn = get_db()
+        cursor = conn.cursor()
+        for p in all_valid_pairs:
+            cursor.execute(
+                """
+                INSERT INTO basket_pairs 
+                (sku_a, sku_b, lift, support, confidence, source, reasoning, co_occurrence_count, computed_at, muted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(sku_a, sku_b) DO UPDATE SET
+                    reasoning = excluded.reasoning,
+                    computed_at = excluded.computed_at
+                WHERE basket_pairs.source = 'ai_suggested'
+                """,
+                p
+            )
+        conn.commit()
+        conn.close()
+
+    total_pairs_inserted = len(all_valid_pairs)
+    print(f"✅ Generated and saved {total_pairs_inserted} grounded AI-suggested growth rules.", flush=True)
+    return total_pairs_inserted
+
+
+def compute_lift_pairs(min_co_occurrence: int = 8, min_lift: float = 1.0) -> int:
+    """
+    Part 2: Real Statistical Rules.
+    Mines real orders in historical_orders and computes Lift, Support, Confidence.
+    Requires co_occurrence_count >= 8 before writing a data_verified rule.
+    When an empirical rule crosses the threshold, it replaces any prior ai_suggested rule
+    and logs the graduation to audit_log.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -28,7 +229,6 @@ def compute_lift_pairs(min_support_count: int = 2, min_lift: float = 1.0) -> int
     for row in rows:
         try:
             items = json.loads(row["items"]) if isinstance(row["items"], str) else row["items"]
-            # Deduplicate items in the basket
             unique_items = sorted(list(set(items)))
 
             for item in unique_items:
@@ -38,14 +238,24 @@ def compute_lift_pairs(min_support_count: int = 2, min_lift: float = 1.0) -> int
                 for j in range(len(unique_items)):
                     if i != j:
                         pair_counts[(unique_items[i], unique_items[j])] += 1
-        except Exception as e:
+        except Exception:
             continue
 
-    now = datetime.utcnow().isoformat() + "Z"
-    pairs_to_insert = []
+    now_iso = datetime.utcnow().isoformat() + "Z"
+    verified_rules_count = 0
+
+    # Fetch catalog names for explainable audit logging
+    cursor.execute("SELECT sku, name FROM catalog")
+    catalog_names = {r["sku"]: r["name"] for r in cursor.fetchall()}
 
     for (sku_a, sku_b), pair_freq in pair_counts.items():
-        if pair_freq < min_support_count:
+        # Strict empirical gating
+        if pair_freq < min_co_occurrence:
+            # Update co_occurrence_count for tracking progress in UI even if unverified
+            cursor.execute(
+                "UPDATE basket_pairs SET co_occurrence_count = ? WHERE sku_a = ? AND sku_b = ?",
+                (pair_freq, sku_a, sku_b)
+            )
             continue
 
         support_a = item_counts[sku_a] / total_orders
@@ -59,49 +269,62 @@ def compute_lift_pairs(min_support_count: int = 2, min_lift: float = 1.0) -> int
         lift = confidence / support_b
 
         if lift >= min_lift:
-            pairs_to_insert.append((
-                sku_a,
-                sku_b,
-                round(lift, 4),
-                round(support_ab, 4),
-                now
-            ))
+            # Check if this rule is graduating from ai_suggested
+            cursor.execute(
+                "SELECT source FROM basket_pairs WHERE sku_a = ? AND sku_b = ?",
+                (sku_a, sku_b)
+            )
+            existing = cursor.fetchone()
+            was_ai_suggested = existing and existing["source"] == "ai_suggested"
 
-    # Clear and replace basket_pairs
-    cursor.execute("DELETE FROM basket_pairs")
-    cursor.executemany(
-        """INSERT OR REPLACE INTO basket_pairs (sku_a, sku_b, lift, support, computed_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        pairs_to_insert
-    )
+            cursor.execute(
+                """
+                INSERT INTO basket_pairs 
+                (sku_a, sku_b, lift, support, confidence, source, reasoning, co_occurrence_count, computed_at, muted)
+                VALUES (?, ?, ?, ?, ?, 'data_verified', NULL, ?, ?, 0)
+                ON CONFLICT(sku_a, sku_b) DO UPDATE SET
+                    lift = excluded.lift,
+                    support = excluded.support,
+                    confidence = excluded.confidence,
+                    source = 'data_verified',
+                    reasoning = NULL,
+                    co_occurrence_count = excluded.co_occurrence_count,
+                    computed_at = excluded.computed_at
+                """,
+                (sku_a, sku_b, round(lift, 4), round(support_ab, 4), round(confidence, 4), pair_freq, now_iso)
+            )
+            verified_rules_count += 1
+
+            if was_ai_suggested:
+                from backend.engine.mandates import create_audit_log
+                name_a = catalog_names.get(sku_a, sku_a)
+                name_b = catalog_names.get(sku_b, sku_b)
+                detail = (
+                    f"Association rule '{name_a}' → '{name_b}' crossed empirical threshold "
+                    f"({pair_freq} orders >= {min_co_occurrence}). Graduated from AI-suggested prior "
+                    f"to data-verified rule (Lift: {lift:.2f}x, Support: {support_ab*100:.1f}%, Confidence: {confidence*100:.1f}%)."
+                )
+                create_audit_log(cursor, "growth_rule", f"{sku_a}__{sku_b}", "Rule Graduated to Data-Verified", detail)
+
     conn.commit()
     conn.close()
 
-    print(f"📊 Market Basket Analysis computed {len(pairs_to_insert)} high-lift association rules from {total_orders} orders.")
-    return len(pairs_to_insert)
+    print(f"📊 Statistical Mining: {verified_rules_count} pairs reached data_verified status (>= {min_co_occurrence} orders).")
+    return verified_rules_count
 
 
 def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
     """
-    Given items currently in a cart, finds the top ranked cross-sell candidates
-    using computed market basket lift metrics with catalog boost weighting.
+    Part 3: 4-Layer Scalable Cross-Sell Merge Logic.
 
-    Returns a list of ranked dicts:
-      [
-        {
-          "sku": "...",
-          "name": "...",
-          "price_paise": 1234,
-          "category": "...",
-          "lift": 3.42,
-          "support": 0.08,
-          "final_score": 3.93,
-          "trigger_sku": "...",
-          "trigger_name": "...",
-          "reason": "..."
-        },
-        ...
-      ]
+    Candidate sources blended in priority order:
+      1. data_verified rows from basket_pairs (highest trust, mined exact-pair statistical evidence)
+      2. Layer 2: Co-purchase embeddings (item2vec nearest neighbors from real order patterns)
+      3. Layer 1: Category-compatibility graph (LLM cold-start category affinity + in-stock items)
+      4. ai_suggested rows from basket_pairs (LLM cold-start specific pair priors)
+
+    Boost multiplier (1.35x) applies uniformly across all candidates.
+    No fake or fabricated numeric lift values for non-empirical layers.
     """
     if not cart_items:
         return []
@@ -114,14 +337,13 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
         conn.close()
         return []
 
-    # Map cart SKUs to names for explainability
+    # Map cart SKUs to names
     cursor.execute(
         f"SELECT sku, name FROM catalog WHERE sku IN ({','.join(['?'] * len(cart_skus))})",
         cart_skus
     )
     cart_sku_names = {row["sku"]: row["name"] for row in cursor.fetchall()}
 
-    # Query basket_pairs for all SKUs in the cart
     placeholders = ','.join(['?'] * len(cart_skus))
     sql = f"""
     SELECT 
@@ -129,6 +351,10 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
         bp.sku_b,
         bp.lift,
         bp.support,
+        bp.confidence,
+        bp.source,
+        bp.reasoning,
+        bp.co_occurrence_count,
         c.name AS candidate_name,
         c.price_paise AS candidate_price,
         c.category AS candidate_category,
@@ -143,28 +369,40 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
       AND c.stock > 0
       AND bp.sku_b NOT IN ({placeholders})
       AND (bp.muted IS NULL OR bp.muted = 0)
-    ORDER BY bp.lift DESC
     """
 
     cursor.execute(sql, cart_skus + cart_skus)
     rows = cursor.fetchall()
+    conn.close()
 
     candidates_by_sku = {}
 
+    # ── Source 1 & 4: Basket pairs (data_verified & ai_suggested) ──────────────
     for row in rows:
         sku_b = row["sku_b"]
-        lift = row["lift"]
-        boosted = row["candidate_boosted"] or 0
+        source = row["source"] or "ai_suggested"
+        boosted = bool(row["candidate_boosted"] or 0)
         boost_multiplier = 1.35 if boosted else 1.0
-        final_score = round(lift * boost_multiplier, 4)
 
         trigger_sku = row["sku_a"]
         trigger_name = cart_sku_names.get(trigger_sku, trigger_sku)
 
-        # Build an explainable reason grounded in the co-occurrence data
-        reason = f"Frequently bought together with {trigger_name} (affinity {lift:.1f}x higher than average)."
-        if boosted:
+        if source == "data_verified" and row["lift"] is not None:
+            lift_val = round(row["lift"], 2)
+            support_val = round(row["support"], 4) if row["support"] is not None else None
+            confidence_val = round(row["confidence"], 4) if row["confidence"] is not None else None
+            final_score = round(lift_val * boost_multiplier, 4)
+            reason = f"Frequently bought together with {trigger_name} ({lift_val:.1f}x higher affinity across {row['co_occurrence_count']} orders)."
+            tier_priority = 4  # Highest
+        else:
+            lift_val = None
+            support_val = None
+            confidence_val = None
+            final_score = round(1.0 * boost_multiplier, 4)
+            reason = row["reasoning"] or f"Recommended complementary pairing for {trigger_name}."
+            tier_priority = 1  # AI-suggested specific pair fallback
 
+        if boosted:
             reason += " Featured partner recommendation."
 
         meta_obj = {}
@@ -172,7 +410,7 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
             try:
                 meta_obj = json.loads(row["candidate_metadata"])
             except Exception:
-                meta_obj = {}
+                pass
 
         candidate = {
             "sku": sku_b,
@@ -182,62 +420,64 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
             "image_url": row["candidate_image_url"] or "",
             "description": row["candidate_description"] or "",
             "metadata": meta_obj,
-            "lift": lift,
-            "support": row["support"],
+            "source": source,
+            "lift": lift_val,
+            "support": support_val,
+            "confidence": confidence_val,
+            "reasoning": row["reasoning"],
+            "co_occurrence_count": row["co_occurrence_count"] or 0,
             "final_score": final_score,
-            "boosted": bool(boosted),
+            "boosted": boosted,
             "trigger_sku": trigger_sku,
             "trigger_name": trigger_name,
-            "reason": reason
+            "reason": reason,
+            "_tier_priority": tier_priority
         }
 
-        # Deduplicate candidates across multi-item carts, keeping highest final_score
-        if sku_b not in candidates_by_sku or final_score > candidates_by_sku[sku_b]["final_score"]:
+        if sku_b not in candidates_by_sku or candidate["_tier_priority"] > candidates_by_sku[sku_b]["_tier_priority"]:
             candidates_by_sku[sku_b] = candidate
 
-    # Sort by final_score descending
-    sorted_candidates = sorted(candidates_by_sku.values(), key=lambda x: x["final_score"], reverse=True)
-
-    # Fallback: if no basket pairs exist (e.g. rare combo), provide in-stock category complements
-    if not sorted_candidates:
-        cart_categories = list({item.get("category") for item in cart_items if item.get("category")})
-        cat_filter = f"category IN ({','.join(['?']*len(cart_categories))})" if cart_categories else "1=1"
-        
-        cursor.execute(
-            f"""SELECT sku, name, price_paise, category, boosted, image_url, description, metadata 
-               FROM catalog 
-               WHERE stock > 0 
-                 AND sku NOT IN ({placeholders}) 
-                 AND ({cat_filter})
-               ORDER BY boosted DESC, price_paise ASC 
-               LIMIT ?""",
-            cart_skus + (cart_categories if cart_categories else []) + [top_k]
+    # ── Source 2: Layer 2 Co-Purchase Embeddings (item2vec) ─────────────────────
+    try:
+        from backend.recommendations.scalable_engine import find_co_purchase_neighbors
+        copurchase_candidates = find_co_purchase_neighbors(
+            cart_items,
+            exclude_skus=set(candidates_by_sku.keys()),
+            top_k=top_k
         )
-        for row in cursor.fetchall():
-            meta_obj = {}
-            if row["metadata"]:
-                try:
-                    meta_obj = json.loads(row["metadata"])
-                except Exception:
-                    meta_obj = {}
-            sorted_candidates.append({
-                "sku": row["sku"],
-                "name": row["name"],
-                "price_paise": row["price_paise"],
-                "category": row["category"],
-                "image_url": row["image_url"] or "",
-                "description": row["description"] or "",
-                "metadata": meta_obj,
-                "lift": 1.2,
-                "support": 0.05,
-                "final_score": 1.38 if row["boosted"] else 1.2,
-                "boosted": bool(row["boosted"]),
-                "trigger_sku": cart_skus[0] if cart_skus else "",
-                "trigger_name": "your cart",
-                "reason": f"Popular complementary {row['category']} item for your order."
-            })
+        for cand in copurchase_candidates:
+            cand["_tier_priority"] = 3  # Priority 2: learned empirical embedding
+            sku = cand["sku"]
+            if sku not in candidates_by_sku or cand["_tier_priority"] > candidates_by_sku[sku]["_tier_priority"]:
+                candidates_by_sku[sku] = cand
+    except Exception as e:
+        print(f"⚠️ Layer 2 co-purchase neighbor lookup skipped: {e}")
 
+    # ── Source 3: Layer 1 Category-Compatibility Graph ──────────────────────────
+    try:
+        from backend.recommendations.scalable_engine import find_category_compat_candidates
+        cat_compat_candidates = find_category_compat_candidates(
+            cart_items,
+            exclude_skus=set(candidates_by_sku.keys()),
+            top_k=top_k
+        )
+        for cand in cat_compat_candidates:
+            cand["_tier_priority"] = 2  # Priority 3: category compatibility graph
+            sku = cand["sku"]
+            if sku not in candidates_by_sku or cand["_tier_priority"] > candidates_by_sku[sku]["_tier_priority"]:
+                candidates_by_sku[sku] = cand
+    except Exception as e:
+        print(f"⚠️ Layer 1 category compatibility lookup skipped: {e}")
 
-    conn.close()
+    # Sort candidates by tier priority first (4 -> 3 -> 2 -> 1), then by final_score (boosted items rise)
+    sorted_candidates = sorted(
+        candidates_by_sku.values(),
+        key=lambda x: (x.get("_tier_priority", 0), x.get("final_score", 0)),
+        reverse=True
+    )
+
+    # Clean up internal sorting helper before returning
+    for cand in sorted_candidates:
+        cand.pop("_tier_priority", None)
+
     return sorted_candidates[:top_k]
-

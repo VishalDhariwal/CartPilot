@@ -20,7 +20,8 @@ import {
   VolumeX,
   Layers,
   BarChart3,
-  DollarSign
+  DollarSign,
+  Plus
 } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
@@ -60,6 +61,8 @@ export default function MerchantConsole() {
   const [growthRules, setGrowthRules] = useState([]);
   const [rulesSummary, setRulesSummary] = useState({
     total_rules: 0,
+    verified_rules: 0,
+    ai_suggested_rules: 0,
     active_rules: 0,
     muted_rules: 0,
     total_offered: 0,
@@ -68,8 +71,26 @@ export default function MerchantConsole() {
     total_revenue_lift_rupees: 0
   });
   const [ruleSearch, setRuleSearch] = useState('');
-  const [ruleStatusFilter, setRuleStatusFilter] = useState('all'); // 'all' | 'active' | 'muted'
+  const [ruleStatusFilter, setRuleStatusFilter] = useState('all'); // 'all' | 'data_verified' | 'ai_suggested' | 'active' | 'muted'
   const [mutingRuleId, setMutingRuleId] = useState(null);
+  const [isReseedingPriors, setIsReseedingPriors] = useState(false);
+
+  // ─── Scalable Architecture: Category Compat & Embeddings State ───────────
+  const [compatPairs, setCompatPairs] = useState([]);
+  const [isGeneratingCompat, setIsGeneratingCompat] = useState(false);
+  const [isAddingCompat, setIsAddingCompat] = useState(false);
+  const [newCompatA, setNewCompatA] = useState('');
+  const [newCompatB, setNewCompatB] = useState('');
+  const [newCompatReason, setNewCompatReason] = useState('');
+  const [showAddCompatModal, setShowAddCompatModal] = useState(false);
+  const [embeddingStatus, setEmbeddingStatus] = useState({
+    real_order_count: 0,
+    min_orders_required: 50,
+    skus_with_embeddings: 0,
+    trained: false,
+    ready: false
+  });
+  const [isTrainingEmbeddings, setIsTrainingEmbeddings] = useState(false);
 
   // Spend cap and autonomy presets
   const spendCapPresets = [500, 1000, 2500, 5000, 10000, 50000];
@@ -86,6 +107,8 @@ export default function MerchantConsole() {
     fetchPolicy();
     fetchCatalog();
     fetchGrowthRules();
+    fetchCategoryCompat();
+    fetchEmbeddingStatus();
   }, []);
 
   /* ─── Fetch Policy Configuration ────────────────────────────────────────── */
@@ -286,6 +309,143 @@ export default function MerchantConsole() {
       showToast(`❌ Error: ${err.message}`, 'error');
     } finally {
       setMutingRuleId(null);
+    }
+  };
+
+  /* ─── Reseed AI Cold-Start Priors ───────────────────────────────────────── */
+  const handleReseedPriors = async () => {
+    setIsReseedingPriors(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/growth-rules/reseed-priors`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to reseed priors');
+      showToast(`🤖 ${data.message}`);
+      fetchGrowthRules();
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, 'error');
+    } finally {
+      setIsReseedingPriors(false);
+    }
+  };
+
+  /* ─── Fetch Category Compatibility Graph ────────────────────────────────── */
+  const fetchCategoryCompat = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/category-compat`);
+      const data = await res.json();
+      if (res.ok) {
+        setCompatPairs(data.pairs || []);
+      }
+    } catch (err) {
+      console.error('Error fetching category compat:', err);
+    }
+  };
+
+  /* ─── Generate Category Compatibility Graph (LLM) ───────────────────────── */
+  const handleGenerateCompat = async () => {
+    setIsGeneratingCompat(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/category-compat/generate`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to generate category compatibility graph');
+      showToast(`🌐 ${data.message}`);
+      fetchCategoryCompat();
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, 'error');
+    } finally {
+      setIsGeneratingCompat(false);
+    }
+  };
+
+  /* ─── Delete / Lock Category Compatibility Pair ─────────────────────────── */
+  const handleDeleteCompat = async (catA, catB) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/category-compat/${encodeURIComponent(catA)}/${encodeURIComponent(catB)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to delete pair');
+      showToast(`🔒 ${data.message}`);
+      fetchCategoryCompat();
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, 'error');
+    }
+  };
+
+  /* ─── Add Custom Category Compatibility Pair ────────────────────────────── */
+  const handleAddCompat = async (e) => {
+    e.preventDefault();
+    if (!newCompatA || !newCompatB || !newCompatReason.trim()) {
+      showToast('❌ Please select both categories and provide reasoning.', 'error');
+      return;
+    }
+    if (newCompatA === newCompatB) {
+      showToast('❌ Cannot pair a category with itself.', 'error');
+      return;
+    }
+    setIsAddingCompat(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/category-compat/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category_a: newCompatA,
+          category_b: newCompatB,
+          reasoning: newCompatReason.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to add compatibility pair');
+      showToast(`✅ ${data.message}`);
+      setNewCompatA('');
+      setNewCompatB('');
+      setNewCompatReason('');
+      setShowAddCompatModal(false);
+      fetchCategoryCompat();
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, 'error');
+    } finally {
+      setIsAddingCompat(false);
+    }
+  };
+
+  /* ─── Fetch Co-Purchase Embeddings Status ────────────────────────────────── */
+  const fetchEmbeddingStatus = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/embeddings/status`);
+      const data = await res.json();
+      if (res.ok) {
+        setEmbeddingStatus(data);
+      }
+    } catch (err) {
+      console.error('Error fetching embedding status:', err);
+    }
+  };
+
+  /* ─── Train Co-Purchase Embeddings (item2vec) ────────────────────────────── */
+  const handleTrainEmbeddings = async () => {
+    setIsTrainingEmbeddings(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/embeddings/train`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.status === 'insufficient_data') {
+        showToast(`⚠️ ${data.message}`, 'error');
+      } else if (!res.ok) {
+        throw new Error(data.detail || 'Failed to train embeddings');
+      } else {
+        showToast(`🧠 ${data.message}`);
+      }
+      fetchEmbeddingStatus();
+    } catch (err) {
+      showToast(`❌ Error: ${err.message}`, 'error');
+    } finally {
+      setIsTrainingEmbeddings(false);
     }
   };
 
@@ -641,7 +801,8 @@ export default function MerchantConsole() {
 
           {/* Catalog Products Table */}
           <div className="console-table-card">
-            <table className="console-table">
+            <div className="console-table-scroll">
+              <table className="console-table">
               <thead>
                 <tr>
                   <th style={{ width: '45%' }}>Product & SKU</th>
@@ -725,23 +886,24 @@ export default function MerchantConsole() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* ── TAB 3: Growth Rules Inspector (Flagship Governance) ── */}
+      {/* ── TAB 3: Growth Rules Inspector (Hybrid AI & Data Governance) ── */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === 'growth-rules' && (
         <div className="console-tab-content">
           {/* Top Performance KPI Metrics */}
           <div className="console-kpi-grid">
             <div className="console-kpi-card">
-              <div className="kpi-label">Active Market Basket Rules</div>
+              <div className="kpi-label">Active Growth Rules</div>
               <div className="kpi-value" style={{ color: 'var(--accent-teal)' }}>
                 {rulesSummary.active_rules}
               </div>
-              <div className="kpi-sub">{rulesSummary.muted_rules} muted rules excluded</div>
+              <div className="kpi-sub">{rulesSummary.verified_rules || 0} Data-Verified · {rulesSummary.ai_suggested_rules || 0} AI-Priors</div>
             </div>
 
             <div className="console-kpi-card">
@@ -773,7 +935,7 @@ export default function MerchantConsole() {
               <Search size={15} color="var(--ink-muted)" />
               <input
                 type="text"
-                placeholder="Search rules by trigger item, recommended product, or SKU…"
+                placeholder="Search rules by trigger, recommended SKU, or reasoning…"
                 value={ruleSearch}
                 onChange={(e) => setRuleSearch(e.target.value)}
               />
@@ -785,34 +947,64 @@ export default function MerchantConsole() {
                   className={`filter-chip ${ruleStatusFilter === 'all' ? 'active' : ''}`}
                   onClick={() => setRuleStatusFilter('all')}
                 >
-                  All ({rulesSummary.total_rules})
+                  All ({rulesSummary.total_rules || 0})
                 </button>
                 <button
-                  className={`filter-chip ${ruleStatusFilter === 'active' ? 'active' : ''}`}
-                  onClick={() => setRuleStatusFilter('active')}
+                  className={`filter-chip ${ruleStatusFilter === 'data_verified' ? 'active' : ''}`}
+                  onClick={() => setRuleStatusFilter('data_verified')}
                 >
-                  Active ({rulesSummary.active_rules})
+                  <CheckCircle2 size={12} style={{ display: 'inline', marginRight: 4 }} />
+                  Data-Verified ({rulesSummary.verified_rules || 0})
+                </button>
+                <button
+                  className={`filter-chip ${ruleStatusFilter === 'ai_suggested' ? 'active' : ''}`}
+                  onClick={() => setRuleStatusFilter('ai_suggested')}
+                >
+                  <Sparkles size={12} style={{ display: 'inline', marginRight: 4 }} />
+                  AI-Priors ({rulesSummary.ai_suggested_rules || 0})
                 </button>
                 <button
                   className={`filter-chip ${ruleStatusFilter === 'muted' ? 'active' : ''}`}
                   onClick={() => setRuleStatusFilter('muted')}
                 >
-                  Muted ({rulesSummary.muted_rules})
+                  <VolumeX size={12} style={{ display: 'inline', marginRight: 4 }} />
+                  Muted ({rulesSummary.muted_rules || 0})
                 </button>
               </div>
+
+              <button
+                type="button"
+                className="btn-console-outline"
+                onClick={handleReseedPriors}
+                disabled={isReseedingPriors}
+                title="Regenerate LLM-seeded cold-start priors grounded in active store catalog"
+              >
+                {isReseedingPriors ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Seeding Priors…</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={13} color="var(--accent-mustard)" />
+                    <span>Regenerate AI Priors</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
           {/* Growth Rules Table */}
           <div className="console-table-card">
-            <table className="console-table">
+            <div className="console-table-scroll">
+              <table className="console-table">
               <thead>
                 <tr>
-                  <th style={{ width: '38%' }}>Association Rule (Trigger → Recommendation)</th>
-                  <th>Framing & Explanation</th>
-                  <th>Statistical Metrics</th>
+                  <th style={{ width: '30%' }}>Association Rule (Trigger → Recommendation)</th>
+                  <th style={{ width: '22%' }}>Evidence Source & Verification</th>
+                  <th style={{ width: '26%' }}>Framing & Contextual Reasoning</th>
                   <th>Empirical Conversion</th>
-                  <th style={{ textAlign: 'right' }}>Governance Lever</th>
+                  <th style={{ textAlign: 'right' }}>Governance</th>
                 </tr>
               </thead>
               <tbody>
@@ -825,6 +1017,7 @@ export default function MerchantConsole() {
                 ) : (
                   growthRules.map((rule) => {
                     const isMuted = rule.muted;
+                    const isVerified = rule.source === 'data_verified' && rule.lift !== null;
 
                     return (
                       <tr key={rule.rule_id} className={isMuted ? 'muted-rule-row' : ''}>
@@ -858,22 +1051,55 @@ export default function MerchantConsole() {
                           </div>
                         </td>
 
-                        {/* Plain Language Framing */}
+                        {/* Evidence Source & Verification Tracker */}
                         <td>
-                          <div className="rule-plain-framing">
-                            "{rule.plain_language}"
-                          </div>
+                          {isVerified ? (
+                            <div>
+                              <div className="source-tag-verified">
+                                <CheckCircle2 size={12} />
+                                <span>Data-Verified Rule</span>
+                              </div>
+                              <div className="rule-stat-badges" style={{ marginTop: '0.35rem' }}>
+                                <span className="stat-badge lift" title="Empirical Market Basket Lift Multiplier">
+                                  {rule.lift.toFixed(2)}x Lift
+                                </span>
+                                <span className="stat-badge support" title="Real co-occurrence count across completed orders">
+                                  {rule.co_occurrence_count} orders ({(rule.support * 100).toFixed(1)}% Sup)
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="source-tag-ai">
+                                <Sparkles size={12} />
+                                <span>AI-Suggested Prior</span>
+                              </div>
+                              <div className="verification-tracker" style={{ marginTop: '0.35rem' }}>
+                                <div className="verification-bar">
+                                  <div
+                                    className="verification-bar-fill"
+                                    style={{ width: `${Math.min(100, ((rule.co_occurrence_count || 0) / 8) * 100)}%` }}
+                                  />
+                                </div>
+                                <span className="verification-text">
+                                  {rule.co_occurrence_count || 0} of 8 orders needed to verify
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </td>
 
-                        {/* Statistical Metrics */}
+                        {/* Framing & LLM Reasoning */}
                         <td>
-                          <div className="rule-stat-badges">
-                            <span className="stat-badge lift" title="Market Basket Lift Multiplier">
-                              {rule.lift.toFixed(2)}x Lift
-                            </span>
-                            <span className="stat-badge support" title="Market Basket Co-occurrence Support">
-                              {(rule.support * 100).toFixed(1)}% Sup
-                            </span>
+                          <div className="rule-plain-framing">
+                            {isVerified ? (
+                              <span>"{rule.plain_language}"</span>
+                            ) : (
+                              <div>
+                                <span className="llm-reasoning-quote">"{rule.reasoning || rule.plain_language}"</span>
+                                <div className="llm-badge-sub">Grounded LLM Merchandising Prior</div>
+                              </div>
+                            )}
                           </div>
                         </td>
 
@@ -932,6 +1158,269 @@ export default function MerchantConsole() {
                 )}
               </tbody>
             </table>
+            </div>
+          </div>
+
+          {/* ─────────────────────────────────────────────────────────────────── */}
+          {/* ── Scalable Architecture: Category Compatibility & Embeddings ── */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
+          <div className="scalable-layers-grid" style={{ marginTop: '2rem' }}>
+            {/* Card 1: Category Compatibility Graph */}
+            <div className="console-card">
+              <div className="console-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div className="card-title-wrap">
+                    <Layers size={16} color="var(--accent-teal)" />
+                    <h3 className="console-card-title">Scalable Layer 1: Category Compatibility Graph</h3>
+                  </div>
+                  <p className="console-card-desc">
+                    High-level cross-category affinities generated by LLM cold-start. Scales by category count (not product count).
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn-console-outline"
+                    onClick={() => setShowAddCompatModal(!showAddCompatModal)}
+                  >
+                    <Plus size={13} />
+                    <span>Add Pair</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-console-outline"
+                    onClick={handleGenerateCompat}
+                    disabled={isGeneratingCompat}
+                    title="Regenerate category compatibility graph with LLM. Preserves merchant-locked pairs."
+                  >
+                    {isGeneratingCompat ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        <span>Generating…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={13} color="var(--accent-mustard)" />
+                        <span>Regenerate Graph</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Add Custom Pair Inline Modal / Form */}
+              {showAddCompatModal && (
+                <form onSubmit={handleAddCompat} className="compat-add-form" style={{ padding: '1rem', background: 'var(--bg-paper-tint)', borderBottom: '1px solid var(--hairline)', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr auto', gap: '8px', alignItems: 'end' }}>
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--ink-secondary)', display: 'block', marginBottom: 4 }}>
+                        Category A
+                      </label>
+                      <select
+                        value={newCompatA}
+                        onChange={(e) => setNewCompatA(e.target.value)}
+                        className="console-select"
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '0.8rem' }}
+                      >
+                        <option value="">Select Category A</option>
+                        {policyData.available_categories.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--ink-secondary)', display: 'block', marginBottom: 4 }}>
+                        Category B
+                      </label>
+                      <select
+                        value={newCompatB}
+                        onChange={(e) => setNewCompatB(e.target.value)}
+                        className="console-select"
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '0.8rem' }}
+                      >
+                        <option value="">Select Category B</option>
+                        {policyData.available_categories.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--ink-secondary)', display: 'block', marginBottom: 4 }}>
+                        Reasoning / Merchandising Rule
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Riders need protective gear and accessories"
+                        value={newCompatReason}
+                        onChange={(e) => setNewCompatReason(e.target.value)}
+                        className="console-input"
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '0.8rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="submit"
+                        className="btn-console-primary"
+                        disabled={isAddingCompat}
+                        style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                      >
+                        {isAddingCompat ? 'Saving…' : 'Save & Lock'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-console-outline"
+                        onClick={() => setShowAddCompatModal(false)}
+                        style={{ padding: '6px 8px' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {/* Category Compat List */}
+              <div className="console-table-scroll" style={{ maxHeight: '320px' }}>
+                <table className="console-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '35%' }}>Compatible Categories</th>
+                      <th>Merchandising Reasoning</th>
+                      <th style={{ width: '15%' }}>Governance Status</th>
+                      <th style={{ textAlign: 'right', width: '10%' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compatPairs.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="table-empty-cell">
+                          No category compatibility pairs recorded. Click 'Regenerate Graph' to seed from catalog.
+                        </td>
+                      </tr>
+                    ) : (
+                      compatPairs.slice(0, 30).map((pair, idx) => (
+                        <tr key={`${pair.category_a}__${pair.category_b}__${idx}`}>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
+                              <span className="category-micro-tag" style={{ fontWeight: 600 }}>{pair.category_a}</span>
+                              <ArrowRight size={12} color="var(--ink-muted)" />
+                              <span className="category-micro-tag" style={{ fontWeight: 600 }}>{pair.category_b}</span>
+                            </div>
+                          </td>
+                          <td style={{ fontSize: '0.78rem', color: 'var(--ink-secondary)' }}>
+                            {pair.reasoning}
+                          </td>
+                          <td>
+                            {pair.editable ? (
+                              <span className="source-tag-ai" style={{ fontSize: '0.68rem' }}>
+                                AI-Generated
+                              </span>
+                            ) : (
+                              <span className="source-tag-verified" style={{ fontSize: '0.68rem' }}>
+                                <Lock size={10} style={{ display: 'inline', marginRight: 2 }} />
+                                Merchant-Locked
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn-rule-mute"
+                              onClick={() => handleDeleteCompat(pair.category_a, pair.category_b)}
+                              title="Delete compatibility pair and lock against future regeneration"
+                              style={{ padding: '2px 6px', fontSize: '0.7rem' }}
+                            >
+                              <X size={11} />
+                              <span>Remove</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Card 2: Co-Purchase Embeddings (Layer 2) */}
+            <div className="console-card" style={{ marginTop: '1.25rem' }}>
+              <div className="console-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div className="card-title-wrap">
+                    <BarChart3 size={16} color="var(--accent-mustard)" />
+                    <h3 className="console-card-title">Scalable Layer 2: Co-Purchase Embeddings (item2vec)</h3>
+                  </div>
+                  <p className="console-card-desc">
+                    Trained over real order sequences only (<span style={{ fontFamily: 'var(--font-mono)' }}>is_synthetic = 0</span>). Requires $\ge 50$ real completed orders.
+                  </p>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    className="btn-console-primary"
+                    onClick={handleTrainEmbeddings}
+                    disabled={isTrainingEmbeddings || embeddingStatus.real_order_count < embeddingStatus.min_orders_required}
+                    title={
+                      embeddingStatus.real_order_count < embeddingStatus.min_orders_required
+                        ? `Requires at least ${embeddingStatus.min_orders_required} real orders (currently ${embeddingStatus.real_order_count})`
+                        : "Train item2vec skip-gram embeddings over real orders"
+                    }
+                  >
+                    {isTrainingEmbeddings ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        <span>Training Vectors…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={13} />
+                        <span>Train Embeddings</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', background: 'var(--bg-paper-tint)', borderTop: '1px solid var(--hairline)' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Real Orders</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--ink)' }}>{embeddingStatus.real_order_count}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-secondary)' }}>Minimum needed: {embeddingStatus.min_orders_required}</div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Training Readiness</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: embeddingStatus.ready ? 'var(--accent-teal)' : 'var(--alert-brick)' }}>
+                    {embeddingStatus.ready ? 'Ready to Train' : 'Gating Active'}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-secondary)' }}>
+                    {embeddingStatus.ready ? 'Sufficient order volume' : `${Math.max(0, embeddingStatus.min_orders_required - embeddingStatus.real_order_count)} more orders needed`}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>SKUs with Vectors</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: embeddingStatus.skus_with_embeddings > 0 ? 'var(--accent-teal)' : 'var(--ink-muted)' }}>
+                    {embeddingStatus.skus_with_embeddings}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-secondary)' }}>In-stock catalog items</div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Model Status</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: embeddingStatus.trained ? 'var(--accent-teal)' : 'var(--accent-mustard)' }}>
+                    {embeddingStatus.trained ? 'Trained (Active)' : 'Cold-Start Fallback'}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-secondary)' }}>
+                    {embeddingStatus.trained ? 'Layer 2 active in blend' : 'Layers 1, 3 & 4 active'}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

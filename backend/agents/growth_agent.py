@@ -16,25 +16,23 @@ class UpsellChoice(BaseModel):
 
 def generate_upsell(cart_items: list) -> dict | None:
     """
-    Data-driven cross-sell recommendation using Market Basket Analysis:
-      Layer 1 (Lift Engine): query basket_pairs derived from historical orders
-                             (support, confidence, lift calculation + boost multiplier)
-      Layer 2 (Growth Agent): given top-3 ranked candidates, LLM selects best
+    Data-driven cross-sell recommendation using Hybrid Growth Engine:
+      Layer 1 (Lift Engine): query basket_pairs derived from empirical orders or AI-seeded priors.
+      Layer 2 (Growth Agent): given top candidates, LLM selects best
                              and writes natural, contextual copy grounded in the cart.
 
     Returns dict with keys:
-      sku, name, price_paise, category, lift, support, final_score, reason, candidates
+      sku, name, price_paise, category, source, lift, support, confidence, reasoning, final_score, reason, candidates
     """
     if not cart_items:
         return None
 
-    # Layer 1: Query Market Basket Lift Engine for top 3 candidates
+    # Layer 1: Query Hybrid Lift Engine for top candidates
     candidates = find_cross_sell(cart_items, top_k=3)
 
     if not candidates:
         return None
 
-    # If only 1 candidate or no LLM key, use pre-calculated lift reason
     api_key = os.getenv("OPENAI_API_KEY")
     if len(candidates) == 1 or not api_key:
         c = candidates[0]
@@ -43,22 +41,33 @@ def generate_upsell(cart_items: list) -> dict | None:
             "name": c["name"],
             "price_paise": c["price_paise"],
             "category": c["category"],
-            "lift": c.get("lift", 1.0),
-            "support": c.get("support", 0.0),
+            "source": c.get("source", "ai_suggested"),
+            "lift": c.get("lift"),
+            "support": c.get("support"),
+            "confidence": c.get("confidence"),
+            "reasoning": c.get("reasoning"),
+            "co_occurrence_count": c.get("co_occurrence_count", 0),
             "final_score": c.get("final_score", 1.0),
-            "reason": c.get("reason", "Frequently purchased together with items in your cart."),
+            "reason": c.get("reason", "Complementary recommendation for your cart."),
             "candidates": candidates,
         }
 
-    # Layer 2: LLM picks the best among top-3 candidates and writes a natural reason
+    # Layer 2: LLM picks the best among candidates and writes a contextual reason
     client = OpenAI(api_key=api_key)
 
-    candidate_str = "\n".join(
-        f"- SKU: {c['sku']}, Name: {c['name']}, Price: ₹{c['price_paise']/100:.0f}, "
-        f"Lift Score: {c.get('lift', 1.0):.2f}x affinity with {c.get('trigger_name', 'cart')}"
-        + (" [BOOSTED PARTNER]" if c.get("boosted") else "")
-        for c in candidates
-    )
+    candidate_lines = []
+    for c in candidates:
+        is_boosted = " [BOOSTED PARTNER]" if c.get("boosted") else ""
+        if c.get("source") == "data_verified" and c.get("lift") is not None:
+            evidence = f"Data-Verified ({c['lift']:.2f}x lift across {c.get('co_occurrence_count', 0)} orders)"
+        else:
+            evidence = f"AI-Suggested Prior ({c.get('reasoning') or 'Curated complement'})"
+
+        candidate_lines.append(
+            f"- SKU: {c['sku']}, Name: {c['name']}, Price: ₹{c['price_paise']/100:.0f}, Evidence: {evidence}{is_boosted}"
+        )
+
+    candidate_str = "\n".join(candidate_lines)
 
     cart_summary = ", ".join(
         f"{item.get('name', item.get('sku'))} (×{item.get('qty', 1)}, ₹{item.get('price_paise', 0)/100:.0f})"
@@ -66,18 +75,18 @@ def generate_upsell(cart_items: list) -> dict | None:
     )
 
     system_instruction = f"""
-    You are an AI Growth Agent for an e-commerce store. Your job is to select the single best
-    cross-sell recommendation from a pre-vetted list computed by our Market Basket Lift Engine.
+    You are an AI Growth Merchandising Agent for an e-commerce store. Your job is to select the single best
+    cross-sell recommendation from a pre-vetted list computed by our Hybrid Growth Engine.
 
     Current cart contents: {cart_summary}
 
-    Candidate cross-sell items (all real, in-stock catalog items with measured affinity):
+    Candidate cross-sell items (all real, in-stock catalog items):
     {candidate_str}
 
     Rules:
     1. Pick EXACTLY ONE SKU from the candidate list above. Do not invent or alter any SKU.
-    2. Prefer higher lift scores and boosted partner items when quality is comparable.
-    3. Write a single natural, specific 1-sentence reason that explains why this item pairs with the cart contents.
+    2. Prefer Data-Verified rules and boosted partner items when relevance is comparable.
+    3. Write a single natural, specific 1-sentence customer-facing reason explaining why this item pairs with the cart.
     4. Set suggest=true.
     """
 
@@ -102,8 +111,12 @@ def generate_upsell(cart_items: list) -> dict | None:
                     "name": chosen["name"],
                     "price_paise": chosen["price_paise"],
                     "category": chosen["category"],
-                    "lift": chosen.get("lift", 1.0),
-                    "support": chosen.get("support", 0.0),
+                    "source": chosen.get("source", "ai_suggested"),
+                    "lift": chosen.get("lift"),
+                    "support": chosen.get("support"),
+                    "confidence": chosen.get("confidence"),
+                    "reasoning": chosen.get("reasoning"),
+                    "co_occurrence_count": chosen.get("co_occurrence_count", 0),
                     "final_score": chosen.get("final_score", 1.0),
                     "reason": choice.reason,
                     "candidates": candidates,
@@ -118,9 +131,13 @@ def generate_upsell(cart_items: list) -> dict | None:
         "name": c["name"],
         "price_paise": c["price_paise"],
         "category": c["category"],
-        "lift": c.get("lift", 1.0),
-        "support": c.get("support", 0.0),
+        "source": c.get("source", "ai_suggested"),
+        "lift": c.get("lift"),
+        "support": c.get("support"),
+        "confidence": c.get("confidence"),
+        "reasoning": c.get("reasoning"),
+        "co_occurrence_count": c.get("co_occurrence_count", 0),
         "final_score": c.get("final_score", 1.0),
-        "reason": c.get("reason", "Top complementary item based on customer purchase history."),
+        "reason": c.get("reason", "Top complementary item for your order."),
         "candidates": candidates,
     }

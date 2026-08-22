@@ -2573,6 +2573,33 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
 
+.console-table-scroll {
+  max-height: 520px;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-dark) transparent;
+}
+
+.console-table-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.console-table-scroll::-webkit-scrollbar-track {
+  background: var(--bg-card);
+}
+
+.console-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--hairline-dark);
+  border-radius: 3px;
+}
+
+.console-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-muted);
+}
+
 .console-table {
   width: 100%;
   border-collapse: collapse;
@@ -2590,6 +2617,10 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--hairline);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-shadow: 0 1px 0 var(--hairline);
 }
 
 .console-table td {
@@ -2956,6 +2987,132 @@ body {
   line-height: 1.35;
   margin: 0;
 }
+
+/* Hybrid Growth Engine: Source Badges & Verification Tracker */
+.source-tag-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+}
+
+.source-tag-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FAF5FF;
+  border: 1px solid #E9D5FF;
+  color: #7E22CE;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+}
+
+.verification-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 170px;
+}
+
+.verification-bar {
+  width: 100%;
+  height: 4px;
+  background: #E5E7EB;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.verification-bar-fill {
+  height: 100%;
+  background: #8B5CF6;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.verification-text {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-muted);
+}
+
+.llm-reasoning-quote {
+  font-size: 0.82rem;
+  color: var(--ink);
+  line-height: 1.35;
+  font-style: normal;
+  display: block;
+}
+
+.llm-badge-sub {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: #7E22CE;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 3px;
+  letter-spacing: 0.02em;
+}
+
+/* Scalable Layer 2: Co-purchase item2vec badge */
+.source-tag-copurchase {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1D4ED8;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+}
+
+/* Scalable Layer 1: Category Match badge */
+.source-tag-catmatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  color: #334155;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+}
+
+/* Scalable Layer 1 Inline Form */
+.compat-add-form {
+  border-radius: var(--radius-sm);
+  animation: fadeIn 0.2s ease;
+}
+
+.console-select {
+  background: #FFF;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xs);
+  color: var(--ink);
+  outline: none;
+  font-family: var(--font-sans);
+}
+
+.console-select:focus {
+  border-color: var(--accent-teal);
+}
+
+
 
 
 

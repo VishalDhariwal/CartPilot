@@ -122,86 +122,23 @@ def sync_dummyjson_catalog():
     else:
         print("⚠️ Model not loaded; will compute embeddings on first query.")
 
-    # ── Bootstrap Market Basket Historical Orders ────────────────────────
-    print("📊 Bootstrapping historical orders for Market Basket Analysis...")
-    cursor.execute("SELECT sku, name, category FROM catalog WHERE stock > 0")
-    all_cat_items = [dict(row) for row in cursor.fetchall()]
-
-    cat_map = {}
-    for item in all_cat_items:
-        cat_map.setdefault(item["category"], []).append(item["sku"])
-
-    # High affinity category pairs
-    affinity_pairs = [
-        ("smartphones", "mobile-accessories"),
-        ("laptops", "mobile-accessories"),
-        ("laptops", "tablets"),
-        ("beauty", "skin-care"),
-        ("fragrances", "beauty"),
-        ("mens-shirts", "mens-shoes"),
-        ("mens-shirts", "mens-watches"),
-        ("mens-shirts", "sunglasses"),
-        ("womens-dresses", "womens-shoes"),
-        ("womens-dresses", "womens-jewellery"),
-        ("womens-dresses", "womens-bags"),
-        ("groceries", "kitchen-accessories"),
-        ("home-decoration", "furniture"),
-        ("sports-accessories", "smartphones"),
-    ]
-
-    orders_to_insert = []
-    base_time = datetime.utcnow() - timedelta(days=60)
-
-    for i in range(350):
-        order_id = f"syn_dj_{i+1:04d}"
-        created_at = (base_time + timedelta(hours=i * 4 + random.randint(0, 180))).isoformat() + "Z"
-
-        if random.random() < 0.75:
-            c1, c2 = random.choice(affinity_pairs)
-            p1 = cat_map.get(c1, [])
-            p2 = cat_map.get(c2, [])
-            basket = []
-            if p1:
-                basket.append(random.choice(p1))
-            if p2:
-                basket.append(random.choice(p2))
-            if p1 and random.random() < 0.4:
-                extra = random.choice(p1)
-                if extra not in basket:
-                    basket.append(extra)
-        else:
-            cat = random.choice(list(cat_map.keys()))
-            pool = cat_map[cat]
-            k = min(len(pool), random.randint(2, 4))
-            basket = random.sample(pool, k)
-
-        basket = list(dict.fromkeys(basket))
-        if len(basket) < 2:
-            basket.append(random.choice(all_cat_items)["sku"])
-            basket = list(dict.fromkeys(basket))
-
-        orders_to_insert.append((
-            order_id,
-            json.dumps(basket),
-            1,  # is_synthetic = 1
-            created_at
-        ))
-
+    # ── Purge Synthetic Orders & Seed Grounded AI Priors ─────────────────
+    print("🤖 Seeding grounded AI priors for Market Basket Growth Engine...")
     cursor.execute("DELETE FROM historical_orders WHERE is_synthetic = 1")
-    cursor.executemany(
-        """INSERT OR REPLACE INTO historical_orders (order_id, items, is_synthetic, created_at)
-           VALUES (?, ?, ?, ?)""",
-        orders_to_insert
-    )
     conn.commit()
     conn.close()
 
-    # Recompute lift pairs
-    from backend.recommendations.lift_engine import compute_lift_pairs
-    rules_count = compute_lift_pairs()
-    print(f"✅ Market Basket Analysis computed {rules_count} association rules.")
+    # Generate grounded LLM priors
+    from backend.recommendations.lift_engine import generate_ai_priors, compute_lift_pairs
+    priors_count = generate_ai_priors()
+    print(f"✅ Growth Engine seeded with {priors_count} AI-suggested rules.")
+
+    # Check real empirical orders for data-verified rules
+    verified_count = compute_lift_pairs(min_co_occurrence=8)
+    print(f"✅ Market Basket Analysis verified {verified_count} empirical rules (>= 8 orders).")
 
     return len(items_to_insert)
 
 if __name__ == "__main__":
     sync_dummyjson_catalog()
+

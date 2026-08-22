@@ -6,7 +6,9 @@ from datetime import datetime
 DB_PATH = "cartpilot.db"
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn = sqlite3.connect(DB_PATH, timeout=60.0)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=60000;")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -90,12 +92,16 @@ def init_db():
       created_at TEXT NOT NULL
     );
 
-    -- Market Basket Analysis pairs: derived from historical_orders lift/support calculations
+    -- Market Basket Analysis pairs: derived from LLM-seeded priors (ai_suggested) or statistical lift (data_verified)
     CREATE TABLE IF NOT EXISTS basket_pairs (
       sku_a TEXT NOT NULL,
       sku_b TEXT NOT NULL,
-      lift REAL NOT NULL,
-      support REAL NOT NULL,
+      lift REAL,
+      support REAL,
+      confidence REAL,
+      source TEXT NOT NULL DEFAULT 'ai_suggested',
+      reasoning TEXT,
+      co_occurrence_count INTEGER DEFAULT 0,
       computed_at TEXT NOT NULL,
       muted INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (sku_a, sku_b)
@@ -121,6 +127,17 @@ def init_db():
       cart_total_after_paise INTEGER NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    -- Scalable Layer 1: Category compatibility graph (LLM-generated, merchant-editable)
+    -- editable=1 means LLM regeneration may overwrite; editable=0 means merchant has locked the row
+    CREATE TABLE IF NOT EXISTS category_compatibility (
+      category_a TEXT NOT NULL,
+      category_b TEXT NOT NULL,
+      reasoning TEXT NOT NULL,
+      editable INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (category_a, category_b)
+    );
     ''')
 
     # ── Safe Column Alterations for Existing Databases ───────────────────
@@ -131,14 +148,41 @@ def init_db():
         ("catalog", "tags", "TEXT"),
         ("catalog", "metadata", "TEXT"),
         ("catalog", "embedding", "TEXT"),
+        ("catalog", "co_purchase_embedding", "TEXT"),  # Layer 2: item2vec co-purchase vectors
         ("policy_config", "autonomy_threshold_paise", "INTEGER NOT NULL DEFAULT 500000"),
-        ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0")
+        ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0"),
+        ("basket_pairs", "source", "TEXT NOT NULL DEFAULT 'ai_suggested'"),
+        ("basket_pairs", "reasoning", "TEXT"),
+        ("basket_pairs", "co_occurrence_count", "INTEGER DEFAULT 0"),
+        ("basket_pairs", "confidence", "REAL"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
             conn.commit()
         except Exception:
             pass
+
+    # Ensure basket_pairs has nullable lift/support for Hybrid Growth Engine
+    cursor.execute("PRAGMA table_info(basket_pairs)")
+    bp_cols = {row["name"]: row for row in cursor.fetchall()}
+    if bp_cols.get("lift") and bp_cols["lift"]["notnull"] == 1:
+        cursor.execute("DROP TABLE basket_pairs")
+        cursor.execute("""
+        CREATE TABLE basket_pairs (
+          sku_a TEXT NOT NULL,
+          sku_b TEXT NOT NULL,
+          lift REAL,
+          support REAL,
+          confidence REAL,
+          source TEXT NOT NULL DEFAULT 'ai_suggested',
+          reasoning TEXT,
+          co_occurrence_count INTEGER DEFAULT 0,
+          computed_at TEXT NOT NULL,
+          muted INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (sku_a, sku_b)
+        )
+        """)
+        conn.commit()
 
     # ── Seed Policy Config ───────────────────────────────────────────────
     all_allowed = [

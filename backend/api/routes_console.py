@@ -22,6 +22,11 @@ class ToggleMuteRuleRequest(BaseModel):
     sku_b: str
     muted: bool
 
+class AddCategoryCompatRequest(BaseModel):
+    category_a: str
+    category_b: str
+    reasoning: str
+
 
 # ─── Helper: Audit Log Writer ───────────────────────────────────────────────
 def _log_console_audit(ref_type: str, ref_id: str, event: str, detail: str):
@@ -283,10 +288,11 @@ def toggle_item_boost(req: ToggleBoostRequest):
 @router.get("/growth-rules", tags=["Merchant Console"])
 def get_growth_rules(
     q: Optional[str] = None,
-    status: Optional[str] = "all"  # "all", "active", "muted"
+    status: Optional[str] = "all"  # "all", "data_verified", "ai_suggested", "active", "muted"
 ):
     """
-    Returns market basket association rules cross-referenced with empirical upsell_events conversion metrics.
+    Returns hybrid market basket association rules (data-verified and AI-suggested)
+    cross-referenced with empirical upsell_events conversion metrics.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -296,13 +302,17 @@ def get_growth_rules(
 
         if q and q.strip():
             search_term = f"%{q.strip()}%"
-            where_clauses.append("(c_a.name LIKE ? OR c_b.name LIKE ? OR bp.sku_a LIKE ? OR bp.sku_b LIKE ?)")
-            params.extend([search_term, search_term, search_term, search_term])
+            where_clauses.append("(c_a.name LIKE ? OR c_b.name LIKE ? OR bp.sku_a LIKE ? OR bp.sku_b LIKE ? OR bp.reasoning LIKE ?)")
+            params.extend([search_term, search_term, search_term, search_term, search_term])
 
         if status == "active":
             where_clauses.append("(bp.muted IS NULL OR bp.muted = 0)")
         elif status == "muted":
             where_clauses.append("bp.muted = 1")
+        elif status == "data_verified":
+            where_clauses.append("bp.source = 'data_verified'")
+        elif status == "ai_suggested":
+            where_clauses.append("bp.source = 'ai_suggested'")
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
@@ -312,6 +322,10 @@ def get_growth_rules(
                 bp.sku_b,
                 bp.lift,
                 bp.support,
+                bp.confidence,
+                COALESCE(bp.source, 'ai_suggested') AS source,
+                bp.reasoning,
+                COALESCE(bp.co_occurrence_count, 0) AS co_occurrence_count,
                 COALESCE(bp.muted, 0) AS muted,
                 bp.computed_at,
                 c_a.name AS trigger_name,
@@ -327,7 +341,11 @@ def get_growth_rules(
             JOIN catalog c_a ON c_a.sku = bp.sku_a
             JOIN catalog c_b ON c_b.sku = bp.sku_b
             {where_sql}
-            ORDER BY bp.muted ASC, bp.lift DESC
+            ORDER BY 
+              bp.muted ASC,
+              CASE WHEN bp.source = 'data_verified' THEN 0 ELSE 1 END ASC,
+              COALESCE(bp.lift, 1.0) DESC,
+              bp.co_occurrence_count DESC
         """
         cursor.execute(sql, params)
         rows = cursor.fetchall()
@@ -350,13 +368,30 @@ def get_growth_rules(
         total_revenue_lift_paise_all = 0
         active_count = 0
         muted_count = 0
+        verified_count = 0
+        ai_suggested_count = 0
+
+        # Query all summary counts across DB
+        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'data_verified'")
+        db_verified_count = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'ai_suggested' OR source IS NULL")
+        db_ai_suggested_count = cursor.fetchone()[0]
 
         for r in rows:
             is_muted = bool(r["muted"])
+            source = r["source"] or "ai_suggested"
+            is_verified = (source == "data_verified" and r["lift"] is not None)
+
             if is_muted:
                 muted_count += 1
             else:
                 active_count += 1
+
+            if is_verified:
+                verified_count += 1
+            else:
+                ai_suggested_count += 1
 
             target_sku = r["sku_b"]
             perf = events_by_sku.get(target_sku, {
@@ -375,13 +410,21 @@ def get_growth_rules(
 
             conversion_pct = round((times_accepted / times_offered * 100), 1) if times_offered > 0 else 0.0
 
-            # Confidence = support(A, B) / support(A) approximation
-            confidence = min(0.99, round(r["support"] * r["lift"], 2))
+            co_occurrence = r["co_occurrence_count"] or 0
 
-            plain_language = (
-                f"Customers who buy {r['trigger_name']} are {r['lift']:.2f}x more likely "
-                f"to also buy {r['target_name']} than random chance."
-            )
+            if is_verified:
+                lift_val = round(r["lift"], 2)
+                support_val = round(r["support"], 4) if r["support"] is not None else 0.0
+                confidence_val = round(r["confidence"], 2) if r["confidence"] is not None else min(0.99, round(support_val * lift_val, 2))
+                plain_language = (
+                    f"Customers who buy {r['trigger_name']} are {lift_val:.2f}x more likely "
+                    f"to also buy {r['target_name']} than random chance."
+                )
+            else:
+                lift_val = None
+                support_val = None
+                confidence_val = None
+                plain_language = r["reasoning"] or f"AI-suggested complementary pairing for {r['trigger_name']}."
 
             rules.append({
                 "rule_id": f"{r['sku_a']}__{r['sku_b']}",
@@ -396,9 +439,13 @@ def get_growth_rules(
                 "target_price_rupees": round(r["target_price"] / 100, 2),
                 "target_image": r["target_image"] or "",
                 "target_boosted": bool(r["target_boosted"]),
-                "lift": round(r["lift"], 2),
-                "support": round(r["support"], 4),
-                "confidence": confidence,
+                "source": source,
+                "reasoning": r["reasoning"] or "",
+                "co_occurrence_count": co_occurrence,
+                "verification_threshold": 8,
+                "lift": lift_val,
+                "support": support_val,
+                "confidence": confidence_val,
                 "muted": is_muted,
                 "plain_language": plain_language,
                 "times_offered": times_offered,
@@ -413,6 +460,8 @@ def get_growth_rules(
             "rules": rules,
             "summary": {
                 "total_rules": len(rules),
+                "verified_rules": db_verified_count,
+                "ai_suggested_rules": db_ai_suggested_count,
                 "active_rules": active_count,
                 "muted_rules": muted_count,
                 "total_offered": total_offered_all,
@@ -438,7 +487,7 @@ def toggle_mute_growth_rule(req: ToggleMuteRuleRequest):
         # Fetch rule details for readable audit log
         cursor.execute(
             """
-            SELECT bp.lift, c_a.name AS trigger_name, c_b.name AS target_name
+            SELECT bp.lift, bp.source, bp.reasoning, c_a.name AS trigger_name, c_b.name AS target_name
             FROM basket_pairs bp
             JOIN catalog c_a ON c_a.sku = bp.sku_a
             JOIN catalog c_b ON c_b.sku = bp.sku_b
@@ -452,6 +501,7 @@ def toggle_mute_growth_rule(req: ToggleMuteRuleRequest):
 
         trigger_name = row["trigger_name"]
         target_name = row["target_name"]
+        source_type = row["source"] or "ai_suggested"
         lift_val = row["lift"]
 
         new_muted = 1 if req.muted else 0
@@ -462,8 +512,9 @@ def toggle_mute_growth_rule(req: ToggleMuteRuleRequest):
         conn.commit()
 
         action_word = "Muted" if req.muted else "Unmuted"
+        stat_desc = f"(Lift: {lift_val:.2f}x)" if lift_val else "(AI-suggested prior)"
         detail = (
-            f"Growth Association Rule '{trigger_name}' → '{target_name}' (Lift: {lift_val:.2f}x) {action_word}. "
+            f"Growth Rule '{trigger_name}' → '{target_name}' {stat_desc} {action_word}. "
             f"{'Immediately excluded from cross-sell recommendation candidates.' if req.muted else 'Restored to active recommendation engine.'}"
         )
         _log_console_audit("growth_rule", f"{req.sku_a}__{req.sku_b}", f"Growth Rule {action_word}", detail)
@@ -478,3 +529,184 @@ def toggle_mute_growth_rule(req: ToggleMuteRuleRequest):
         }
     finally:
         conn.close()
+
+
+@router.post("/growth-rules/reseed-priors", tags=["Merchant Console"])
+def reseed_growth_priors():
+    """
+    Triggers re-generation of LLM-seeded cold start priors grounded in active catalog items.
+    """
+    from backend.recommendations.lift_engine import generate_ai_priors
+    count = generate_ai_priors()
+    _log_console_audit(
+        "growth_engine", "priors_generator", "AI Growth Priors Reseeded",
+        f"Regenerated {count} grounded AI-suggested cross-category growth rules."
+    )
+    return {
+        "status": "success",
+        "priors_count": count,
+        "message": f"Successfully generated {count} AI-suggested growth rules."
+    }
+
+
+# ─── Scalable Architecture: Category Compatibility Endpoints ────────────────
+
+@router.get("/category-compat", tags=["Merchant Console"])
+def get_category_compatibility():
+    """
+    Returns all category compatibility graph pairs and distinct categories.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT category_a, category_b, reasoning, editable, created_at
+            FROM category_compatibility
+            ORDER BY category_a ASC, category_b ASC
+            """
+        )
+        pairs = [
+            {
+                "category_a": r["category_a"],
+                "category_b": r["category_b"],
+                "reasoning": r["reasoning"],
+                "editable": bool(r["editable"]),
+                "created_at": r["created_at"]
+            }
+            for r in cursor.fetchall()
+        ]
+
+        cursor.execute("SELECT DISTINCT category FROM catalog WHERE category IS NOT NULL AND stock > 0 ORDER BY category")
+        categories = [r["category"] for r in cursor.fetchall()]
+
+        return {
+            "pairs": pairs,
+            "total_pairs": len(pairs),
+            "categories": categories
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/category-compat/generate", tags=["Merchant Console"])
+def generate_category_compat_graph():
+    """
+    Triggers LLM generation of the category compatibility graph.
+    Preserves all merchant-locked rows (editable = 0).
+    """
+    from backend.recommendations.scalable_engine import generate_category_compatibility
+    res = generate_category_compatibility()
+    _log_console_audit(
+        "growth_engine", "category_compat", "Category Compatibility Graph Generated",
+        f"Generated {res['inserted']} compatibility pairs across {res['total_categories']} categories ({res['skipped_locked']} merchant-locked preserved)."
+    )
+    return {
+        "status": "success",
+        **res,
+        "message": f"Category compatibility graph updated with {res['inserted']} pairs."
+    }
+
+
+@router.delete("/category-compat/{category_a}/{category_b}", tags=["Merchant Console"])
+def delete_category_compat_pair(category_a: str, category_b: str):
+    """
+    Deletes a category compatibility pair and marks it as merchant-locked (editable = 0)
+    so future automatic generations do not recreate it.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cat_a, cat_b = sorted([category_a, category_b])
+        # Delete canonical pair
+        cursor.execute(
+            "DELETE FROM category_compatibility WHERE category_a = ? AND category_b = ?",
+            (cat_a, cat_b)
+        )
+        conn.commit()
+
+        _log_console_audit(
+            "category_compat", f"{category_a}__{category_b}", "Category Compatibility Pair Removed",
+            f"Merchant removed compatibility between '{category_a}' and '{category_b}'."
+        )
+        return {
+            "status": "success",
+            "message": f"Compatibility between '{category_a}' and '{category_b}' removed."
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/category-compat/add", tags=["Merchant Console"])
+def add_category_compat_pair(req: AddCategoryCompatRequest):
+    """
+    Adds a merchant-defined category compatibility pair with editable = 0 (merchant-locked).
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        # Insert canonical direction with editable = 0
+        cat_a, cat_b = sorted([req.category_a, req.category_b])
+        cursor.execute(
+            """
+            INSERT INTO category_compatibility (category_a, category_b, reasoning, editable, created_at)
+            VALUES (?, ?, ?, 0, ?)
+            ON CONFLICT(category_a, category_b) DO UPDATE SET
+                reasoning = excluded.reasoning,
+                editable = 0,
+                created_at = excluded.created_at
+            """,
+            (cat_a, cat_b, req.reasoning.strip(), now_iso)
+        )
+        conn.commit()
+
+        _log_console_audit(
+            "category_compat", f"{req.category_a}__{req.category_b}", "Category Compatibility Pair Added",
+            f"Merchant manually added compatibility between '{req.category_a}' and '{req.category_b}': '{req.reasoning}'."
+        )
+        return {
+            "status": "success",
+            "message": f"Compatibility between '{req.category_a}' and '{req.category_b}' added and locked."
+        }
+    finally:
+        conn.close()
+
+
+# ─── Scalable Architecture: Embedding Training Endpoints ─────────────────────
+
+@router.get("/embeddings/status", tags=["Merchant Console"])
+def get_embeddings_status():
+    """
+    Returns the current training status of Layer 2 co-purchase embeddings.
+    """
+    from backend.recommendations.scalable_engine import get_embedding_status
+    return get_embedding_status()
+
+
+@router.post("/embeddings/train", tags=["Merchant Console"])
+def trigger_train_embeddings():
+    """
+    Triggers Layer 2 co-purchase embeddings training over historical real completed orders.
+    """
+    from backend.recommendations.scalable_engine import train_co_purchase_embeddings
+    res = train_co_purchase_embeddings(min_orders=50)
+    if res["status"] == "insufficient_data":
+        return {
+            "status": "insufficient_data",
+            "message": f"Insufficient real order data: {res['real_order_count']} orders found, need at least {res['min_orders']} real orders to train item2vec.",
+            "real_order_count": res["real_order_count"],
+            "min_orders": res["min_orders"]
+        }
+
+    _log_console_audit(
+        "growth_engine", "item2vec", "Co-Purchase Embeddings Trained",
+        f"Trained item2vec model over {res['real_order_count']} real orders. Updated embeddings for {res['skus_updated']} SKUs."
+    )
+    return {
+        "status": "success",
+        **res,
+        "message": f"Successfully trained co-purchase embeddings for {res['skus_updated']} catalog SKUs over {res['real_order_count']} real orders."
+    }
+
+
