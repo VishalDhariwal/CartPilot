@@ -37,7 +37,8 @@ def init_db():
     CREATE TABLE IF NOT EXISTS policy_config (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       spend_cap_paise INTEGER NOT NULL,
-      allowed_categories TEXT NOT NULL
+      allowed_categories TEXT NOT NULL,
+      autonomy_threshold_paise INTEGER NOT NULL DEFAULT 500000
     );
 
     CREATE TABLE IF NOT EXISTS intent_mandates (
@@ -96,6 +97,7 @@ def init_db():
       lift REAL NOT NULL,
       support REAL NOT NULL,
       computed_at TEXT NOT NULL,
+      muted INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (sku_a, sku_b)
     );
 
@@ -122,17 +124,18 @@ def init_db():
     ''')
 
     # ── Safe Column Alterations for Existing Databases ───────────────────
-    for col_def in [
-        ("boosted", "INTEGER NOT NULL DEFAULT 0"),
-        ("image_url", "TEXT"),
-        ("description", "TEXT"),
-        ("tags", "TEXT"),
-        ("metadata", "TEXT"),
-        ("embedding", "TEXT")
+    for table_name, col_name, col_type in [
+        ("catalog", "boosted", "INTEGER NOT NULL DEFAULT 0"),
+        ("catalog", "image_url", "TEXT"),
+        ("catalog", "description", "TEXT"),
+        ("catalog", "tags", "TEXT"),
+        ("catalog", "metadata", "TEXT"),
+        ("catalog", "embedding", "TEXT"),
+        ("policy_config", "autonomy_threshold_paise", "INTEGER NOT NULL DEFAULT 500000"),
+        ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0")
     ]:
-
         try:
-            cursor.execute(f"ALTER TABLE catalog ADD COLUMN {col_def[0]} {col_def[1]}")
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
             conn.commit()
         except Exception:
             pass
@@ -149,14 +152,16 @@ def init_db():
     cursor.execute("SELECT COUNT(*) FROM policy_config")
     if cursor.fetchone()[0] == 0:
         cursor.execute(
-            "INSERT INTO policy_config (id, spend_cap_paise, allowed_categories) VALUES (?, ?, ?)",
-            (1, 1000000, json.dumps(all_allowed))
+            "INSERT INTO policy_config (id, spend_cap_paise, allowed_categories, autonomy_threshold_paise) VALUES (?, ?, ?, ?)",
+            (1, 1000000, json.dumps(all_allowed), 500000)
         )
     else:
-        cursor.execute(
-            "UPDATE policy_config SET allowed_categories = ?, spend_cap_paise = MAX(spend_cap_paise, 1000000) WHERE id = 1",
-            (json.dumps(all_allowed),)
-        )
+        cursor.execute("SELECT autonomy_threshold_paise FROM policy_config WHERE id = 1")
+        row = cursor.fetchone()
+        if row and (row["autonomy_threshold_paise"] is None or row["autonomy_threshold_paise"] == 0):
+            cursor.execute("UPDATE policy_config SET autonomy_threshold_paise = 500000 WHERE id = 1")
+            conn.commit()
+
 
 
     # ── Seed Catalog ─────────────────────────────────────────────────────

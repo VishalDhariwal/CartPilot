@@ -6,7 +6,8 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db import init_db, get_db
-from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery
+from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery, routes_console
+
 
 
 
@@ -63,6 +64,8 @@ app.include_router(routes_checkout.router, prefix="/checkout", tags=["Checkout"]
 app.include_router(routes_webhook.router, prefix="/webhook", tags=["Webhook"])
 app.include_router(routes_resolution.router, prefix="/resolution", tags=["Resolution"])
 app.include_router(routes_recovery.router, prefix="/recovery", tags=["Recovery"])
+app.include_router(routes_console.router, prefix="/api/console", tags=["Merchant Console"])
+
 
 
 @app.get("/catalog", tags=["Catalog"])

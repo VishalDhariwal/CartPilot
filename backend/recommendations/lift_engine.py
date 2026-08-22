@@ -142,6 +142,7 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
     WHERE bp.sku_a IN ({placeholders})
       AND c.stock > 0
       AND bp.sku_b NOT IN ({placeholders})
+      AND (bp.muted IS NULL OR bp.muted = 0)
     ORDER BY bp.lift DESC
     """
 
@@ -154,7 +155,7 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
         sku_b = row["sku_b"]
         lift = row["lift"]
         boosted = row["candidate_boosted"] or 0
-        boost_multiplier = 1.15 if boosted else 1.0
+        boost_multiplier = 1.35 if boosted else 1.0
         final_score = round(lift * boost_multiplier, 4)
 
         trigger_sku = row["sku_a"]
@@ -163,6 +164,7 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
         # Build an explainable reason grounded in the co-occurrence data
         reason = f"Frequently bought together with {trigger_name} (affinity {lift:.1f}x higher than average)."
         if boosted:
+
             reason += " Featured partner recommendation."
 
         meta_obj = {}

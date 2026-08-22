@@ -162,6 +162,18 @@ function ReceiptCard({
         </span>
       </div>
 
+      {cartData.status === 'pending_confirmation' && (
+        <div className="pending-confirmation-banner">
+          <div className="pending-conf-title">
+            <Lock size={14} color="var(--accent-mustard)" />
+            <strong>Reserve Pay Autonomy Threshold Confirmation</strong>
+          </div>
+          <p className="pending-conf-desc">
+            This order of ₹{totalRupees} meets or exceeds the merchant autonomy threshold. Explicit authorization is required before generating the Razorpay payment mandate.
+          </p>
+        </div>
+      )}
+
       {cartData.guardrail_reason && (
         <div className="receipt-guardrail-tag">
           <Shield size={13} />
@@ -177,14 +189,24 @@ function ReceiptCard({
             disabled={isUpdating}
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0.65rem 1rem' }}
           >
-            <span>Proceed to Payment</span>
-            <ArrowRight size={14} />
+            {cartData.status === 'pending_confirmation' ? (
+              <>
+                <Lock size={14} />
+                <span>Authorize High-Value Order & Proceed</span>
+              </>
+            ) : (
+              <>
+                <span>Proceed to Payment</span>
+                <ArrowRight size={14} />
+              </>
+            )}
           </button>
         </div>
       )}
     </div>
   );
 }
+
 
 
 

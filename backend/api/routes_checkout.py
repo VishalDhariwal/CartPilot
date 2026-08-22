@@ -444,6 +444,44 @@ def accept_substitute(req: AcceptSubstituteRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ConfirmMandateRequest(BaseModel):
+    cart_id: str
+
+
+@router.post("/confirm-mandate")
+def confirm_mandate(req: ConfirmMandateRequest):
+    """
+    Explicitly approves a cart mandate in 'pending_confirmation' status.
+    Transitions status to 'approved' and logs the authorization in audit_log.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM cart_mandates WHERE id = ?", (req.cart_id,))
+        cart = cursor.fetchone()
+        if not cart:
+            raise HTTPException(status_code=404, detail="Cart mandate not found")
+
+        cursor.execute("UPDATE cart_mandates SET status = 'approved' WHERE id = ?", (req.cart_id,))
+        conn.commit()
+
+        items = json.loads(cart["items"]) if isinstance(cart["items"], str) else cart["items"]
+        total_paise = cart["total_paise"]
+
+        append_audit_log(
+            "cart", req.cart_id, "Autonomy Threshold Mandate Confirmed",
+            f"High-value order (₹{total_paise/100:.2f}, {len(items)} item(s)) explicitly confirmed by merchant/buyer. Approved for checkout."
+        )
+
+        return {
+            "status": "approved",
+            "cart_id": req.cart_id,
+            "message": "Cart mandate confirmed and approved for payment."
+        }
+    finally:
+        conn.close()
+
+
 @router.post("/finalize")
 def finalize_checkout(req: FinalizeRequest):
     """
@@ -456,12 +494,24 @@ def finalize_checkout(req: FinalizeRequest):
             raise HTTPException(status_code=404, detail="Cart not found")
 
         original_cart = state["cart"]
-        if original_cart["status"] != "approved":
+        if original_cart["status"] not in ["approved", "pending_confirmation"]:
             raise HTTPException(status_code=400, detail="Cannot finalize a blocked cart")
 
         final_cart_id = original_cart["id"]
         final_total_paise = original_cart["total_paise"]
         cart_total_before = original_cart["total_paise"]
+
+        if original_cart["status"] == "pending_confirmation":
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE cart_mandates SET status = 'approved' WHERE id = ?", (final_cart_id,))
+            conn.commit()
+            conn.close()
+            append_audit_log(
+                "cart", final_cart_id, "Autonomy Threshold Mandate Confirmed",
+                f"High-value order (₹{final_total_paise/100:.2f}) confirmed during checkout; payment order initiated."
+            )
+
 
         if not req.is_upsell_accepted():
             append_audit_log(

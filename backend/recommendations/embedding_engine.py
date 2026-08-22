@@ -201,8 +201,9 @@ def find_substitutes(
             continue
 
         boosted = row["boosted"] or 0
-        boost_multiplier = 1.15 if boosted else 1.0
+        boost_multiplier = 1.30 if boosted else 1.0
         final_score = round(raw_sim * boost_multiplier, 4)
+
 
         reason = f"Closest in-stock semantic alternative ({raw_sim*100:.0f}% similarity) in {row['category']}."
         if boosted:
