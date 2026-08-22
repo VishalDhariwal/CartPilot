@@ -3,7 +3,7 @@ import json
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from openai import OpenAI
-from backend.db import get_db
+from backend.recommendations.lift_engine import find_cross_sell
 
 load_dotenv()
 
@@ -16,140 +16,111 @@ class UpsellChoice(BaseModel):
 
 def generate_upsell(cart_items: list) -> dict | None:
     """
-    Cross-sell recommendation using two layers:
-      Layer 1 (deterministic): query catalog_pairings for each cart item.
-                               Filter: sku_b must be in-stock and not already in cart.
-                               Prefer boosted=1 pairs first.
-      Layer 2 (LLM): given the 2-3 best candidates, pick the single best one
-                     for this specific cart and write a natural reason.
+    Data-driven cross-sell recommendation using Market Basket Analysis:
+      Layer 1 (Lift Engine): query basket_pairs derived from historical orders
+                             (support, confidence, lift calculation + boost multiplier)
+      Layer 2 (Growth Agent): given top-3 ranked candidates, LLM selects best
+                             and writes natural, contextual copy grounded in the cart.
 
-    Returns {sku, name, price_paise, category, reason} or None.
+    Returns dict with keys:
+      sku, name, price_paise, category, lift, support, final_score, reason, candidates
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set in .env")
+    if not cart_items:
+        return None
 
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cart_skus = {item["sku"] for item in cart_items}
-
-    # Layer 1: Find all valid pairings for items in the cart
-    candidates = []
-    for item in cart_items:
-        cursor.execute(
-            """
-            SELECT cp.sku_b, cp.reason_template, cp.boosted,
-                   c.name, c.price_paise, c.category, c.stock
-            FROM catalog_pairings cp
-            JOIN catalog c ON c.sku = cp.sku_b
-            WHERE cp.sku_a = ?
-              AND c.stock > 0
-              AND cp.sku_b NOT IN ({})
-            ORDER BY cp.boosted DESC, c.price_paise ASC
-            """.format(",".join("?" * len(cart_skus)) if cart_skus else "'__none__'"),
-            (item["sku"], *cart_skus) if cart_skus else (item["sku"],)
-        )
-        rows = cursor.fetchall()
-        for row in rows:
-            candidates.append({
-                "sku": row["sku_b"],
-                "name": row["name"],
-                "price_paise": row["price_paise"],
-                "category": row["category"],
-                "reason_template": row["reason_template"],
-                "boosted": row["boosted"],
-                "trigger_sku": item["sku"],
-            })
-
-    conn.close()
+    # Layer 1: Query Market Basket Lift Engine for top 3 candidates
+    candidates = find_cross_sell(cart_items, top_k=3)
 
     if not candidates:
         return None
 
-    # Deduplicate (same sku_b may come from multiple cart items) — keep the boosted version
-    seen = {}
-    for c in candidates:
-        if c["sku"] not in seen or c["boosted"] > seen[c["sku"]]["boosted"]:
-            seen[c["sku"]] = c
-    unique_candidates = sorted(seen.values(), key=lambda x: (-x["boosted"], x["price_paise"]))
-
-    # If only one candidate, skip the LLM and use the pre-authored reason
-    if len(unique_candidates) == 1:
-        c = unique_candidates[0]
+    # If only 1 candidate or no LLM key, use pre-calculated lift reason
+    api_key = os.getenv("OPENAI_API_KEY")
+    if len(candidates) == 1 or not api_key:
+        c = candidates[0]
         return {
             "sku": c["sku"],
             "name": c["name"],
             "price_paise": c["price_paise"],
             "category": c["category"],
-            "reason": c["reason_template"],
+            "lift": c.get("lift", 1.0),
+            "support": c.get("support", 0.0),
+            "final_score": c.get("final_score", 1.0),
+            "reason": c.get("reason", "Frequently purchased together with items in your cart."),
+            "candidates": candidates,
         }
 
     # Layer 2: LLM picks the best among top-3 candidates and writes a natural reason
     client = OpenAI(api_key=api_key)
 
-    top_candidates = unique_candidates[:3]
     candidate_str = "\n".join(
         f"- SKU: {c['sku']}, Name: {c['name']}, Price: ₹{c['price_paise']/100:.0f}, "
-        f"Pre-authored reason: \"{c['reason_template']}\""
-        + (" [BOOSTED]" if c["boosted"] else "")
-        for c in top_candidates
+        f"Lift Score: {c.get('lift', 1.0):.2f}x affinity with {c.get('trigger_name', 'cart')}"
+        + (" [BOOSTED PARTNER]" if c.get("boosted") else "")
+        for c in candidates
     )
 
     cart_summary = ", ".join(
-        f"{item['sku']} (×{item['qty']}, ₹{item['price_paise']/100:.0f})"
+        f"{item.get('name', item.get('sku'))} (×{item.get('qty', 1)}, ₹{item.get('price_paise', 0)/100:.0f})"
         for item in cart_items
     )
 
     system_instruction = f"""
-    You are a Growth Agent for an e-commerce store. Your job is to pick the single best
-    cross-sell item from a pre-vetted list and write a compelling, natural reason.
+    You are an AI Growth Agent for an e-commerce store. Your job is to select the single best
+    cross-sell recommendation from a pre-vetted list computed by our Market Basket Lift Engine.
 
-    The customer's current cart contains: {cart_summary}
+    Current cart contents: {cart_summary}
 
-    These are the only valid cross-sell candidates (all real, in-stock SKUs from our catalog):
+    Candidate cross-sell items (all real, in-stock catalog items with measured affinity):
     {candidate_str}
 
     Rules:
-    1. Pick EXACTLY ONE SKU from the list above. Do not suggest any SKU not listed.
-    2. Prefer BOOSTED items unless a non-boosted item is clearly more relevant to the cart.
-    3. Write a single natural, specific 1-sentence reason that references what's actually in the cart.
-    4. Set suggest=true unless there is genuinely no logical pairing (rare given the filtered list).
+    1. Pick EXACTLY ONE SKU from the candidate list above. Do not invent or alter any SKU.
+    2. Prefer higher lift scores and boosted partner items when quality is comparable.
+    3. Write a single natural, specific 1-sentence reason that explains why this item pairs with the cart contents.
+    4. Set suggest=true.
     """
 
-    completion = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": "Pick the best cross-sell item for this cart."}
-        ],
-        response_format=UpsellChoice,
-        temperature=0.2
-    )
+    try:
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": "Pick the best complementary cross-sell item for this cart."}
+            ],
+            response_format=UpsellChoice,
+            temperature=0.2
+        )
 
-    choice = completion.choices[0].message.parsed
+        choice = completion.choices[0].message.parsed
+        if choice.suggest and choice.sku:
+            candidate_map = {c["sku"]: c for c in candidates}
+            if choice.sku in candidate_map:
+                chosen = candidate_map[choice.sku]
+                return {
+                    "sku": chosen["sku"],
+                    "name": chosen["name"],
+                    "price_paise": chosen["price_paise"],
+                    "category": chosen["category"],
+                    "lift": chosen.get("lift", 1.0),
+                    "support": chosen.get("support", 0.0),
+                    "final_score": chosen.get("final_score", 1.0),
+                    "reason": choice.reason,
+                    "candidates": candidates,
+                }
+    except Exception as e:
+        print(f"Error in Growth Agent LLM selection: {e}")
 
-    if not choice.suggest or not choice.sku:
-        return None
-
-    # Anti-hallucination guard: verify chosen SKU is in our candidate list
-    candidate_map = {c["sku"]: c for c in top_candidates}
-    if choice.sku not in candidate_map:
-        # Fallback: use the top boosted candidate with its pre-authored reason
-        c = top_candidates[0]
-        return {
-            "sku": c["sku"],
-            "name": c["name"],
-            "price_paise": c["price_paise"],
-            "category": c["category"],
-            "reason": c["reason_template"],
-        }
-
-    chosen = candidate_map[choice.sku]
+    # Fallback to top ranked candidate by final_score
+    c = candidates[0]
     return {
-        "sku": chosen["sku"],
-        "name": chosen["name"],
-        "price_paise": chosen["price_paise"],
-        "category": chosen["category"],
-        "reason": choice.reason,
+        "sku": c["sku"],
+        "name": c["name"],
+        "price_paise": c["price_paise"],
+        "category": c["category"],
+        "lift": c.get("lift", 1.0),
+        "support": c.get("support", 0.0),
+        "final_score": c.get("final_score", 1.0),
+        "reason": c.get("reason", "Top complementary item based on customer purchase history."),
+        "candidates": candidates,
     }

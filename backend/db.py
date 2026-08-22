@@ -6,9 +6,11 @@ from datetime import datetime
 DB_PATH = "cartpilot.db"
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     return conn
+
+
 
 def init_db():
     conn = get_db()
@@ -23,8 +25,14 @@ def init_db():
       stock INTEGER NOT NULL,
       category TEXT NOT NULL,
       merchant TEXT NOT NULL,
-      boosted INTEGER NOT NULL DEFAULT 0
+      boosted INTEGER NOT NULL DEFAULT 0,
+      image_url TEXT,
+      description TEXT,
+      tags TEXT,
+      metadata TEXT,
+      embedding TEXT
     );
+
 
     CREATE TABLE IF NOT EXISTS policy_config (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -73,18 +81,25 @@ def init_db():
       created_at TEXT NOT NULL
     );
 
-    -- Pairing table: deterministic ground truth for cross-sell recommendations.
-    -- sku_a is in the cart; sku_b is the complementary item to suggest.
-    CREATE TABLE IF NOT EXISTS catalog_pairings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sku_a TEXT NOT NULL,
-      sku_b TEXT NOT NULL,
-      reason_template TEXT NOT NULL,
-      boosted INTEGER NOT NULL DEFAULT 0,
+    -- Historical orders table: seeded with synthetic orders and updated dynamically on real purchases
+    CREATE TABLE IF NOT EXISTS historical_orders (
+      order_id TEXT PRIMARY KEY,
+      items TEXT NOT NULL,           -- JSON array of SKUs
+      is_synthetic INTEGER NOT NULL, -- 1 = bootstrap data, 0 = real completed order
       created_at TEXT NOT NULL
     );
 
-    -- Measurement table: every upsell/cross-sell offer, outcome, and AOV impact.
+    -- Market Basket Analysis pairs: derived from historical_orders lift/support calculations
+    CREATE TABLE IF NOT EXISTS basket_pairs (
+      sku_a TEXT NOT NULL,
+      sku_b TEXT NOT NULL,
+      lift REAL NOT NULL,
+      support REAL NOT NULL,
+      computed_at TEXT NOT NULL,
+      PRIMARY KEY (sku_a, sku_b)
+    );
+
+    -- Measurement table: every upsell/cross-sell offer, outcome, and AOV impact
     CREATE TABLE IF NOT EXISTS upsell_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       cart_id TEXT NOT NULL,
@@ -96,29 +111,43 @@ def init_db():
     );
     ''')
 
-    # ── Add boosted column to existing catalog rows if it doesn't exist ──
-    try:
-        cursor.execute("ALTER TABLE catalog ADD COLUMN boosted INTEGER NOT NULL DEFAULT 0")
-        conn.commit()
-    except Exception:
-        pass  # column already exists
+    # ── Safe Column Alterations for Existing Databases ───────────────────
+    for col_def in [
+        ("boosted", "INTEGER NOT NULL DEFAULT 0"),
+        ("image_url", "TEXT"),
+        ("description", "TEXT"),
+        ("tags", "TEXT"),
+        ("metadata", "TEXT"),
+        ("embedding", "TEXT")
+    ]:
+
+        try:
+            cursor.execute(f"ALTER TABLE catalog ADD COLUMN {col_def[0]} {col_def[1]}")
+            conn.commit()
+        except Exception:
+            pass
 
     # ── Seed Policy Config ───────────────────────────────────────────────
+    all_allowed = [
+        "beauty", "fragrances", "furniture", "groceries", "home-decoration",
+        "kitchen-accessories", "laptops", "mens-shirts", "mens-shoes", "mens-watches",
+        "mobile-accessories", "motorcycle", "skin-care", "smartphones", "sports-accessories",
+        "sunglasses", "tablets", "tops", "vehicle", "womens-bags", "womens-dresses",
+        "womens-jewellery", "womens-shoes", "womens-watches", "grocery", "fashion",
+        "electronics", "kitchenware", "home"
+    ]
     cursor.execute("SELECT COUNT(*) FROM policy_config")
     if cursor.fetchone()[0] == 0:
         cursor.execute(
             "INSERT INTO policy_config (id, spend_cap_paise, allowed_categories) VALUES (?, ?, ?)",
-            (1, 500000, json.dumps(["grocery", "kitchenware", "electronics", "fashion", "home"]))
+            (1, 1000000, json.dumps(all_allowed))
         )
     else:
-        # Upgrade spend cap if it's still at the old ₹1500 default
-        cursor.execute("SELECT spend_cap_paise FROM policy_config WHERE id = 1")
-        row = cursor.fetchone()
-        if row and row[0] <= 150000:
-            cursor.execute(
-                "UPDATE policy_config SET spend_cap_paise = ? WHERE id = 1",
-                (500000,)
-            )
+        cursor.execute(
+            "UPDATE policy_config SET allowed_categories = ?, spend_cap_paise = MAX(spend_cap_paise, 1000000) WHERE id = 1",
+            (json.dumps(all_allowed),)
+        )
+
 
     # ── Seed Catalog ─────────────────────────────────────────────────────
     cursor.execute("SELECT COUNT(*) FROM catalog")
@@ -135,8 +164,6 @@ def init_db():
                     )
 
     # ── Seed Boosted Items ───────────────────────────────────────────────
-    # Mark items the merchant wants to move (cross-sell targets).
-    # These will be preferred by the growth agent when multiple pairings match.
     boosted_skus = [
         "BOO-GRO-0377",   # Butter Classic 375 — grocery, ₹68
         "SNE-GRO-0290",   # Milk Plus 473       — grocery, ₹90
@@ -153,47 +180,6 @@ def init_db():
     ]
     for sku in boosted_skus:
         cursor.execute("UPDATE catalog SET boosted = 1 WHERE sku = ?", (sku,))
-
-    # ── Seed Catalog Pairings ────────────────────────────────────────────
-    cursor.execute("SELECT COUNT(*) FROM catalog_pairings")
-    if cursor.fetchone()[0] == 0:
-        now = datetime.utcnow().isoformat() + "Z"
-        # Format: (sku_a, sku_b, reason_template, boosted)
-        pairings = [
-            # Grocery → Grocery pairings
-            ("BOO-GRO-0359", "BOO-GRO-0377", "Butter is the perfect companion for bread — great for toast or sandwiches", 1),
-            ("BOO-GRO-0359", "SNE-GRO-0290", "Milk pairs naturally with bread for a quick, wholesome breakfast", 1),
-            ("SNE-GRO-0293", "BOO-GRO-0377", "Butter elevates plain rice into a delicious side dish", 1),
-            ("GAR-GRO-0921", "BOO-GRO-0377", "Wheat flour and butter are a classic baking combination", 0),
-            ("SNE-GRO-0254", "BOO-GRO-0377", "Add butter to complement your wheat for richer flatbreads", 0),
-            ("BOO-GRO-0364", "BOO-GRO-0359", "Eggs and bread make a quick, protein-packed breakfast", 1),
-            ("GOU-GRO-0838", "BOO-GRO-0364", "Eggs pair perfectly with cheese for omelettes or sandwiches", 1),
-            ("SNE-GRO-0282", "MUS-GRO-0692", "Bananas and milk blend into a perfect nutritious smoothie", 0),
-
-            # Kitchenware → Kitchenware pairings
-            ("PET-KIT-0440", "OFF-KIT-0136",  "A spatula is essential for working with your pan — great combo", 1),
-            ("FAS-KIT-0226", "TOY-KIT-0640",  "A kettle alongside your blender covers both hot and cold drink prep", 1),
-            ("GAM-KIT-0070", "TOY-KIT-0640",  "Pair your toaster with a kettle for a complete breakfast station", 0),
-            ("JEW-KIT-0976", "PET-KIT-0440",  "An oven and a pan give you full stovetop-plus-oven cooking capability", 0),
-
-            # Electronics → Electronics pairings
-            ("AUT-ELE-0582", "GOU-ELE-0831",  "A keyboard is essential for getting the most out of your tablet", 1),
-            ("AUT-ELE-0582", "AUT-ELE-0579",  "A mouse makes tablet navigation far faster and more precise", 1),
-            ("GOU-ELE-0819", "GOU-ELE-0831",  "Add a keyboard to your monitor setup for a complete workstation", 1),
-            ("GOU-ELE-0819", "AUT-ELE-0579",  "A mouse completes your monitor setup for seamless desktop use", 0),
-            ("GOU-ELE-0802", "FIT-ELE-0711",  "Headphones pair beautifully with a smartwatch for music on the go", 1),
-            ("GOU-ELE-0806", "GOU-ELE-0831",  "Keep your keyboard charged with this compatible charger nearby", 0),
-
-            # Fashion → Fashion pairings
-            ("TEC-FAS-0050", "HOM-FAS-0181",  "A belt completes the look with your jacket — great styling combo", 1),
-            ("GAR-FAS-0920", "HOM-FAS-0181",  "Add a belt to your jeans for a polished, put-together outfit", 1),
-            ("TEC-FAS-0024", "TEC-FAS-0031",  "Sunglasses are the perfect finishing touch for your jacket outfit", 0),
-        ]
-        for sku_a, sku_b, reason, boosted in pairings:
-            cursor.execute(
-                "INSERT INTO catalog_pairings (sku_a, sku_b, reason_template, boosted, created_at) VALUES (?, ?, ?, ?, ?)",
-                (sku_a, sku_b, reason, boosted, now)
-            )
 
     conn.commit()
     conn.close()

@@ -23,11 +23,19 @@ router = APIRouter()
 
 class AgentCheckoutRequest(BaseModel):
     query: str
+    spend_cap_paise: Optional[int] = None
 
 class FinalizeRequest(BaseModel):
     cart_id: str
-    accept_upsell: bool
+    accept_upsell: bool = False
+    upsell_accepted: Optional[bool] = None
     upsell_sku: Optional[str] = None
+
+    def is_upsell_accepted(self) -> bool:
+        if self.upsell_accepted is not None:
+            return self.upsell_accepted
+        return self.accept_upsell
+
 
 class AcceptSubstituteRequest(BaseModel):
     intent_id: str
@@ -69,14 +77,15 @@ def _record_upsell_event(cart_id: str, suggested_sku: str, accepted: bool,
 def agent_checkout(req: AgentCheckoutRequest):
     """
     Full agent checkout pipeline:
-      1. Buyer Agent parses NL request → structured cart
+      1. Buyer Agent parses NL request → structured cart (bounded by custom or global spend cap)
       2. OOS detection → Substitution Agent (if needed) — returned before guardrail
       3. Guardrail Engine validates cart
       4. Growth Agent cross-sell (post-guardrail, pre-Razorpay)
     """
     try:
         # ── Step 1: Buyer Agent ──────────────────────────────────────────
-        agent_output = generate_cart_proposal(req.query)
+        agent_output = generate_cart_proposal(req.query, custom_spend_cap_paise=req.spend_cap_paise)
+
 
         # ── Step 2: Create Intent Mandate ────────────────────────────────
         intent = create_intent_mandate(
@@ -98,7 +107,7 @@ def agent_checkout(req: AgentCheckoutRequest):
 
             if substitute:
                 append_audit_log(
-                    "intent", intent["id"], "Substitution Offered",
+                    "substitution", intent["id"], "Substitution Offered",
                     f"OOS: {oos_item['sku']} — Substitute: {substitute['sku']} ({substitute['name']}) "
                     f"at ₹{substitute['price_paise']/100:.0f}. Reason: {substitute['reason']}"
                 )
@@ -175,7 +184,7 @@ def agent_checkout(req: AgentCheckoutRequest):
                 upsell["price_paise"] = row["price_paise"]
                 upsell["category"] = row["category"]
                 append_audit_log(
-                    "cart", cart["id"], "Upsell Offered",
+                    "upsell", cart["id"], "Upsell Offered",
                     f"SKU: {upsell['sku']} ({upsell['name']}) — ₹{upsell['price_paise']/100:.0f}. "
                     f"Reason: {upsell['reason']}"
                 )
@@ -223,17 +232,25 @@ def update_cart(req: UpdateCartRequest):
         for item in req.items:
             if item.qty <= 0:
                 continue
-            cursor.execute("SELECT sku, name, price_paise, category, stock FROM catalog WHERE sku = ?", (item.sku,))
+            cursor.execute("SELECT sku, name, price_paise, category, stock, image_url, description, metadata FROM catalog WHERE sku = ?", (item.sku,))
             row = cursor.fetchone()
             if not row:
-                conn.close()
-                raise HTTPException(status_code=404, detail=f"Item {item.sku} not found in catalog")
+                continue
+            meta_obj = {}
+            if row["metadata"]:
+                try:
+                    meta_obj = json.loads(row["metadata"])
+                except Exception:
+                    meta_obj = {}
             enriched_items.append({
                 "sku": row["sku"],
                 "name": row["name"],
                 "price_paise": row["price_paise"],
                 "qty": item.qty,
-                "category": row["category"]
+                "category": row["category"],
+                "image_url": row["image_url"] or "",
+                "description": row["description"] or "",
+                "metadata": meta_obj
             })
         conn.close()
 
@@ -278,13 +295,19 @@ def update_cart(req: UpdateCartRequest):
         if upsell:
             conn = get_db()
             cursor = conn.cursor()
-            cursor.execute("SELECT sku, name, price_paise, category FROM catalog WHERE sku = ?", (upsell["sku"],))
+            cursor.execute("SELECT sku, name, price_paise, category, image_url, description FROM catalog WHERE sku = ?", (upsell["sku"],))
             row = cursor.fetchone()
             conn.close()
             if row:
-                upsell.update({"name": row["name"], "price_paise": row["price_paise"], "category": row["category"]})
+                upsell.update({
+                    "name": row["name"],
+                    "price_paise": row["price_paise"],
+                    "category": row["category"],
+                    "image_url": row["image_url"] or upsell.get("image_url", ""),
+                    "description": row["description"] or upsell.get("description", "")
+                })
                 append_audit_log(
-                    "cart", new_cart["id"], "Upsell Offered",
+                    "upsell", new_cart["id"], "Upsell Offered",
                     f"SKU: {upsell['sku']} ({upsell['name']}) — ₹{upsell['price_paise']/100:.0f}. Reason: {upsell['reason']}"
                 )
             else:
@@ -330,19 +353,21 @@ def accept_substitute(req: AcceptSubstituteRequest):
                 "name": sub_row["name"],
                 "qty": 1,
                 "price_paise": sub_row["price_paise"],
-                "category": sub_row["category"]
+                "category": sub_row["category"],
+                "image_url": sub_row["image_url"] or "",
+                "description": sub_row["description"] or ""
             })
             total_paise += sub_row["price_paise"]
 
             append_audit_log(
-                "intent", req.intent_id, "Substitute Accepted",
+                "substitution", req.intent_id, "Substitute Accepted",
                 f"Customer accepted {sub_row['sku']} ({sub_row['name']}) "
                 f"at ₹{sub_row['price_paise']/100:.0f} as substitute. "
                 f"New cart total: ₹{total_paise/100:.0f}"
             )
         else:
             append_audit_log(
-                "intent", req.intent_id, "Substitute Declined",
+                "substitution", req.intent_id, "Substitute Declined",
                 f"Customer declined the substitute. Proceeding with {len(items)} remaining items."
             )
 
@@ -386,7 +411,7 @@ def accept_substitute(req: AcceptSubstituteRequest):
             if row:
                 upsell.update({"name": row["name"], "price_paise": row["price_paise"], "category": row["category"]})
                 append_audit_log(
-                    "cart", cart["id"], "Upsell Offered",
+                    "upsell", cart["id"], "Upsell Offered",
                     f"SKU: {upsell['sku']} ({upsell['name']}) — ₹{upsell['price_paise']/100:.0f}. "
                     f"Reason: {upsell['reason']}"
                 )
@@ -425,9 +450,9 @@ def finalize_checkout(req: FinalizeRequest):
         final_total_paise = original_cart["total_paise"]
         cart_total_before = original_cart["total_paise"]
 
-        if not req.accept_upsell:
+        if not req.is_upsell_accepted():
             append_audit_log(
-                "cart", final_cart_id, "Upsell Declined",
+                "upsell", final_cart_id, "Upsell Declined",
                 "Customer chose to proceed with original cart without the upsell item"
             )
             # Record event: declined
@@ -479,7 +504,7 @@ def finalize_checkout(req: FinalizeRequest):
 
             if new_cart["status"] == "blocked":
                 append_audit_log(
-                    "cart", new_cart["id"], "Upsell Blocked by Guardrail",
+                    "upsell", new_cart["id"], "Upsell Blocked by Guardrail",
                     f"Upsell SKU {req.upsell_sku} pushed cart over limit. {validation['reason']}"
                 )
                 # Record event: attempted but blocked (count as declined for measurement)
@@ -498,7 +523,7 @@ def finalize_checkout(req: FinalizeRequest):
                 }
 
             append_audit_log(
-                "cart", new_cart["id"], "Upsell Accepted",
+                "upsell", new_cart["id"], "Upsell Accepted",
                 f"SKU {req.upsell_sku} ({upsell_row['name']}) added. "
                 f"New total: ₹{new_total/100:.0f}. Guardrail: {validation['reason']}"
             )
@@ -538,11 +563,13 @@ def finalize_checkout(req: FinalizeRequest):
         return {
             "status": "approved",
             "payment_url": payment_link["short_url"],
+            "payment_link": payment_link["short_url"],
             "cart_id": final_cart_id,
             "payment_mandate_id": payment_mandate["id"],
             "razorpay_order_id": order["id"],
             "amount_paise": final_total_paise
         }
+
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

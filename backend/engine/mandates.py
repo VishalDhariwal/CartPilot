@@ -94,16 +94,18 @@ def update_payment_mandate_status(razorpay_order_id: str = None, cart_id: str = 
     try:
         row = None
         if razorpay_order_id:
-            cursor.execute("SELECT id, status FROM payment_mandates WHERE razorpay_order_id = ?", (razorpay_order_id,))
+            cursor.execute("SELECT id, cart_id, status FROM payment_mandates WHERE razorpay_order_id = ?", (razorpay_order_id,))
             row = cursor.fetchone()
         if not row and cart_id:
-            cursor.execute("SELECT id, status FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+            cursor.execute("SELECT id, cart_id, status FROM payment_mandates WHERE cart_id = ?", (cart_id,))
             row = cursor.fetchone()
             
         if not row:
             return None
         
         pay_id = row["id"]
+        associated_cart_id = row["cart_id"]
+
         # If already in desired status with same payment_id, don't duplicate audit log
         if row["status"] == status and status == "succeeded":
             return pay_id
@@ -119,10 +121,37 @@ def update_payment_mandate_status(razorpay_order_id: str = None, cart_id: str = 
         detail = failure_reason if failure_reason else f"Payment succeeded with ID {payment_id}"
         create_audit_log(cursor, "payment", pay_id, event_name, detail)
         
+        # When payment succeeds, feed real order data into historical_orders (is_synthetic = 0)
+        if status == "succeeded" and associated_cart_id:
+            try:
+                cursor.execute("SELECT items FROM cart_mandates WHERE id = ?", (associated_cart_id,))
+                cart_row = cursor.fetchone()
+                if cart_row and cart_row["items"]:
+                    cart_items = json.loads(cart_row["items"])
+                    skus = [item["sku"] for item in cart_items if "sku" in item]
+                    if len(skus) >= 1:
+                        cursor.execute(
+                            """INSERT OR REPLACE INTO historical_orders (order_id, items, is_synthetic, created_at)
+                               VALUES (?, ?, 0, ?)""",
+                            (f"real_{pay_id}", json.dumps(skus), updated_at)
+                        )
+            except Exception as e:
+                print(f"Error logging real order to historical_orders: {e}")
+
         conn.commit()
+
+        # Recompute lift pairs with newly added real order data
+        if status == "succeeded":
+            try:
+                from backend.recommendations.lift_engine import compute_lift_pairs
+                compute_lift_pairs()
+            except Exception as e:
+                print(f"Error recomputing lift pairs: {e}")
+
         return pay_id
     finally:
         conn.close()
+
 
 
 def get_cart_state(cart_id: str) -> dict:
