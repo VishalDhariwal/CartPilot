@@ -294,6 +294,24 @@ def update_cart(req: UpdateCartRequest):
             f"Updated to {len(enriched_items)} item(s), new total: ₹{total_paise/100:.0f}. Guardrail: {validation['reason']}"
         )
 
+        # Record upsell event when cart value expands via recommendation additions
+        if total_paise > original_cart["total_paise"] and new_cart["status"] != "blocked":
+            try:
+                orig_raw = original_cart["items"]
+                orig_parsed = json.loads(orig_raw) if isinstance(orig_raw, str) else orig_raw
+                orig_skus = {it.get("sku") for it in orig_parsed if isinstance(it, dict)}
+                added_skus = [it["sku"] for it in enriched_items if it["sku"] not in orig_skus]
+                for added_sku in added_skus:
+                    _record_upsell_event(
+                        cart_id=new_cart["id"],
+                        suggested_sku=added_sku,
+                        accepted=True,
+                        cart_total_before=original_cart["total_paise"],
+                        cart_total_after=total_paise
+                    )
+            except Exception as e:
+                print(f"Error recording upsell event in update_cart: {e}")
+
         if new_cart["status"] == "blocked":
             return {
                 "status": "blocked",

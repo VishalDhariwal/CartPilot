@@ -3,7 +3,8 @@ import json
 import os
 from datetime import datetime
 
-DB_PATH = "cartpilot.db"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.environ.get("CARTPILOT_DB") or os.path.join(BASE_DIR, "cartpilot.db")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH, timeout=60.0)
@@ -48,6 +49,7 @@ def init_db():
       raw_request TEXT NOT NULL,
       goal TEXT NOT NULL,
       spend_cap_paise INTEGER NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'web_chat',
       created_at TEXT NOT NULL
     );
 
@@ -150,6 +152,7 @@ def init_db():
         ("catalog", "metadata", "TEXT"),
         ("catalog", "embedding", "TEXT"),
         ("catalog", "co_purchase_embedding", "TEXT"),  # Layer 2: item2vec co-purchase vectors
+        ("intent_mandates", "channel", "TEXT NOT NULL DEFAULT 'web_chat'"),
         ("policy_config", "autonomy_threshold_paise", "INTEGER NOT NULL DEFAULT 500000"),
         ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0"),
         ("basket_pairs", "retired", "INTEGER NOT NULL DEFAULT 0"),

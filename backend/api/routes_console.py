@@ -367,10 +367,20 @@ def get_growth_rules(
         """)
         events_by_sku = {r["suggested_sku"]: dict(r) for r in cursor.fetchall()}
 
+        # Global totals across all upsell events
+        cursor.execute("""
+            SELECT 
+                COUNT(*) AS total_offered,
+                SUM(CASE WHEN accepted = 1 THEN 1 ELSE 0 END) AS total_accepted,
+                SUM(CASE WHEN accepted = 1 THEN (cart_total_after_paise - cart_total_before_paise) ELSE 0 END) AS total_revenue_lift_paise
+            FROM upsell_events
+        """)
+        global_summary = cursor.fetchone()
+        total_offered_all = global_summary["total_offered"] or 0
+        total_accepted_all = global_summary["total_accepted"] or 0
+        total_revenue_lift_paise_all = global_summary["total_revenue_lift_paise"] or 0
+
         rules = []
-        total_offered_all = 0
-        total_accepted_all = 0
-        total_revenue_lift_paise_all = 0
         active_count = 0
         muted_count = 0
 
@@ -408,10 +418,6 @@ def get_growth_rules(
             times_offered = perf["times_offered"] or 0
             times_accepted = perf["times_accepted"] or 0
             lift_paise = perf["total_revenue_lift_paise"] or 0
-
-            total_offered_all += times_offered
-            total_accepted_all += times_accepted
-            total_revenue_lift_paise_all += lift_paise
 
             conversion_pct = round((times_accepted / times_offered * 100), 1) if times_offered > 0 else 0.0
             co_occurrence = r["co_occurrence_count"] or 0
@@ -459,7 +465,11 @@ def get_growth_rules(
                 "revenue_lift_rupees": round(lift_paise / 100, 2)
             })
 
-        overall_conv = round((total_accepted_all / total_offered_all * 100), 1) if total_offered_all > 0 else 0.0
+        # Query total customer shopping orders vs total accepted recommendations
+        cursor.execute("SELECT COUNT(*) FROM intent_mandates")
+        total_customer_orders = cursor.fetchone()[0] or 1
+
+        overall_conv = round((total_accepted_all / total_customer_orders * 100), 1)
 
         return {
             "rules": rules,
@@ -470,8 +480,9 @@ def get_growth_rules(
                 "category_compat_rules": db_category_compat_count,
                 "retired_priors": db_retired_count,
                 "muted_rules": muted_count,
-                "total_offered": total_offered_all,
+                "total_orders": total_customer_orders,
                 "total_accepted": total_accepted_all,
+                "total_offered": total_offered_all,
                 "overall_conversion_pct": overall_conv,
                 "total_revenue_lift_rupees": round(total_revenue_lift_paise_all / 100, 2)
             }

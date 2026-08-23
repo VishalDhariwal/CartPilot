@@ -9,13 +9,9 @@ class ResolutionDecision(BaseModel):
 
 def decide_resolution(natural_language_request: str, order_state: dict) -> dict:
     """
-    Calls ChatGPT to determine what action to take (e.g. cancel, escalate) based on the user's request and order state.
+    Determines what action to take (e.g. cancel, escalate) based on the user's request and order state using OpenAI or Gemini.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set in .env")
-        
-    client = OpenAI(api_key=api_key)
+    from backend.engine.llm import generate_structured
     
     system_instruction = f"""
     You are the Autonomous AI Resolution & Refund Agent for CartPilot.
@@ -39,15 +35,9 @@ def decide_resolution(natural_language_request: str, order_state: dict) -> dict:
        - Provide a concise 1-sentence confirmation (e.g. "Your cancellation request has been verified against merchant policy and approved for immediate Razorpay refund.").
     """
     
-    completion = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": natural_language_request}
-        ],
-        response_format=ResolutionDecision,
-        temperature=0.0
+    data = generate_structured(
+        prompt=natural_language_request,
+        schema=ResolutionDecision,
+        system_prompt=system_instruction
     )
-    
-    data = completion.choices[0].message.parsed
     return data.model_dump()

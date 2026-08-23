@@ -9,7 +9,7 @@ def create_audit_log(cursor, ref_type: str, ref_id: str, event: str, detail: str
         (ref_type, ref_id, event, detail, datetime.utcnow().isoformat() + "Z")
     )
 
-def create_intent_mandate(raw_request: str, goal: str, spend_cap_paise: int) -> dict:
+def create_intent_mandate(raw_request: str, goal: str, spend_cap_paise: int, channel: str = "web_chat") -> dict:
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -17,10 +17,10 @@ def create_intent_mandate(raw_request: str, goal: str, spend_cap_paise: int) -> 
         created_at = datetime.utcnow().isoformat() + "Z"
 
         cursor.execute(
-            "INSERT INTO intent_mandates (id, raw_request, goal, spend_cap_paise, created_at) VALUES (?, ?, ?, ?, ?)",
-            (intent_id, raw_request, goal, spend_cap_paise, created_at)
+            "INSERT INTO intent_mandates (id, raw_request, goal, spend_cap_paise, channel, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (intent_id, raw_request, goal, spend_cap_paise, channel, created_at)
         )
-        create_audit_log(cursor, "intent", intent_id, "Intent Created", f"Goal: {goal}, Cap: {spend_cap_paise} paise")
+        create_audit_log(cursor, "intent", intent_id, "Intent Created", f"Goal: {goal}, Cap: {spend_cap_paise} paise, Channel: {channel}")
         
         conn.commit()
         return {
@@ -28,6 +28,7 @@ def create_intent_mandate(raw_request: str, goal: str, spend_cap_paise: int) -> 
             "raw_request": raw_request,
             "goal": goal,
             "spend_cap_paise": spend_cap_paise,
+            "channel": channel,
             "created_at": created_at
         }
     finally:
@@ -163,10 +164,14 @@ def get_cart_state(cart_id: str) -> dict:
         if not cart:
             return None
             
+        cursor.execute("SELECT * FROM intent_mandates WHERE id = ?", (cart["intent_id"],))
+        intent = cursor.fetchone()
+
         cursor.execute("SELECT * FROM payment_mandates WHERE cart_id = ?", (cart_id,))
         payment = cursor.fetchone()
         
         return {
+            "intent": dict(intent) if intent else None,
             "cart": dict(cart),
             "payment": dict(payment) if payment else None
         }

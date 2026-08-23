@@ -52,56 +52,14 @@ def generate_upsell(cart_items: list) -> dict | None:
             "candidates": candidates,
         }
 
-    # Layer 2: LLM picks the best among candidates and writes a contextual reason
-    client = OpenAI(api_key=api_key)
-
-    candidate_lines = []
-    for c in candidates:
-        is_boosted = " [BOOSTED PARTNER]" if c.get("boosted") else ""
-        if c.get("source") == "data_verified" and c.get("lift") is not None:
-            evidence = f"Data-Verified ({c['lift']:.2f}x lift across {c.get('co_occurrence_count', 0)} orders)"
-        else:
-            evidence = f"AI-Suggested Prior ({c.get('reasoning') or 'Curated complement'})"
-
-        candidate_lines.append(
-            f"- SKU: {c['sku']}, Name: {c['name']}, Price: ₹{c['price_paise']/100:.0f}, Evidence: {evidence}{is_boosted}"
-        )
-
-    candidate_str = "\n".join(candidate_lines)
-
-    cart_summary = ", ".join(
-        f"{item.get('name', item.get('sku'))} (×{item.get('qty', 1)}, ₹{item.get('price_paise', 0)/100:.0f})"
-        for item in cart_items
-    )
-
-    system_instruction = f"""
-    You are an AI Growth Merchandising Agent for an e-commerce store. Your job is to select the single best
-    cross-sell recommendation from a pre-vetted list computed by our Hybrid Growth Engine.
-
-    Current cart contents: {cart_summary}
-
-    Candidate cross-sell items (all real, in-stock catalog items):
-    {candidate_str}
-
-    Rules:
-    1. Pick EXACTLY ONE SKU from the candidate list above. Do not invent or alter any SKU.
-    2. Prefer Data-Verified rules and boosted partner items when relevance is comparable.
-    3. Write a single natural, specific 1-sentence customer-facing reason explaining why this item pairs with the cart.
-    4. Set suggest=true.
-    """
-
+    from backend.engine.llm import generate_structured
     try:
-        completion = client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": "Pick the best complementary cross-sell item for this cart."}
-            ],
-            response_format=UpsellChoice,
-            temperature=0.2
+        choice = generate_structured(
+            prompt="Pick the best complementary cross-sell item for this cart.",
+            schema=UpsellChoice,
+            system_prompt=system_instruction
         )
 
-        choice = completion.choices[0].message.parsed
         if choice.suggest and choice.sku:
             candidate_map = {c["sku"]: c for c in candidates}
             if choice.sku in candidate_map:

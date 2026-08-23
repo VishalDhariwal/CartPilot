@@ -3252,6 +3252,33 @@ body {
   background: #FFF;
 }
 
+/* Channel Badges (MCP vs Web Chat) */
+.channel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.channel-badge.mcp {
+  background: #F3E8FF;
+  color: #6B46C1;
+  border: 1px solid #D6BCFA;
+}
+
+.channel-badge.web {
+  background: #EBF8FF;
+  color: #2B6CB0;
+  border: 1px solid #BEE3F8;
+}
+
+
 
 
 

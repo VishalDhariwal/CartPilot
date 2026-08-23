@@ -54,9 +54,8 @@ def find_substitute(original_item: dict, budget_remaining_paise: int = None) -> 
             "original_name": original_name,
         }
 
-    # 2. LLM selects the single best candidate from the top-3 ranked list
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    from backend.engine.llm import generate_structured, get_available_providers
+    if not get_available_providers():
         c = candidates[0]
         return {
             "sku": c["sku"],
@@ -70,8 +69,6 @@ def find_substitute(original_item: dict, budget_remaining_paise: int = None) -> 
             "original_sku": original_sku,
             "original_name": original_name,
         }
-
-    client = OpenAI(api_key=api_key)
 
     candidate_str = "\n".join(
         f"- SKU: {c['sku']}, Name: {c['name']}, Price: ₹{c['price_paise']/100:.0f}, "
@@ -95,16 +92,11 @@ def find_substitute(original_item: dict, budget_remaining_paise: int = None) -> 
     """
 
     try:
-        completion = client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": f"Pick the best substitute for {original_name}."}
-            ],
-            response_format=SubstituteChoice,
-            temperature=0.1
+        choice = generate_structured(
+            prompt=f"Pick the best substitute for {original_name}.",
+            schema=SubstituteChoice,
+            system_prompt=system_instruction
         )
-        choice = completion.choices[0].message.parsed
         candidate_map = {c["sku"]: c for c in candidates}
 
         if choice.sku in candidate_map:

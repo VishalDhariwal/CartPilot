@@ -52,15 +52,13 @@ def generate_category_compatibility() -> dict:
     - NEVER overwrites rows where editable=0 (merchant-locked decisions).
     - Returns {"inserted": N, "skipped_locked": M, "total_categories": K}
     """
-    from openai import OpenAI
+    from backend.engine.llm import generate_structured, get_available_providers
     from backend.db import get_db
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("⚠️ OPENAI_API_KEY not set — skipping category compatibility generation.")
+    if not get_available_providers():
+        print("⚠️ Neither OPENAI_API_KEY nor GEMINI_API_KEY is set — skipping category compatibility generation.")
         return {"inserted": 0, "skipped_locked": 0, "total_categories": 0}
 
-    client = OpenAI(api_key=api_key)
     conn = get_db()
     cursor = conn.cursor()
 
@@ -101,16 +99,12 @@ RULES:
 """
 
     try:
-        completion = client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You produce cross-category shopping compatibility graphs for e-commerce recommendation engines."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format=CategoryCompatResponse,
-            temperature=0.2
+        data = generate_structured(
+            prompt=prompt,
+            schema=CategoryCompatResponse,
+            system_prompt="You produce cross-category shopping compatibility graphs for e-commerce recommendation engines."
         )
-        pairs = completion.choices[0].message.parsed.pairs
+        pairs = data.pairs
     except Exception as e:
         print(f"⚠️ LLM call failed for category compatibility: {e}")
         conn.close()

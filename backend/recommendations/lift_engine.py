@@ -204,32 +204,54 @@ STRICT MERCHANDISING RULES:
     return total_pairs_inserted
 
 
-def compute_lift_pairs(min_co_occurrence: int = 8, min_lift: float = 1.0) -> int:
+def compute_lift_pairs(min_co_occurrence: int = 8, min_lift: float = 1.2) -> int:
     """
     Part 2: Real Statistical Rules.
-    Mines real orders in historical_orders and computes Lift, Support, Confidence.
-    Requires co_occurrence_count >= 8 before writing a data_verified rule.
-    When an empirical rule crosses the threshold, it replaces any prior ai_suggested rule
-    and logs the graduation to audit_log.
+    Mines real orders in historical_orders and cart_mandates to compute Lift, Support, Confidence.
+    Strictly gates data_verified rules at:
+      - co_occurrence_count >= min_co_occurrence (default >= 8)
+      - lift > min_lift (default > 1.2)
+    When an empirical rule crosses these thresholds, it graduates to data_verified (retired = 0).
+    Any rules falling below these gates are re-retired (retired = 1, source = 'ai_suggested').
     """
     conn = get_db()
     cursor = conn.cursor()
 
+    # Fetch items from historical_orders AND all succeeded cart_mandates
     cursor.execute("SELECT items FROM historical_orders")
-    rows = cursor.fetchall()
+    hist_rows = cursor.fetchall()
 
-    if not rows:
+    cursor.execute("""
+        SELECT cm.items 
+        FROM cart_mandates cm
+        JOIN payment_mandates pm ON pm.cart_id = cm.id
+        WHERE pm.status = 'succeeded'
+    """)
+    settled_rows = cursor.fetchall()
+
+    all_raw_orders = [r["items"] for r in hist_rows] + [r["items"] for r in settled_rows]
+
+    if not all_raw_orders:
         conn.close()
         return 0
 
-    total_orders = len(rows)
+    total_orders = len(all_raw_orders)
     item_counts = defaultdict(int)
     pair_counts = defaultdict(int)
 
-    for row in rows:
+    for raw_items in all_raw_orders:
         try:
-            items = json.loads(row["items"]) if isinstance(row["items"], str) else row["items"]
-            unique_items = sorted(list(set(items)))
+            parsed = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
+            if not parsed:
+                continue
+            # Extract SKUs whether items are list of strings or list of dicts
+            skus = []
+            for it in parsed:
+                if isinstance(it, dict) and "sku" in it:
+                    skus.append(it["sku"])
+                elif isinstance(it, str):
+                    skus.append(it)
+            unique_items = sorted(list(set(skus)))
 
             for item in unique_items:
                 item_counts[item] += 1
@@ -248,16 +270,22 @@ def compute_lift_pairs(min_co_occurrence: int = 8, min_lift: float = 1.0) -> int
     cursor.execute("SELECT sku, name FROM catalog")
     catalog_names = {r["sku"]: r["name"] for r in cursor.fetchall()}
 
-    for (sku_a, sku_b), pair_freq in pair_counts.items():
-        # Strict empirical gating
-        if pair_freq < min_co_occurrence:
-            # Update co_occurrence_count for tracking progress in UI even if unverified
-            cursor.execute(
-                "UPDATE basket_pairs SET co_occurrence_count = ? WHERE sku_a = ? AND sku_b = ?",
-                (pair_freq, sku_a, sku_b)
-            )
-            continue
+    # Re-retire any existing rules that do not meet the strict >=8 co-occurrence & >1.2 lift gates
+    cursor.execute(
+        """
+        UPDATE basket_pairs
+        SET source = 'ai_suggested',
+            retired = 1,
+            lift = NULL,
+            support = NULL,
+            confidence = NULL
+        WHERE source = 'data_verified'
+          AND (co_occurrence_count < ? OR lift <= ?)
+        """,
+        (min_co_occurrence, min_lift)
+    )
 
+    for (sku_a, sku_b), pair_freq in pair_counts.items():
         support_a = item_counts[sku_a] / total_orders
         support_b = item_counts[sku_b] / total_orders
         support_ab = pair_freq / total_orders
@@ -268,48 +296,66 @@ def compute_lift_pairs(min_co_occurrence: int = 8, min_lift: float = 1.0) -> int
         confidence = support_ab / support_a
         lift = confidence / support_b
 
-        if lift >= min_lift:
-            # Check if this rule is graduating from ai_suggested
-            cursor.execute(
-                "SELECT source FROM basket_pairs WHERE sku_a = ? AND sku_b = ?",
-                (sku_a, sku_b)
-            )
-            existing = cursor.fetchone()
-            was_ai_suggested = existing and existing["source"] == "ai_suggested"
-
+        # Strict empirical gating: must meet BOTH >= min_co_occurrence AND > min_lift
+        if pair_freq < min_co_occurrence or lift <= min_lift:
+            # Update co_occurrence_count for progress tracking, but keep retired
             cursor.execute(
                 """
-                INSERT INTO basket_pairs 
-                (sku_a, sku_b, lift, support, confidence, source, reasoning, co_occurrence_count, computed_at, muted)
-                VALUES (?, ?, ?, ?, ?, 'data_verified', NULL, ?, ?, 0)
-                ON CONFLICT(sku_a, sku_b) DO UPDATE SET
-                    lift = excluded.lift,
-                    support = excluded.support,
-                    confidence = excluded.confidence,
-                    source = 'data_verified',
-                    reasoning = NULL,
-                    co_occurrence_count = excluded.co_occurrence_count,
-                    computed_at = excluded.computed_at
+                UPDATE basket_pairs 
+                SET co_occurrence_count = ?,
+                    source = 'ai_suggested',
+                    retired = 1,
+                    lift = NULL,
+                    support = NULL,
+                    confidence = NULL
+                WHERE sku_a = ? AND sku_b = ?
                 """,
-                (sku_a, sku_b, round(lift, 4), round(support_ab, 4), round(confidence, 4), pair_freq, now_iso)
+                (pair_freq, sku_a, sku_b)
             )
-            verified_rules_count += 1
+            continue
 
-            if was_ai_suggested:
-                from backend.engine.mandates import create_audit_log
-                name_a = catalog_names.get(sku_a, sku_a)
-                name_b = catalog_names.get(sku_b, sku_b)
-                detail = (
-                    f"Association rule '{name_a}' → '{name_b}' crossed empirical threshold "
-                    f"({pair_freq} orders >= {min_co_occurrence}). Graduated from AI-suggested prior "
-                    f"to data-verified rule (Lift: {lift:.2f}x, Support: {support_ab*100:.1f}%, Confidence: {confidence*100:.1f}%)."
-                )
-                create_audit_log(cursor, "growth_rule", f"{sku_a}__{sku_b}", "Rule Graduated to Data-Verified", detail)
+        # Check if this rule is graduating from ai_suggested / retired
+        cursor.execute(
+            "SELECT source, retired FROM basket_pairs WHERE sku_a = ? AND sku_b = ?",
+            (sku_a, sku_b)
+        )
+        existing = cursor.fetchone()
+        was_unverified = existing and (existing["source"] == "ai_suggested" or existing["retired"] == 1)
+
+        cursor.execute(
+            """
+            INSERT INTO basket_pairs 
+            (sku_a, sku_b, lift, support, confidence, source, reasoning, co_occurrence_count, computed_at, muted, retired)
+            VALUES (?, ?, ?, ?, ?, 'data_verified', NULL, ?, ?, 0, 0)
+            ON CONFLICT(sku_a, sku_b) DO UPDATE SET
+                lift = excluded.lift,
+                support = excluded.support,
+                confidence = excluded.confidence,
+                source = 'data_verified',
+                retired = 0,
+                reasoning = NULL,
+                co_occurrence_count = excluded.co_occurrence_count,
+                computed_at = excluded.computed_at
+            """,
+            (sku_a, sku_b, round(lift, 4), round(support_ab, 4), round(confidence, 4), pair_freq, now_iso)
+        )
+        verified_rules_count += 1
+
+        if was_unverified:
+            from backend.engine.mandates import create_audit_log
+            name_a = catalog_names.get(sku_a, sku_a)
+            name_b = catalog_names.get(sku_b, sku_b)
+            detail = (
+                f"Association rule '{name_a}' → '{name_b}' crossed empirical threshold "
+                f"({pair_freq} orders >= {min_co_occurrence}, Lift {lift:.2f}x > {min_lift:.1f}x). "
+                f"Graduated to data-verified rule (Lift: {lift:.2f}x, Support: {support_ab*100:.1f}%, Confidence: {confidence*100:.1f}%)."
+            )
+            create_audit_log(cursor, "growth_rule", f"{sku_a}__{sku_b}", "Rule Graduated to Data-Verified", detail)
 
     conn.commit()
     conn.close()
 
-    print(f"📊 Statistical Mining: {verified_rules_count} pairs reached data_verified status (>= {min_co_occurrence} orders).")
+    print(f"📊 Statistical Mining: {verified_rules_count} pairs reached data_verified status (>= {min_co_occurrence} orders & > {min_lift} lift).")
     return verified_rules_count
 
 

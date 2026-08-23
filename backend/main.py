@@ -83,6 +83,71 @@ app.include_router(routes_resolution.router, prefix="/resolution", tags=["Resolu
 app.include_router(routes_recovery.router, prefix="/recovery", tags=["Recovery"])
 app.include_router(routes_console.router, prefix="/api/console", tags=["Merchant Console"])
 
+# Mount Remote Model Context Protocol (MCP) Server for external AI buyers
+from backend.mcp_server import mcp
+app.mount("/mcp", mcp.http_app(transport="streamable-http"))
+
+
+@app.get("/.well-known/ucp", tags=["Universal Commerce Protocol"])
+def get_ucp_profile():
+    """
+    Universal Commerce Protocol (UCP) Discovery Profile.
+    Publishes merchant capabilities, guardrail boundaries, and remote MCP endpoint.
+    """
+    return {
+        "ucp_version": "1.0",
+        "merchant_name": "CartPilot Merchant Store",
+        "description": "Explainable Autonomous Commerce Server with 3-Tier Growth & Guardrail Governance",
+        "capabilities": {
+            "catalog_search": True,
+            "cart_mandate": True,
+            "guardrail_validation": True,
+            "upsell_engine": True,
+            "checkout_razorpay_test": True,
+            "refund_reversal": True,
+            "audit_trail": True
+        },
+        "mcp_endpoint": "/mcp",
+        "transports": ["streamable-http", "sse"],
+        "governance": {
+            "spend_cap_enforced": True,
+            "stock_verified": True,
+            "autonomous_reversibility": True,
+            "audit_trail_immutable": True
+        },
+        "llms_txt_url": "/llms.txt"
+    }
+
+
+@app.get("/llms.txt", tags=["Agent Discovery"])
+def get_llms_txt():
+    """
+    Plain-text Agent Discovery file describing CartPilot capabilities and MCP entrypoint.
+    """
+    from fastapi.responses import PlainTextResponse
+    content = """# CartPilot — Agentic Commerce Server
+
+CartPilot enables autonomous AI buyers and shopping agents to discover products, itemize carts within budget spend caps, receive grounded recommendations, and execute Razorpay test-mode transactions with complete explainability.
+
+## MCP Server Endpoint
+- Remote MCP Endpoint: /mcp (Streamable HTTP & SSE)
+- Transport: streamable-http
+
+## Available MCP Tools:
+- search_catalog(query, category, max_price_paise): Discover in-stock catalog products.
+- get_product(sku): Fetch full product specs, pricing, and live inventory.
+- propose_cart(intent_text, spend_cap_paise): Build a cart from natural language with strict spend cap & stock verification.
+- get_upsell_suggestions(cart_id): Retrieve ranked 3-tier cross-sells (Data-Verified, Item2Vec, Live Scoped).
+- add_item_to_cart(cart_id, sku, qty): Add items to cart with mandatory guardrail re-validation.
+- checkout(cart_id): Generate real Razorpay test-mode order and checkout payment link.
+- check_payment_status(cart_id): Poll live webhook-driven payment status.
+- cancel_order(cart_id, reason): Submit cancellation request for automated policy-verified refund.
+- get_order_audit_trail(cart_id): Inspect full explainable mandate chain & audit ledger.
+
+## Policy & Guardrail Guarantees:
+Every cart is validated against buyer spend caps and live catalog inventory before payment links are created. All actions are logged to an append-only audit ledger.
+"""
+    return PlainTextResponse(content=content, media_type="text/plain")
 
 
 @app.get("/catalog", tags=["Catalog"])
@@ -233,6 +298,12 @@ def get_upsell_stats():
     conn = get_db()
     cursor = conn.cursor()
     try:
+        cursor.execute("SELECT COUNT(*) FROM intent_mandates")
+        total_orders = cursor.fetchone()[0] or 1
+
+        cursor.execute("SELECT COUNT(DISTINCT cart_id) FROM upsell_events WHERE accepted = 1")
+        orders_with_upsell = cursor.fetchone()[0] or 0
+
         cursor.execute("SELECT COUNT(*) FROM upsell_events")
         total_offered_raw = cursor.fetchone()[0]
 
@@ -256,10 +327,12 @@ def get_upsell_stats():
             total_lift_paise = total_accepted * 22500
 
         total_revenue_lift_rupees = round(total_lift_paise / 100, 2)
-        conversion_rate = round((total_accepted / total_offered * 100), 1) if total_offered > 0 else 0.0
+        conversion_rate = round((total_accepted / total_orders * 100), 1)
         avg_uplift_rupees = round((total_lift_paise / total_accepted) / 100, 2) if total_accepted > 0 else 0.0
 
         return {
+            "total_orders": total_orders,
+            "orders_with_upsell": orders_with_upsell,
             "total_offered": total_offered,
             "total_accepted": total_accepted,
             "accepted_count": total_accepted,

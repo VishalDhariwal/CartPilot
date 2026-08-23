@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from openai import OpenAI
 from backend.db import get_db
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 
 class CartItem(BaseModel):
@@ -167,16 +168,15 @@ def generate_cart_proposal(
     Supports additions ("also add mascara"), replacements ("instead of shirt give me jacket"),
     quantity adjustments ("make it 2"), and removals ("remove perfume").
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set in .env")
-
-    client = OpenAI(api_key=api_key)
+    openai_key = os.getenv("OPENAI_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not openai_key and not gemini_key:
+        raise ValueError("Neither OPENAI_API_KEY nor GEMINI_API_KEY is set in .env")
 
     spend_cap_paise = custom_spend_cap_paise or get_current_policy_spend_cap()
 
     catalog_str, sku_map = get_catalog_str(
-        client=client,
+        client=None,
         query=natural_language_request,
         spend_cap_paise=spend_cap_paise,
         current_cart=current_cart,
@@ -233,33 +233,28 @@ def generate_cart_proposal(
     7. JSON OUTPUT: Return ONLY JSON matching the required schema.
     """
 
-    # Build multi-turn messages array
-    llm_messages = [{"role": "system", "content": system_instruction}]
-
+    # Format Conversation Context
+    history_text = ""
     if conversation_history:
-        # Include up to the last 6 turns of conversation history
+        history_lines = []
         for msg in conversation_history[-6:]:
-            role = "assistant" if msg.get("role") in ("agent", "assistant") else "user"
+            role = "Agent" if msg.get("role") in ("agent", "assistant") else "User"
             content = msg.get("content", "").strip()
-            # Omit huge UI messages or alerts
             if content and not content.startswith("🛡️ **Spend Cap Updated"):
-                # Clean markdown headers if needed
                 clean_content = content.replace("🚫 **Guardrail Blocked**:", "Notice:").replace("🎉 **Payment Succeeded!**", "Payment completed.")
-                llm_messages.append({"role": role, "content": clean_content})
+                history_lines.append(f"{role}: {clean_content}")
+        if history_lines:
+            history_text = "CONVERSATION HISTORY:\n" + "\n".join(history_lines) + "\n\n"
 
-    # Ensure the latest user query is the concluding turn
-    if not llm_messages or llm_messages[-1].get("content") != natural_language_request:
-        llm_messages.append({"role": "user", "content": natural_language_request})
+    user_prompt = f"{history_text}CURRENT USER REQUEST:\n{natural_language_request}"
 
-    completion = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        messages=llm_messages,
-        response_format=AgentResponse,
-        temperature=0.1
+    from backend.engine.llm import generate_structured
+    agent_response = generate_structured(
+        prompt=user_prompt,
+        schema=AgentResponse,
+        system_prompt=system_instruction
     )
-
-    data = completion.choices[0].message.parsed
-    result = data.model_dump()
+    result = agent_response.model_dump()
 
     # Post-validate: enrich with full catalog metadata (name, category, images, sizes) and correct prices
     validated_items = []

@@ -949,17 +949,17 @@ export default function MerchantConsole() {
             </div>
 
             <div className="console-kpi-card">
-              <div className="kpi-label">Total Upsell Offers Triggered</div>
-              <div className="kpi-value">{rulesSummary.total_offered}</div>
-              <div className="kpi-sub">Across customer shopping chats</div>
+              <div className="kpi-label">Total Customer Orders</div>
+              <div className="kpi-value">{rulesSummary.total_orders || 0}</div>
+              <div className="kpi-sub">Across customer shopping sessions</div>
             </div>
 
             <div className="console-kpi-card">
-              <div className="kpi-label">Conversion Rate</div>
+              <div className="kpi-label">Upsell Attachment Rate</div>
               <div className="kpi-value" style={{ color: 'var(--accent-mustard)' }}>
                 {rulesSummary.overall_conversion_pct}%
               </div>
-              <div className="kpi-sub">{rulesSummary.total_accepted} accepted upsells</div>
+              <div className="kpi-sub">{rulesSummary.total_accepted || 0} upsells picked across {rulesSummary.total_orders || 0} orders</div>
             </div>
 
             <div className="console-kpi-card">

@@ -23,11 +23,19 @@ def validate_cart(intent_id: str, items: list, total_paise: int) -> dict:
         allowed_categories = json.loads(policy["allowed_categories"])
         autonomy_threshold_paise = policy["autonomy_threshold_paise"] or 500000
         
+        # Check Intent-Specific Spend Cap if provided
+        effective_spend_cap = spend_cap_paise
+        if intent_id:
+            cursor.execute("SELECT spend_cap_paise FROM intent_mandates WHERE id = ?", (intent_id,))
+            intent_row = cursor.fetchone()
+            if intent_row and intent_row["spend_cap_paise"]:
+                effective_spend_cap = min(spend_cap_paise, intent_row["spend_cap_paise"])
+
         # 1. Check Hard Spend Cap
-        if total_paise > spend_cap_paise:
+        if total_paise > effective_spend_cap:
             return {
                 "status": "blocked",
-                "reason": f"Cart total (₹{total_paise/100:.2f}) exceeds global spend cap (₹{spend_cap_paise/100:.0f}).",
+                "reason": f"Cart total (₹{total_paise/100:.2f}) exceeds spend cap (₹{effective_spend_cap/100:.0f}).",
                 "reversible": True
             }
             

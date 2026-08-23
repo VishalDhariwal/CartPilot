@@ -95,7 +95,12 @@ function OrderLedgerCard({ order }) {
       {/* Header */}
       <div className="ledger-card-header">
         <div>
-          <div className="ledger-goal-title">{intent.goal || intent.raw_request}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <div className="ledger-goal-title">{intent.goal || intent.raw_request}</div>
+            <span className={`channel-badge ${intent.channel === 'mcp_agent' ? 'mcp' : 'web'}`}>
+              {intent.channel === 'mcp_agent' ? '🤖 MCP External Agent' : '🌐 Buyer Web Chat'}
+            </span>
+          </div>
           <div className="ledger-submeta">
             <span>ID: <strong>{intent.id.slice(-8).toUpperCase()}</strong></span>
             <span>•</span>
@@ -255,9 +260,15 @@ export default function Dashboard() {
       return { total: 0, totalPaise: 0, completed: 0, blocked: 0, failed: 0, refunded: 0 };
     }
     let completed = 0, blocked = 0, failed = 0, refunded = 0, totalPaise = 0;
+    let mcpCount = 0, webCount = 0;
     orders.forEach(o => {
       const lp = o.payments[o.payments.length - 1];
       const lc = o.carts[o.carts.length - 1];
+      if (o.intent.channel === 'mcp_agent') {
+        mcpCount++;
+      } else {
+        webCount++;
+      }
       if (lc?.status === 'approved') {
         totalPaise += (lc.total_paise || 0);
       }
@@ -275,7 +286,7 @@ export default function Dashboard() {
         blocked++;
       }
     });
-    return { total: orders.length, totalPaise, completed, blocked, failed, refunded };
+    return { total: orders.length, totalPaise, completed, blocked, failed, refunded, mcpCount, webCount };
   }, [orders]);
 
   // Filtered orders
@@ -293,6 +304,12 @@ export default function Dashboard() {
     }
     if (filter === 'upsell') {
       return orders.filter(o => o.logs.some(l => l.event.includes('Upsell Accepted') || l.event.includes('Substitute Accepted') || l.event.includes('Post-Purchase Add-on Created')));
+    }
+    if (filter === 'mcp') {
+      return orders.filter(o => o.intent.channel === 'mcp_agent');
+    }
+    if (filter === 'web') {
+      return orders.filter(o => o.intent.channel !== 'mcp_agent');
     }
     return orders;
   }, [orders, filter]);
@@ -339,7 +356,7 @@ export default function Dashboard() {
               : '+₹0'}
           </div>
           <div className="kpi-badge mustard">
-            <span>{upsellStats?.accepted_count || 0} upsells accepted ({upsellStats?.conversion_rate_pct || 0}% rate)</span>
+            <span>{upsellStats?.accepted_count || 0} upsells picked across {upsellStats?.total_orders || 0} orders ({upsellStats?.conversion_rate_pct || 0}%)</span>
           </div>
         </div>
 
@@ -415,6 +432,19 @@ export default function Dashboard() {
           onClick={() => setFilter('refunded')}
         >
           ↩ Refunded ({stats.refunded})
+        </button>
+        <button
+          className={`filter-pill ${filter === 'mcp' ? 'active' : ''}`}
+          onClick={() => setFilter('mcp')}
+          style={{ borderColor: filter === 'mcp' ? '#6B46C1' : undefined, color: filter === 'mcp' ? '#FFF' : '#6B46C1', background: filter === 'mcp' ? '#6B46C1' : '#F3E8FF' }}
+        >
+          🤖 MCP Agent ({stats.mcpCount || 0})
+        </button>
+        <button
+          className={`filter-pill ${filter === 'web' ? 'active' : ''}`}
+          onClick={() => setFilter('web')}
+        >
+          🌐 Web Chat ({stats.webCount || 0})
         </button>
       </div>
 

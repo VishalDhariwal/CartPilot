@@ -7,13 +7,9 @@ class RecoveryMessage(BaseModel):
 
 def analyze_failure(raw_error_reason: str) -> dict:
     """
-    Calls ChatGPT to translate a raw Razorpay webhook error into a friendly, actionable recovery message.
+    Translates raw payment errors into friendly, actionable recovery messages using OpenAI or Gemini.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set in .env")
-        
-    client = OpenAI(api_key=api_key)
+    from backend.engine.llm import generate_structured
     
     system_instruction = f"""
     You are an AI Payment Recovery Agent for an e-commerce store.
@@ -24,15 +20,9 @@ def analyze_failure(raw_error_reason: str) -> dict:
     Do not use technical jargon. Tell them exactly what they should do next (e.g. try a different card, check balance, etc).
     """
     
-    completion = client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": "Generate the friendly recovery message."}
-        ],
-        response_format=RecoveryMessage,
-        temperature=0.3
+    data = generate_structured(
+        prompt="Generate the friendly recovery message.",
+        schema=RecoveryMessage,
+        system_prompt=system_instruction
     )
-    
-    data = completion.choices[0].message.parsed
     return {"recommendation": data.message}
