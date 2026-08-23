@@ -315,14 +315,14 @@ def compute_lift_pairs(min_co_occurrence: int = 8, min_lift: float = 1.0) -> int
 
 def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
     """
-    Part 3: 4-Layer Scalable Cross-Sell Merge Logic.
+    Live-Computed 3-Tier Recommendation Merge Logic:
 
     Candidate sources blended in priority order:
-      1. data_verified rows from basket_pairs (highest trust, mined exact-pair statistical evidence)
-      2. Layer 2: Co-purchase embeddings (item2vec nearest neighbors from real order patterns)
-      3. Layer 1: Category-compatibility graph (LLM cold-start category affinity + in-stock items)
-      4. ai_suggested rows from basket_pairs (LLM cold-start specific pair priors)
+      1. Tier 1 (Highest Trust): data_verified rows from basket_pairs (mined exact-pair statistical evidence >= 8 real orders)
+      2. Tier 2 (Empirical Sequences): Layer 2 co-purchase embeddings (item2vec nearest neighbors from >= 50 real orders)
+      3. Tier 3 (Live Cold-Start): find_live_category_candidates (live-computed category graph + semantic dense embeddings)
 
+    Per-SKU static ai_suggested priors are completely retired and excluded (bp.retired = 0).
     Boost multiplier (1.35x) applies uniformly across all candidates.
     No fake or fabricated numeric lift values for non-empirical layers.
     """
@@ -345,6 +345,7 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
     cart_sku_names = {row["sku"]: row["name"] for row in cursor.fetchall()}
 
     placeholders = ','.join(['?'] * len(cart_skus))
+    # Query only active, non-retired, empirical data_verified rules
     sql = f"""
     SELECT 
         bp.sku_a,
@@ -368,7 +369,9 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
     WHERE bp.sku_a IN ({placeholders})
       AND c.stock > 0
       AND bp.sku_b NOT IN ({placeholders})
+      AND bp.source = 'data_verified'
       AND (bp.muted IS NULL OR bp.muted = 0)
+      AND (bp.retired IS NULL OR bp.retired = 0)
     """
 
     cursor.execute(sql, cart_skus + cart_skus)
@@ -377,30 +380,22 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
 
     candidates_by_sku = {}
 
-    # ── Source 1 & 4: Basket pairs (data_verified & ai_suggested) ──────────────
+    # ── Tier 1: Exact-Pair Data-Verified Rules (Highest Priority) ───────────────
     for row in rows:
         sku_b = row["sku_b"]
-        source = row["source"] or "ai_suggested"
+        source = "data_verified"
         boosted = bool(row["candidate_boosted"] or 0)
         boost_multiplier = 1.35 if boosted else 1.0
 
         trigger_sku = row["sku_a"]
         trigger_name = cart_sku_names.get(trigger_sku, trigger_sku)
 
-        if source == "data_verified" and row["lift"] is not None:
-            lift_val = round(row["lift"], 2)
-            support_val = round(row["support"], 4) if row["support"] is not None else None
-            confidence_val = round(row["confidence"], 4) if row["confidence"] is not None else None
-            final_score = round(lift_val * boost_multiplier, 4)
-            reason = f"Frequently bought together with {trigger_name} ({lift_val:.1f}x higher affinity across {row['co_occurrence_count']} orders)."
-            tier_priority = 4  # Highest
-        else:
-            lift_val = None
-            support_val = None
-            confidence_val = None
-            final_score = round(1.0 * boost_multiplier, 4)
-            reason = row["reasoning"] or f"Recommended complementary pairing for {trigger_name}."
-            tier_priority = 1  # AI-suggested specific pair fallback
+        lift_val = round(row["lift"], 2) if row["lift"] is not None else 1.0
+        support_val = round(row["support"], 4) if row["support"] is not None else None
+        confidence_val = round(row["confidence"], 4) if row["confidence"] is not None else None
+        final_score = round(lift_val * boost_multiplier, 4)
+        reason = f"Frequently bought together with {trigger_name} ({lift_val:.1f}x higher affinity across {row['co_occurrence_count']} orders)."
+        tier_priority = 3  # Tier 1 highest
 
         if boosted:
             reason += " Featured partner recommendation."
@@ -437,7 +432,7 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
         if sku_b not in candidates_by_sku or candidate["_tier_priority"] > candidates_by_sku[sku_b]["_tier_priority"]:
             candidates_by_sku[sku_b] = candidate
 
-    # ── Source 2: Layer 2 Co-Purchase Embeddings (item2vec) ─────────────────────
+    # ── Tier 2: Layer 2 Co-Purchase Embeddings (item2vec, >= 50 real orders) ─────
     try:
         from backend.recommendations.scalable_engine import find_co_purchase_neighbors
         copurchase_candidates = find_co_purchase_neighbors(
@@ -446,30 +441,30 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
             top_k=top_k
         )
         for cand in copurchase_candidates:
-            cand["_tier_priority"] = 3  # Priority 2: learned empirical embedding
+            cand["_tier_priority"] = 2  # Tier 2 priority
             sku = cand["sku"]
             if sku not in candidates_by_sku or cand["_tier_priority"] > candidates_by_sku[sku]["_tier_priority"]:
                 candidates_by_sku[sku] = cand
     except Exception as e:
         print(f"⚠️ Layer 2 co-purchase neighbor lookup skipped: {e}")
 
-    # ── Source 3: Layer 1 Category-Compatibility Graph ──────────────────────────
+    # ── Tier 3: Live Category-Scoped Selection (Category Graph + Dense Embeddings)
     try:
-        from backend.recommendations.scalable_engine import find_category_compat_candidates
-        cat_compat_candidates = find_category_compat_candidates(
+        from backend.recommendations.scalable_engine import find_live_category_candidates
+        live_cat_candidates = find_live_category_candidates(
             cart_items,
             exclude_skus=set(candidates_by_sku.keys()),
             top_k=top_k
         )
-        for cand in cat_compat_candidates:
-            cand["_tier_priority"] = 2  # Priority 3: category compatibility graph
+        for cand in live_cat_candidates:
+            cand["_tier_priority"] = 1  # Tier 3 live cold-start priority
             sku = cand["sku"]
             if sku not in candidates_by_sku or cand["_tier_priority"] > candidates_by_sku[sku]["_tier_priority"]:
                 candidates_by_sku[sku] = cand
     except Exception as e:
-        print(f"⚠️ Layer 1 category compatibility lookup skipped: {e}")
+        print(f"⚠️ Live category candidate lookup skipped: {e}")
 
-    # Sort candidates by tier priority first (4 -> 3 -> 2 -> 1), then by final_score (boosted items rise)
+    # Sort candidates by tier priority first (3 -> 2 -> 1), then by final_score (boosted items rise)
     sorted_candidates = sorted(
         candidates_by_sku.values(),
         key=lambda x: (x.get("_tier_priority", 0), x.get("final_score", 0)),

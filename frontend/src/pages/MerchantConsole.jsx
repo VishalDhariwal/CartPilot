@@ -21,7 +21,10 @@ import {
   Layers,
   BarChart3,
   DollarSign,
-  Plus
+  Plus,
+  Archive,
+  Play,
+  Eye
 } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
@@ -57,13 +60,19 @@ export default function MerchantConsole() {
   const [togglingSku, setTogglingSku] = useState(null);
   const [boostPreviewToast, setBoostPreviewToast] = useState(null);
 
-  // ─── TAB 3: Growth Rules State ────────────────────────────────────────────
+  // ─── TAB 3: Growth Rules & Live Preview State ─────────────────────────────
+  const [growthSubTab, setGrowthSubTab] = useState('live_preview'); // 'live_preview' | 'verified' | 'retired'
+  const [previewSku, setPreviewSku] = useState('SUN-FAS-PAR-157'); // default: Party Glasses
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [previewData, setPreviewData] = useState(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [growthRules, setGrowthRules] = useState([]);
   const [rulesSummary, setRulesSummary] = useState({
     total_rules: 0,
-    verified_rules: 0,
-    ai_suggested_rules: 0,
     active_rules: 0,
+    verified_rules: 0,
+    category_compat_rules: 0,
+    retired_priors: 0,
     muted_rules: 0,
     total_offered: 0,
     total_accepted: 0,
@@ -71,7 +80,7 @@ export default function MerchantConsole() {
     total_revenue_lift_rupees: 0
   });
   const [ruleSearch, setRuleSearch] = useState('');
-  const [ruleStatusFilter, setRuleStatusFilter] = useState('all'); // 'all' | 'data_verified' | 'ai_suggested' | 'active' | 'muted'
+  const [ruleStatusFilter, setRuleStatusFilter] = useState('all'); // 'all' | 'data_verified' | 'retired' | 'active' | 'muted'
   const [mutingRuleId, setMutingRuleId] = useState(null);
   const [isReseedingPriors, setIsReseedingPriors] = useState(false);
 
@@ -171,6 +180,37 @@ export default function MerchantConsole() {
   useEffect(() => {
     fetchGrowthRules();
   }, [ruleSearch, ruleStatusFilter]);
+
+  /* ─── Live Recommendation Preview Sandbox Fetcher ───────────────────────── */
+  const handleFetchLivePreview = async (skuToFetch) => {
+    const targetSku = skuToFetch || previewSku;
+    if (!targetSku) return;
+    setIsPreviewLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/console/growth-rules/live-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku: targetSku, top_k: 4 })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPreviewData(data);
+        setPreviewSku(targetSku);
+      } else {
+        showToast(data.detail || 'Could not compute live preview', 'error');
+      }
+    } catch (err) {
+      console.error('Error fetching live preview:', err);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'growth-rules' && !previewData && !isPreviewLoading) {
+      handleFetchLivePreview(previewSku || 'SUN-FAS-PAR-157');
+    }
+  }, [activeTab]);
 
   /* ─── Save Policy Action ────────────────────────────────────────────────── */
   const handleSavePolicy = async (e) => {
@@ -892,7 +932,7 @@ export default function MerchantConsole() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* ── TAB 3: Growth Rules Inspector (Hybrid AI & Data Governance) ── */}
+      {/* ── TAB 3: Growth Rules Inspector & Live Recommendation Sandbox ── */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {activeTab === 'growth-rules' && (
         <div className="console-tab-content">
@@ -903,7 +943,9 @@ export default function MerchantConsole() {
               <div className="kpi-value" style={{ color: 'var(--accent-teal)' }}>
                 {rulesSummary.active_rules}
               </div>
-              <div className="kpi-sub">{rulesSummary.verified_rules || 0} Data-Verified · {rulesSummary.ai_suggested_rules || 0} AI-Priors</div>
+              <div className="kpi-sub">
+                {rulesSummary.verified_rules || 0} Data-Verified · {rulesSummary.category_compat_rules || 0} Category Graph (Live)
+              </div>
             </div>
 
             <div className="console-kpi-card">
@@ -929,237 +971,376 @@ export default function MerchantConsole() {
             </div>
           </div>
 
-          {/* Search & Filter Bar */}
-          <div className="console-toolbar">
-            <div className="toolbar-search-wrap">
-              <Search size={15} color="var(--ink-muted)" />
-              <input
-                type="text"
-                placeholder="Search rules by trigger, recommended SKU, or reasoning…"
-                value={ruleSearch}
-                onChange={(e) => setRuleSearch(e.target.value)}
-              />
-            </div>
+          {/* Sub-tab Navigation */}
+          <div className="growth-subtabs-nav">
+            <button
+              type="button"
+              className={`growth-subtab-btn ${growthSubTab === 'live_preview' ? 'active' : ''}`}
+              onClick={() => setGrowthSubTab('live_preview')}
+            >
+              <Sparkles size={14} color={growthSubTab === 'live_preview' ? 'var(--accent-teal)' : 'currentColor'} />
+              <span>Live Recommendation Preview (Sandbox)</span>
+            </button>
+            <button
+              type="button"
+              className={`growth-subtab-btn ${growthSubTab === 'verified' ? 'active' : ''}`}
+              onClick={() => { setGrowthSubTab('verified'); setRuleStatusFilter('data_verified'); }}
+            >
+              <CheckCircle2 size={14} color={growthSubTab === 'verified' ? '#16A34A' : 'currentColor'} />
+              <span>Data-Verified Association Rules ({rulesSummary.verified_rules || 0})</span>
+            </button>
+            <button
+              type="button"
+              className={`growth-subtab-btn ${growthSubTab === 'retired' ? 'active' : ''}`}
+              onClick={() => { setGrowthSubTab('retired'); setRuleStatusFilter('retired'); }}
+            >
+              <Archive size={14} />
+              <span>Retired Legacy Priors ({rulesSummary.retired_priors || 0})</span>
+            </button>
+          </div>
 
-            <div className="toolbar-controls-right">
-              <div className="rule-filter-chips">
-                <button
-                  className={`filter-chip ${ruleStatusFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setRuleStatusFilter('all')}
-                >
-                  All ({rulesSummary.total_rules || 0})
-                </button>
-                <button
-                  className={`filter-chip ${ruleStatusFilter === 'data_verified' ? 'active' : ''}`}
-                  onClick={() => setRuleStatusFilter('data_verified')}
-                >
-                  <CheckCircle2 size={12} style={{ display: 'inline', marginRight: 4 }} />
-                  Data-Verified ({rulesSummary.verified_rules || 0})
-                </button>
-                <button
-                  className={`filter-chip ${ruleStatusFilter === 'ai_suggested' ? 'active' : ''}`}
-                  onClick={() => setRuleStatusFilter('ai_suggested')}
-                >
-                  <Sparkles size={12} style={{ display: 'inline', marginRight: 4 }} />
-                  AI-Priors ({rulesSummary.ai_suggested_rules || 0})
-                </button>
-                <button
-                  className={`filter-chip ${ruleStatusFilter === 'muted' ? 'active' : ''}`}
-                  onClick={() => setRuleStatusFilter('muted')}
-                >
-                  <VolumeX size={12} style={{ display: 'inline', marginRight: 4 }} />
-                  Muted ({rulesSummary.muted_rules || 0})
-                </button>
+          {/* ── SUB-TAB 1: Live Recommendation Preview Sandbox ─────────────── */}
+          {growthSubTab === 'live_preview' && (
+            <div className="live-sandbox-container">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="live-badge-glow">
+                      <span className="live-pulse-dot" />
+                      <span>COMPUTED LIVE ON DEMAND · ZERO DATABASE PERSISTENCE</span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--ink-secondary)', marginTop: '0.35rem' }}>
+                    Evaluates live catalog stock, category compatibility graph, and 384-d dense embeddings fresh on every call.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn-console-outline"
+                    onClick={() => handleFetchLivePreview(previewSku)}
+                    disabled={isPreviewLoading}
+                  >
+                    {isPreviewLoading ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                    <span>Re-evaluate Live</span>
+                  </button>
+                </div>
               </div>
 
-              <button
-                type="button"
-                className="btn-console-outline"
-                onClick={handleReseedPriors}
-                disabled={isReseedingPriors}
-                title="Regenerate LLM-seeded cold-start priors grounded in active store catalog"
-              >
-                {isReseedingPriors ? (
-                  <>
-                    <RefreshCw size={13} className="animate-spin" />
-                    <span>Seeding Priors…</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={13} color="var(--accent-mustard)" />
-                    <span>Regenerate AI Priors</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+              {/* Product Selector & Quick Presets */}
+              <div style={{ marginTop: '1.25rem', padding: '1rem', background: 'var(--bg-paper-tint)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--hairline)' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                  Select Trigger Product to Test Recommendations:
+                </div>
+                
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                  {[
+                    { label: 'Party Glasses', sku: 'SUN-FAS-PAR-157' },
+                    { label: 'Generic Motorcycle', sku: 'MOT-GEN-GEN-113' },
+                    { label: 'Men Check Shirt', sku: 'MEN-FAS-CHE-086' },
+                    { label: 'Calvin Klein CK One', sku: 'FRA-CAL-CKO-027' },
+                    { label: 'American Football', sku: 'SPO-BRD-AME-137' },
+                    { label: 'Puma Future Rider', sku: 'MEN-PUM-PUM-090' }
+                  ].map((preset) => (
+                    <button
+                      key={preset.sku}
+                      type="button"
+                      className={`filter-chip ${previewSku === preset.sku ? 'active' : ''}`}
+                      onClick={() => {
+                        setPreviewSku(preset.sku);
+                        handleFetchLivePreview(preset.sku);
+                      }}
+                      style={{ fontSize: '0.78rem' }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
 
-          {/* Growth Rules Table */}
-          <div className="console-table-card">
-            <div className="console-table-scroll">
-              <table className="console-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '30%' }}>Association Rule (Trigger → Recommendation)</th>
-                  <th style={{ width: '22%' }}>Evidence Source & Verification</th>
-                  <th style={{ width: '26%' }}>Framing & Contextual Reasoning</th>
-                  <th>Empirical Conversion</th>
-                  <th style={{ textAlign: 'right' }}>Governance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {growthRules.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="table-empty-cell">
-                      No association rules found matching your filter.
-                    </td>
-                  </tr>
-                ) : (
-                  growthRules.map((rule) => {
-                    const isMuted = rule.muted;
-                    const isVerified = rule.source === 'data_verified' && rule.lift !== null;
+                {/* Dropdown for entire catalog */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <select
+                    className="console-select"
+                    value={previewSku}
+                    onChange={(e) => {
+                      setPreviewSku(e.target.value);
+                      handleFetchLivePreview(e.target.value);
+                    }}
+                    style={{ flex: 1, padding: '7px 10px', fontSize: '0.82rem' }}
+                  >
+                    {catalogItems.map((item) => (
+                      <option key={item.sku} value={item.sku}>
+                        {item.name} ({item.category}) — ₹{(item.price_paise / 100).toFixed(0)} [{item.sku}]
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                    return (
-                      <tr key={rule.rule_id} className={isMuted ? 'muted-rule-row' : ''}>
-                        {/* Association Pair */}
-                        <td>
-                          <div className="rule-pair-visual">
-                            <div className="rule-item-box">
-                              <div className="rule-item-name" title={rule.trigger_name}>
-                                {rule.trigger_name}
-                              </div>
-                              <div className="rule-item-meta">
-                                <span className="category-micro-tag">{rule.trigger_category}</span>
-                                <span>₹{rule.trigger_price_rupees}</span>
-                              </div>
-                            </div>
+              {/* Live Preview Output */}
+              {isPreviewLoading ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--ink-muted)' }}>
+                  <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 0.75rem auto' }} />
+                  <p>Running live category graph scoping & dense embedding ranking…</p>
+                </div>
+              ) : previewData ? (
+                <div style={{ marginTop: '1.25rem' }}>
+                  {/* Trigger Item Banner */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0.75rem 1rem', background: '#FFF', border: '1px solid var(--hairline)', borderRadius: 'var(--radius-sm)' }}>
+                    {previewData.trigger_image && (
+                      <img src={previewData.trigger_image} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-xs)', border: '1px solid var(--hairline)' }} />
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--ink)' }}>
+                        Trigger Cart Product: {previewData.trigger_name}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: 'var(--ink-secondary)', marginTop: '2px' }}>
+                        <span className="category-micro-tag">{previewData.trigger_category}</span>
+                        <span>₹{previewData.trigger_price_rupees}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)' }}>{previewData.trigger_sku}</span>
+                      </div>
+                    </div>
+                  </div>
 
-                            <ArrowRight size={14} className="rule-arrow-icon" />
-
-                            <div className="rule-item-box target">
-                              <div className="rule-item-name" title={rule.target_name}>
-                                {rule.target_name}
-                                {rule.target_boosted && (
-                                  <Sparkles size={11} color="var(--accent-mustard)" style={{ display: 'inline', marginLeft: 4 }} />
-                                )}
-                              </div>
-                              <div className="rule-item-meta">
-                                <span className="category-micro-tag">{rule.target_category}</span>
-                                <span>₹{rule.target_price_rupees}</span>
-                              </div>
-                            </div>
+                  {/* Graph Reasoning Path Box */}
+                  <div className="graph-path-box">
+                    <div className="graph-path-title">
+                      <Layers size={13} color="var(--accent-teal)" />
+                      <span>Category Compatibility Graph Reasoning Path: '{previewData.trigger_category}' ({previewData.compatible_categories.length} Compatible Categories)</span>
+                    </div>
+                    <div className="graph-path-chips">
+                      {previewData.compatible_categories.length === 0 ? (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--ink-muted)' }}>No category compatibility rules found for {previewData.trigger_category}.</span>
+                      ) : (
+                        previewData.compatible_categories.map((c, i) => (
+                          <div key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#FFF', border: '1px solid var(--hairline)', padding: '5px 10px', borderRadius: 'var(--radius-xs)', fontSize: '0.75rem' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{c.compatible_category}</span>
+                            <ArrowRight size={11} color="var(--ink-muted)" />
+                            <span style={{ color: 'var(--ink-secondary)', fontSize: '0.72rem' }}>{c.reasoning}</span>
                           </div>
-                        </td>
+                        ))
+                      )}
+                    </div>
+                  </div>
 
-                        {/* Evidence Source & Verification Tracker */}
-                        <td>
-                          {isVerified ? (
-                            <div>
-                              <div className="source-tag-verified">
-                                <CheckCircle2 size={12} />
-                                <span>Data-Verified Rule</span>
-                              </div>
-                              <div className="rule-stat-badges" style={{ marginTop: '0.35rem' }}>
-                                <span className="stat-badge lift" title="Empirical Market Basket Lift Multiplier">
-                                  {rule.lift.toFixed(2)}x Lift
-                                </span>
-                                <span className="stat-badge support" title="Real co-occurrence count across completed orders">
-                                  {rule.co_occurrence_count} orders ({(rule.support * 100).toFixed(1)}% Sup)
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="source-tag-ai">
-                                <Sparkles size={12} />
-                                <span>AI-Suggested Prior</span>
-                              </div>
-                              <div className="verification-tracker" style={{ marginTop: '0.35rem' }}>
-                                <div className="verification-bar">
-                                  <div
-                                    className="verification-bar-fill"
-                                    style={{ width: `${Math.min(100, ((rule.co_occurrence_count || 0) / 8) * 100)}%` }}
-                                  />
+                  {/* Live-Matched Candidates Grid */}
+                  <div style={{ marginTop: '1.25rem' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
+                      Top Live-Ranked Cross-Sell Recommendations ({previewData.candidates.length}):
+                    </div>
+
+                    {previewData.candidates.length === 0 ? (
+                      <div className="table-empty-cell" style={{ background: '#FFF', border: '1px solid var(--hairline)', borderRadius: 'var(--radius-sm)' }}>
+                        No in-stock compatible items found in the catalog.
+                      </div>
+                    ) : (
+                      <div className="live-candidates-grid">
+                        {previewData.candidates.map((cand, idx) => (
+                          <div key={cand.sku} className="live-candidate-card">
+                            <div className="candidate-img-row">
+                              {cand.image_url ? (
+                                <img src={cand.image_url} alt="" className="candidate-img-thumb" />
+                              ) : (
+                                <div className="candidate-img-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Package size={20} color="var(--ink-muted)" />
                                 </div>
-                                <span className="verification-text">
-                                  {rule.co_occurrence_count || 0} of 8 orders needed to verify
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={cand.name}>
+                                  #{idx + 1} {cand.name}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                  <span className="category-micro-tag" style={{ fontSize: '0.68rem' }}>{cand.category}</span>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--ink)' }}>₹{(cand.price_paise / 100).toFixed(0)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span className="source-tag-catmatch" style={{ fontSize: '0.68rem' }}>
+                                <Layers size={10} style={{ display: 'inline', marginRight: 2 }} />
+                                Live Category Match
+                              </span>
+                              {cand.cosine_similarity !== undefined && (
+                                <span className="stat-badge support" style={{ fontSize: '0.66rem', padding: '1px 5px' }}>
+                                  Sim: {(cand.cosine_similarity * 100).toFixed(0)}%
                                 </span>
-                              </div>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Framing & LLM Reasoning */}
-                        <td>
-                          <div className="rule-plain-framing">
-                            {isVerified ? (
-                              <span>"{rule.plain_language}"</span>
-                            ) : (
-                              <div>
-                                <span className="llm-reasoning-quote">"{rule.reasoning || rule.plain_language}"</span>
-                                <div className="llm-badge-sub">Grounded LLM Merchandising Prior</div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Empirical Conversion */}
-                        <td>
-                          <div className="rule-empirical-stats">
-                            <div className="empirical-row">
-                              <span className="empirical-label">Offered:</span>
-                              <strong>{rule.times_offered}x</strong>
-                              <span className="empirical-label" style={{ marginLeft: 6 }}>Accepted:</span>
-                              <strong>{rule.times_accepted}x</strong>
-                            </div>
-                            <div className="empirical-row">
-                              <span className="empirical-label">Conv:</span>
-                              <strong style={{ color: rule.conversion_rate_pct > 0 ? 'var(--accent-teal)' : 'inherit' }}>
-                                {rule.conversion_rate_pct}%
-                              </strong>
-                              {rule.revenue_lift_rupees > 0 && (
-                                <span className="rule-rev-tag">+₹{rule.revenue_lift_rupees.toFixed(0)}</span>
+                              )}
+                              {cand.boosted && (
+                                <span className="boost-badge" style={{ fontSize: '0.66rem', padding: '1px 5px' }}>
+                                  <Sparkles size={9} /> Partner Boosted
+                                </span>
                               )}
                             </div>
-                          </div>
-                        </td>
 
-                        {/* Governance Mute/Unmute Lever */}
-                        <td style={{ textAlign: 'right' }}>
-                          <div className="rule-action-cell">
-                            {isMuted ? (
-                              <button
-                                type="button"
-                                className="btn-rule-unmute"
-                                onClick={() => handleToggleMuteRule(rule)}
-                                disabled={mutingRuleId === rule.rule_id}
-                                title="Unmute rule and restore to active recommendations"
-                              >
-                                <Volume2 size={13} />
-                                <span>Unmute</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="btn-rule-mute"
-                                onClick={() => handleToggleMuteRule(rule)}
-                                disabled={mutingRuleId === rule.rule_id}
-                                title="Mute rule to immediately exclude from buyer agent recommendations"
-                              >
-                                <VolumeX size={13} />
-                                <span>Mute Rule</span>
-                              </button>
-                            )}
+                            <div style={{ fontSize: '0.76rem', color: 'var(--ink-secondary)', lineHeight: 1.35, background: 'var(--bg-paper-tint)', padding: '6px 8px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--hairline)' }}>
+                              "{cand.reason}"
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
-          </div>
+          )}
+
+          {/* ── SUB-TAB 2: Data-Verified Association Rules ─────────────────── */}
+          {growthSubTab === 'verified' && (
+            <div>
+              {growthRules.length === 0 ? (
+                <div style={{ padding: '2rem', background: 'var(--bg-card)', border: '1px solid var(--hairline)', borderRadius: 'var(--radius-md)', textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%', background: '#F0FDF4', color: '#16A34A', marginBottom: '0.75rem' }}>
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--ink)', marginBottom: '0.35rem' }}>
+                    Empirical Verification Gating Active (≥ 8 Real Orders Needed)
+                  </h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)', maxWidth: '580px', margin: '0 auto', lineHeight: 1.45 }}>
+                    Association rules require at least 8 verified real-world co-purchases to graduate into Data-Verified statistical rules. Currently 0 pairs have crossed this threshold. Cold-start cross-sell recommendations are handled live by the Category Compatibility Graph and semantic embeddings.
+                  </p>
+                </div>
+              ) : (
+                <div className="console-table-card">
+                  <div className="console-table-scroll">
+                    <table className="console-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '30%' }}>Association Rule (Trigger → Recommendation)</th>
+                          <th style={{ width: '22%' }}>Evidence Source & Verification</th>
+                          <th style={{ width: '26%' }}>Framing & Contextual Reasoning</th>
+                          <th>Empirical Conversion</th>
+                          <th style={{ textAlign: 'right' }}>Governance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {growthRules.map((rule) => {
+                          const isMuted = rule.muted;
+                          return (
+                            <tr key={rule.rule_id} className={isMuted ? 'muted-rule-row' : ''}>
+                              <td>
+                                <div className="rule-pair-visual">
+                                  <div className="rule-item-box">
+                                    <div className="rule-item-name">{rule.trigger_name}</div>
+                                    <div className="rule-item-meta">
+                                      <span className="category-micro-tag">{rule.trigger_category}</span>
+                                      <span>₹{rule.trigger_price_rupees}</span>
+                                    </div>
+                                  </div>
+                                  <ArrowRight size={14} className="rule-arrow-icon" />
+                                  <div className="rule-item-box target">
+                                    <div className="rule-item-name">{rule.target_name}</div>
+                                    <div className="rule-item-meta">
+                                      <span className="category-micro-tag">{rule.target_category}</span>
+                                      <span>₹{rule.target_price_rupees}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="source-tag-verified">
+                                  <CheckCircle2 size={12} />
+                                  <span>Data-Verified Rule</span>
+                                </div>
+                                <div className="rule-stat-badges" style={{ marginTop: '0.35rem' }}>
+                                  <span className="stat-badge lift">{rule.lift?.toFixed(2)}x Lift</span>
+                                  <span className="stat-badge support">{rule.co_occurrence_count} orders ({(rule.support * 100).toFixed(1)}% Sup)</span>
+                                </div>
+                              </td>
+                              <td>
+                                <span className="llm-reasoning-quote">"{rule.plain_language}"</span>
+                              </td>
+                              <td>
+                                <div className="rule-empirical-stats">
+                                  <div className="empirical-row">
+                                    <span className="empirical-label">Offered:</span>
+                                    <strong>{rule.times_offered}x</strong>
+                                    <span className="empirical-label" style={{ marginLeft: 6 }}>Accepted:</span>
+                                    <strong>{rule.times_accepted}x</strong>
+                                  </div>
+                                  <div className="empirical-row">
+                                    <span className="empirical-label">Conv:</span>
+                                    <strong>{rule.conversion_rate_pct}%</strong>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  className={isMuted ? 'btn-rule-unmute' : 'btn-rule-mute'}
+                                  onClick={() => handleToggleMuteRule(rule)}
+                                  disabled={mutingRuleId === rule.rule_id}
+                                >
+                                  {isMuted ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                                  <span>{isMuted ? 'Unmute' : 'Mute'}</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── SUB-TAB 3: Retired Legacy Priors Archive ───────────────────── */}
+          {growthSubTab === 'retired' && (
+            <div>
+              <div style={{ padding: '1rem 1.25rem', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.85rem', color: '#4B5563' }}>
+                  <Archive size={15} />
+                  <span>Retired Legacy Per-SKU Priors ({rulesSummary.retired_priors || 0} rows)</span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#6B7280', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                  These static pair rows were retired to eliminate the combinatorial-enumeration problem and prevent catalog staleness. All rows have <code>retired = 1</code> and are completely excluded from live buyer recommendation queries. Preserved for audit & historical reference.
+                </p>
+              </div>
+
+              <div className="console-table-card">
+                <div className="console-table-scroll">
+                  <table className="console-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '35%' }}>Legacy Pair (Trigger → Target)</th>
+                        <th style={{ width: '20%' }}>Status</th>
+                        <th>Original AI Prior Reasoning</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {growthRules.length === 0 ? (
+                        <tr>
+                          <td colSpan="3" className="table-empty-cell">No retired priors recorded.</td>
+                        </tr>
+                      ) : (
+                        growthRules.map((rule) => (
+                          <tr key={rule.rule_id} style={{ opacity: 0.75 }}>
+                            <td>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{rule.trigger_name} → {rule.target_name}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>{rule.sku_a} → {rule.sku_b}</div>
+                            </td>
+                            <td>
+                              <span className="source-tag-retired">
+                                <Archive size={10} style={{ display: 'inline', marginRight: 2 }} />
+                                Retired (Legacy Prior)
+                              </span>
+                            </td>
+                            <td style={{ fontSize: '0.78rem', color: 'var(--ink-secondary)' }}>
+                              "{rule.reasoning || rule.plain_language}"
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ─────────────────────────────────────────────────────────────────── */}
           {/* ── Scalable Architecture: Category Compatibility & Embeddings ── */}

@@ -27,6 +27,10 @@ class AddCategoryCompatRequest(BaseModel):
     category_b: str
     reasoning: str
 
+class LivePreviewRequest(BaseModel):
+    sku: str
+    top_k: int = 4
+
 
 # ─── Helper: Audit Log Writer ───────────────────────────────────────────────
 def _log_console_audit(ref_type: str, ref_id: str, event: str, detail: str):
@@ -284,15 +288,16 @@ def toggle_item_boost(req: ToggleBoostRequest):
         conn.close()
 
 
-# ─── TAB 3: Growth Rules Inspector ──────────────────────────────────────────
+# ─── TAB 3: Growth Rules Inspector & Live Recommendation Sandbox ────────────
 @router.get("/growth-rules", tags=["Merchant Console"])
 def get_growth_rules(
     q: Optional[str] = None,
-    status: Optional[str] = "all"  # "all", "data_verified", "ai_suggested", "active", "muted"
+    status: Optional[str] = "all"  # "all", "data_verified", "retired", "active", "muted"
 ):
     """
-    Returns hybrid market basket association rules (data-verified and AI-suggested)
-    cross-referenced with empirical upsell_events conversion metrics.
+    Returns market basket association rules.
+    - Active view: Only data-verified empirical rules (retired = 0, source = 'data_verified')
+    - Retired view: Legacy static per-SKU priors (retired = 1) kept for audit history.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -305,14 +310,14 @@ def get_growth_rules(
             where_clauses.append("(c_a.name LIKE ? OR c_b.name LIKE ? OR bp.sku_a LIKE ? OR bp.sku_b LIKE ? OR bp.reasoning LIKE ?)")
             params.extend([search_term, search_term, search_term, search_term, search_term])
 
-        if status == "active":
-            where_clauses.append("(bp.muted IS NULL OR bp.muted = 0)")
+        if status == "retired":
+            where_clauses.append("(bp.retired = 1 OR bp.source = 'ai_suggested')")
         elif status == "muted":
-            where_clauses.append("bp.muted = 1")
+            where_clauses.append("bp.muted = 1 AND (bp.retired IS NULL OR bp.retired = 0)")
         elif status == "data_verified":
-            where_clauses.append("bp.source = 'data_verified'")
-        elif status == "ai_suggested":
-            where_clauses.append("bp.source = 'ai_suggested'")
+            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0)")
+        else:  # "all" or "active"
+            where_clauses.append("(bp.retired IS NULL OR bp.retired = 0) AND bp.source = 'data_verified'")
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
@@ -327,6 +332,7 @@ def get_growth_rules(
                 bp.reasoning,
                 COALESCE(bp.co_occurrence_count, 0) AS co_occurrence_count,
                 COALESCE(bp.muted, 0) AS muted,
+                COALESCE(bp.retired, 0) AS retired,
                 bp.computed_at,
                 c_a.name AS trigger_name,
                 c_a.category AS trigger_category,
@@ -343,7 +349,6 @@ def get_growth_rules(
             {where_sql}
             ORDER BY 
               bp.muted ASC,
-              CASE WHEN bp.source = 'data_verified' THEN 0 ELSE 1 END ASC,
               COALESCE(bp.lift, 1.0) DESC,
               bp.co_occurrence_count DESC
         """
@@ -368,30 +373,30 @@ def get_growth_rules(
         total_revenue_lift_paise_all = 0
         active_count = 0
         muted_count = 0
-        verified_count = 0
-        ai_suggested_count = 0
 
         # Query all summary counts across DB
-        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'data_verified'")
+        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'data_verified' AND (retired IS NULL OR retired = 0)")
         db_verified_count = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'ai_suggested' OR source IS NULL")
-        db_ai_suggested_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE retired = 1 OR source = 'ai_suggested'")
+        db_retired_count = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM category_compatibility")
+        db_category_compat_count = cursor.fetchone()[0]
+
+        # Total active live rules = verified empirical rules + category compatibility graph pairs
+        total_active_live_rules = db_verified_count + db_category_compat_count
 
         for r in rows:
             is_muted = bool(r["muted"])
+            is_retired = bool(r["retired"])
             source = r["source"] or "ai_suggested"
             is_verified = (source == "data_verified" and r["lift"] is not None)
 
             if is_muted:
                 muted_count += 1
-            else:
+            elif not is_retired:
                 active_count += 1
-
-            if is_verified:
-                verified_count += 1
-            else:
-                ai_suggested_count += 1
 
             target_sku = r["sku_b"]
             perf = events_by_sku.get(target_sku, {
@@ -409,7 +414,6 @@ def get_growth_rules(
             total_revenue_lift_paise_all += lift_paise
 
             conversion_pct = round((times_accepted / times_offered * 100), 1) if times_offered > 0 else 0.0
-
             co_occurrence = r["co_occurrence_count"] or 0
 
             if is_verified:
@@ -424,7 +428,7 @@ def get_growth_rules(
                 lift_val = None
                 support_val = None
                 confidence_val = None
-                plain_language = r["reasoning"] or f"AI-suggested complementary pairing for {r['trigger_name']}."
+                plain_language = r["reasoning"] or f"Legacy AI prior (Retired): {r['trigger_name']} → {r['target_name']}."
 
             rules.append({
                 "rule_id": f"{r['sku_a']}__{r['sku_b']}",
@@ -447,6 +451,7 @@ def get_growth_rules(
                 "support": support_val,
                 "confidence": confidence_val,
                 "muted": is_muted,
+                "retired": is_retired,
                 "plain_language": plain_language,
                 "times_offered": times_offered,
                 "times_accepted": times_accepted,
@@ -460,15 +465,77 @@ def get_growth_rules(
             "rules": rules,
             "summary": {
                 "total_rules": len(rules),
+                "active_rules": total_active_live_rules,
                 "verified_rules": db_verified_count,
-                "ai_suggested_rules": db_ai_suggested_count,
-                "active_rules": active_count,
+                "category_compat_rules": db_category_compat_count,
+                "retired_priors": db_retired_count,
                 "muted_rules": muted_count,
                 "total_offered": total_offered_all,
                 "total_accepted": total_accepted_all,
                 "overall_conversion_pct": overall_conv,
                 "total_revenue_lift_rupees": round(total_revenue_lift_paise_all / 100, 2)
             }
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/growth-rules/live-preview", tags=["Merchant Console"])
+def preview_live_recommendations(req: LivePreviewRequest):
+    """
+    Live Recommendation Preview Sandbox for merchants.
+    Runs find_live_category_candidates directly in real-time for any catalog product,
+    and returns candidates along with the complete category-graph traversal path.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT sku, name, category, price_paise, image_url, description, metadata, boosted, embedding FROM catalog WHERE sku = ?",
+            (req.sku,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"SKU '{req.sku}' not found in catalog.")
+
+        trigger_item = dict(row)
+        trigger_category = trigger_item["category"]
+
+        # Fetch category compatibility connections for this category
+        cursor.execute(
+            """
+            SELECT category_b AS compat_cat, reasoning, editable
+            FROM category_compatibility
+            WHERE category_a = ?
+            UNION
+            SELECT category_a AS compat_cat, reasoning, editable
+            FROM category_compatibility
+            WHERE category_b = ?
+            """,
+            (trigger_category, trigger_category)
+        )
+        compat_paths = [
+            {
+                "compatible_category": r["compat_cat"],
+                "reasoning": r["reasoning"],
+                "editable": bool(r["editable"])
+            }
+            for r in cursor.fetchall()
+        ]
+
+        from backend.recommendations.scalable_engine import find_live_category_candidates
+        candidates = find_live_category_candidates([trigger_item], top_k=req.top_k)
+
+        return {
+            "trigger_sku": trigger_item["sku"],
+            "trigger_name": trigger_item["name"],
+            "trigger_category": trigger_category,
+            "trigger_price_rupees": round(trigger_item["price_paise"] / 100, 2),
+            "trigger_image": trigger_item["image_url"] or "",
+            "compatible_categories": compat_paths,
+            "candidates": candidates,
+            "computed_at": datetime.utcnow().isoformat() + "Z",
+            "is_live_computed": True
         }
     finally:
         conn.close()
@@ -534,18 +601,18 @@ def toggle_mute_growth_rule(req: ToggleMuteRuleRequest):
 @router.post("/growth-rules/reseed-priors", tags=["Merchant Console"])
 def reseed_growth_priors():
     """
-    Triggers re-generation of LLM-seeded cold start priors grounded in active catalog items.
+    Regenerates the category compatibility graph (Layer 1 cold-start graph).
     """
-    from backend.recommendations.lift_engine import generate_ai_priors
-    count = generate_ai_priors()
+    from backend.recommendations.scalable_engine import generate_category_compatibility
+    res = generate_category_compatibility()
     _log_console_audit(
-        "growth_engine", "priors_generator", "AI Growth Priors Reseeded",
-        f"Regenerated {count} grounded AI-suggested cross-category growth rules."
+        "growth_engine", "category_compat", "Category Compatibility Graph Seeded",
+        f"Regenerated {res['inserted']} compatibility pairs across {res['total_categories']} categories."
     )
     return {
         "status": "success",
-        "priors_count": count,
-        "message": f"Successfully generated {count} AI-suggested growth rules."
+        "category_pairs_count": res.get("inserted", 0),
+        "message": f"Successfully updated category compatibility graph with {res.get('inserted', 0)} pairs."
     }
 
 

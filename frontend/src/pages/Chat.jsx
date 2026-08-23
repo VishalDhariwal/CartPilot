@@ -38,7 +38,7 @@ const loadSavedSessions = () => {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch (_) {}
+  } catch (_) { }
   const def = createDefaultSession();
   return [def];
 };
@@ -211,8 +211,9 @@ function ReceiptCard({
 
 
 /* ─── Scroll-Snap Multi-Card Carousel Component ──────────────────────── */
-function ScrollSnapCarousel({ title, candidates, onAddItem, onSelectDetail, currentCartTotalPaise, spendCapPaise, addingSku }) {
-  if (!candidates || candidates.length === 0) return null;
+function ScrollSnapCarousel({ title, candidates, onAddItem, onSelectDetail, currentCartTotalPaise, spendCapPaise, addingSku, cartSkus }) {
+  const visibleCandidates = (candidates || []).filter(cand => !cartSkus?.has(cand.sku));
+  if (!visibleCandidates || visibleCandidates.length === 0) return null;
 
   return (
     <div className="carousel-wrapper">
@@ -225,7 +226,7 @@ function ScrollSnapCarousel({ title, candidates, onAddItem, onSelectDetail, curr
       </div>
 
       <div className="carousel-track">
-        {candidates.map((cand) => {
+        {visibleCandidates.map((cand) => {
           const itemPriceRupees = (cand.price_paise / 100).toFixed(0);
           const wouldExceed = (currentCartTotalPaise + cand.price_paise) > spendCapPaise;
           const remainingBudgetPaise = Math.max(0, spendCapPaise - currentCartTotalPaise);
@@ -263,7 +264,7 @@ function ScrollSnapCarousel({ title, candidates, onAddItem, onSelectDetail, curr
                   className="btn-carousel-add"
                   disabled={wouldExceed || Boolean(addingSku)}
                   onClick={() => onAddItem(cand)}
-                  title={wouldExceed ? `Exceeds spend cap by ₹${((cand.price_paise - remainingBudgetPaise)/100).toFixed(0)}` : 'Add to your cart'}
+                  title={wouldExceed ? `Exceeds spend cap by ₹${((cand.price_paise - remainingBudgetPaise) / 100).toFixed(0)}` : 'Add to your cart'}
                 >
                   {isAddingThis ? (
                     <span className="flex-center gap-1"><RefreshCcw size={12} className="animate-spin" /> Adding…</span>
@@ -439,7 +440,7 @@ function ProductDetailModalContent({ product, onClose, onAddToCart, currentCartT
 
             <div className="product-detail-info">
               <div className="product-detail-name">{product.name}</div>
-              
+
               <div className="product-detail-meta-row">
                 <div className="product-rating-badge">
                   ★ {metadata.rating || 4.5} / 5.0
@@ -603,8 +604,8 @@ function RazorpayPaymentCard({ paymentData, paymentStatus, onCheckStatus, isChec
           {isRefunded
             ? '✅ Refund completed and recorded in audit ledger'
             : paymentStatus === 'succeeded'
-            ? '✅ Payment confirmed & captured in Razorpay!'
-            : 'Listening for Razorpay webhook / auto-polling…'}
+              ? '✅ Payment confirmed & captured in Razorpay!'
+              : 'Listening for Razorpay webhook / auto-polling…'}
         </span>
         {!isRefunded && paymentStatus !== 'succeeded' && (
           <button
@@ -893,7 +894,7 @@ export default function Chat() {
       nextSessions[idx] = updatedSession;
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSessions));
-      } catch (_) {}
+      } catch (_) { }
 
       // Persist to backend SQLite for cross-browser synchronization
       fetch(`${BASE_URL}/api/chat-sessions`, {
@@ -904,7 +905,7 @@ export default function Chat() {
           title: updatedSession.title,
           session_data: updatedSession
         })
-      }).catch(() => {});
+      }).catch(() => { });
 
       return nextSessions;
     });
@@ -919,7 +920,7 @@ export default function Chat() {
           setSpendCapPaise(data.spend_cap_paise);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     const syncSessions = () => {
       // Do not sync/overwrite state if user is actively awaiting an agent response
@@ -933,7 +934,7 @@ export default function Chat() {
             setSessions(serverSessions);
             try {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(serverSessions));
-            } catch (_) {}
+            } catch (_) { }
 
             // If the currently open session was updated in another browser window
             const serverActive = serverSessions.find(s => s.id === currentSessionId);
@@ -952,7 +953,7 @@ export default function Chat() {
             }
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
 
 
@@ -974,7 +975,7 @@ export default function Chat() {
               setPaymentStatus(active.paymentStatus || null);
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     };
     window.addEventListener('storage', onStorage);
@@ -1020,7 +1021,7 @@ export default function Chat() {
     setSessions(updated);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch (_) {}
+    } catch (_) { }
     setCurrentSessionId(newSession.id);
     localStorage.setItem(ACTIVE_ID_KEY, newSession.id);
     setMessages(newSession.messages);
@@ -1040,12 +1041,12 @@ export default function Chat() {
         title: newSession.title,
         session_data: newSession
       })
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const handleDeleteSession = (e, sessionId) => {
     e?.stopPropagation();
-    fetch(`${BASE_URL}/api/chat-sessions/${sessionId}`, { method: 'DELETE' }).catch(() => {});
+    fetch(`${BASE_URL}/api/chat-sessions/${sessionId}`, { method: 'DELETE' }).catch(() => { });
     const updated = sessions.filter(s => s.id !== sessionId);
     if (updated.length === 0) {
       const fresh = createDefaultSession();
@@ -1053,13 +1054,13 @@ export default function Chat() {
       handleSelectSession(fresh.id);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify([fresh]));
-      } catch (_) {}
+      } catch (_) { }
       return;
     }
     setSessions(updated);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch (_) {}
+    } catch (_) { }
     if (currentSessionId === sessionId) {
       handleSelectSession(updated[0].id);
     }
@@ -1086,12 +1087,12 @@ export default function Chat() {
         if (activeCartData.total_paise > newCapPaise) {
           setActiveCartData(prev => ({
             ...prev,
-            guardrail_reason: `Cart total (₹${(prev.total_paise/100).toFixed(0)}) exceeds updated spend cap (₹${(newCapPaise/100).toFixed(0)})`
+            guardrail_reason: `Cart total (₹${(prev.total_paise / 100).toFixed(0)}) exceeds updated spend cap (₹${(newCapPaise / 100).toFixed(0)})`
           }));
         } else {
           setActiveCartData(prev => ({
             ...prev,
-            guardrail_reason: `Within spend cap (₹${(prev.total_paise/100).toFixed(0)} <= ₹${(newCapPaise/100).toFixed(0)})`
+            guardrail_reason: `Within spend cap (₹${(prev.total_paise / 100).toFixed(0)} <= ₹${(newCapPaise / 100).toFixed(0)})`
           }));
         }
       }
@@ -1335,21 +1336,24 @@ export default function Chat() {
         return;
       }
 
+      const cartItemSkus = new Set((data.proposed_items || items || []).map(i => i.sku));
+      const newUpsells = (data.upsell ? (data.upsell.candidates || [data.upsell]) : []).filter(c => !cartItemSkus.has(c.sku));
+      setUpsellCandidates(newUpsells);
+
       setActiveCartData(data);
       setMessages(prev => {
         const lastIdx = prev.reduce((acc, m, idx) => (m.role === 'agent' && m.cartData) ? idx : acc, -1);
         if (lastIdx !== -1) {
           const next = [...prev];
-          next[lastIdx] = { ...next[lastIdx], cartData: data };
+          next[lastIdx] = { 
+            ...next[lastIdx], 
+            cartData: data,
+            upsellCandidates: newUpsells
+          };
           return next;
         }
         return prev;
       });
-
-      if (data.upsell) {
-        const cands = data.upsell.candidates || [data.upsell];
-        setUpsellCandidates(cands);
-      }
     } catch (err) {
       appendMessage('agent', `❌ ${err.message}`, { isAlert: true });
     } finally {
@@ -1556,8 +1560,13 @@ export default function Chat() {
               const messageCartData = msg.cartData || (isLatestAgent ? activeCartData : null);
               const messagePaymentData = msg.paymentData || (isLatestAgent ? paymentData : null);
               const messagePaymentStatus = msg.paymentStatus || (isLatestAgent ? paymentStatus : null);
-              const messageUpsells = msg.upsellCandidates || (isLatestAgent ? upsellCandidates : []);
-              const messageSubstitutes = msg.substituteCandidates || (isLatestAgent ? substituteCandidates : []);
+              
+              const currentCartSkus = new Set(messageCartData?.proposed_items?.map(item => item.sku) || []);
+              const rawUpsells = isLatestAgent ? (upsellCandidates.length > 0 ? upsellCandidates : (msg.upsellCandidates || [])) : (msg.upsellCandidates || []);
+              const rawSubstitutes = isLatestAgent ? (substituteCandidates.length > 0 ? substituteCandidates : (msg.substituteCandidates || [])) : (msg.substituteCandidates || []);
+              const messageUpsells = rawUpsells.filter(c => !currentCartSkus.has(c.sku));
+              const messageSubstitutes = rawSubstitutes.filter(c => !currentCartSkus.has(c.sku));
+
               const isRefundedMsg = msg.isRefunded || messagePaymentStatus === 'refunded' || (isLatestAgent && (phase === 'refunded' || paymentStatus === 'refunded'));
 
               const isInteractiveProposal = isLatestAgent && phase === 'proposal' && !messagePaymentData;
@@ -1595,6 +1604,7 @@ export default function Chat() {
                               currentCartTotalPaise={messageCartData.total_paise || 0}
                               spendCapPaise={spendCapPaise}
                               addingSku={addingSku}
+                              cartSkus={currentCartSkus}
                             />
                           )}
 
@@ -1608,6 +1618,7 @@ export default function Chat() {
                               currentCartTotalPaise={messageCartData.total_paise || 0}
                               spendCapPaise={spendCapPaise}
                               addingSku={addingSku}
+                              cartSkus={currentCartSkus}
                             />
                           )}
 
@@ -1622,30 +1633,30 @@ export default function Chat() {
                           )}
 
 
-                        {/* Refund button (hidden once refunded) */}
-                        {canRequestRefund && (
-                          <div style={{ marginTop: '0.85rem', display: 'flex', gap: 8 }}>
-                            <button
-                              onClick={handleRequestRefund}
-                              style={{
-                                background: 'var(--alert-brick-bg)', color: 'var(--alert-brick)',
-                                border: '1px solid var(--alert-brick-border)', borderRadius: 'var(--radius-sm)',
-                                padding: '0.45rem 0.85rem', fontSize: '0.8rem', fontWeight: 600,
-                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
-                              }}
-                            >
-                              <RotateCcw size={13} /> Request AI Resolution / Refund
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          });
-        })()}
+                          {/* Refund button (hidden once refunded) */}
+                          {canRequestRefund && (
+                            <div style={{ marginTop: '0.85rem', display: 'flex', gap: 8 }}>
+                              <button
+                                onClick={handleRequestRefund}
+                                style={{
+                                  background: 'var(--alert-brick-bg)', color: 'var(--alert-brick)',
+                                  border: '1px solid var(--alert-brick-border)', borderRadius: 'var(--radius-sm)',
+                                  padding: '0.45rem 0.85rem', fontSize: '0.8rem', fontWeight: 600,
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
+                                }}
+                              >
+                                <RotateCcw size={13} /> Request AI Resolution / Refund
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
 
 
 

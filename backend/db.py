@@ -92,7 +92,7 @@ def init_db():
       created_at TEXT NOT NULL
     );
 
-    -- Market Basket Analysis pairs: derived from LLM-seeded priors (ai_suggested) or statistical lift (data_verified)
+    -- Market Basket Analysis pairs: derived from LLM-seeded priors (ai_suggested, retired) or statistical lift (data_verified)
     CREATE TABLE IF NOT EXISTS basket_pairs (
       sku_a TEXT NOT NULL,
       sku_b TEXT NOT NULL,
@@ -104,6 +104,7 @@ def init_db():
       co_occurrence_count INTEGER DEFAULT 0,
       computed_at TEXT NOT NULL,
       muted INTEGER NOT NULL DEFAULT 0,
+      retired INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (sku_a, sku_b)
     );
 
@@ -151,6 +152,7 @@ def init_db():
         ("catalog", "co_purchase_embedding", "TEXT"),  # Layer 2: item2vec co-purchase vectors
         ("policy_config", "autonomy_threshold_paise", "INTEGER NOT NULL DEFAULT 500000"),
         ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0"),
+        ("basket_pairs", "retired", "INTEGER NOT NULL DEFAULT 0"),
         ("basket_pairs", "source", "TEXT NOT NULL DEFAULT 'ai_suggested'"),
         ("basket_pairs", "reasoning", "TEXT"),
         ("basket_pairs", "co_occurrence_count", "INTEGER DEFAULT 0"),
@@ -161,6 +163,13 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+
+    # Migrate legacy ai_suggested rows to retired = 1 (Retire per-SKU priors)
+    try:
+        cursor.execute("UPDATE basket_pairs SET retired = 1 WHERE source = 'ai_suggested' AND (retired IS NULL OR retired = 0)")
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Error retiring legacy basket pairs: {e}")
 
     # Ensure basket_pairs has nullable lift/support for Hybrid Growth Engine
     cursor.execute("PRAGMA table_info(basket_pairs)")
@@ -179,6 +188,7 @@ def init_db():
           co_occurrence_count INTEGER DEFAULT 0,
           computed_at TEXT NOT NULL,
           muted INTEGER NOT NULL DEFAULT 0,
+          retired INTEGER NOT NULL DEFAULT 0,
           PRIMARY KEY (sku_a, sku_b)
         )
         """)

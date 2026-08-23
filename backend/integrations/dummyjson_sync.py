@@ -122,18 +122,14 @@ def sync_dummyjson_catalog():
     else:
         print("⚠️ Model not loaded; will compute embeddings on first query.")
 
-    # ── Purge Synthetic Orders & Seed Grounded AI Priors ─────────────────
-    print("🤖 Seeding grounded AI priors for Market Basket Growth Engine...")
-    cursor.execute("DELETE FROM historical_orders WHERE is_synthetic = 1")
-    conn.commit()
-    conn.close()
-
-    # Generate grounded LLM priors
-    from backend.recommendations.lift_engine import generate_ai_priors, compute_lift_pairs
-    priors_count = generate_ai_priors()
-    print(f"✅ Growth Engine seeded with {priors_count} AI-suggested rules.")
+    # ── Verify Category Compatibility Graph for Scalable Growth Engine ───
+    print("🤖 Ensuring Category Compatibility Graph is seeded...")
+    from backend.recommendations.scalable_engine import generate_category_compatibility
+    res = generate_category_compatibility()
+    print(f"✅ Category compatibility graph ready ({res.get('inserted', 0)} pairs added).")
 
     # Check real empirical orders for data-verified rules
+    from backend.recommendations.lift_engine import compute_lift_pairs
     verified_count = compute_lift_pairs(min_co_occurrence=8)
     print(f"✅ Market Basket Analysis verified {verified_count} empirical rules (>= 8 orders).")
 

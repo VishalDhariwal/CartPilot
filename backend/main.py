@@ -41,15 +41,6 @@ def startup_event():
             from backend.integrations.dummyjson_sync import sync_dummyjson_catalog
             sync_dummyjson_catalog()
         else:
-            # Check if basket pairs exist; if empty, seed AI priors
-            conn = get_db()
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM basket_pairs")
-            bp_count = cursor.fetchone()[0]
-            conn.close()
-            if bp_count == 0:
-                from backend.recommendations.lift_engine import generate_ai_priors
-                generate_ai_priors()
             # Compute empirical rules for any pairs with >= 8 real orders
             from backend.recommendations.lift_engine import compute_lift_pairs
             compute_lift_pairs(min_co_occurrence=8)

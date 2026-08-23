@@ -463,42 +463,79 @@ def find_co_purchase_neighbors(
     return results
 
 
-# ── Layer 1: Category-match candidates at recommendation time ─────────────────
+# ── Layer 1: Live Category-Scoped Selection at Recommendation Time ───────────
 
-def find_category_compat_candidates(
+def find_live_category_candidates(
     cart_items: list[dict],
-    exclude_skus: set[str],
-    top_k: int = 5
+    exclude_skus: Optional[set[str]] = None,
+    top_k: int = 3
 ) -> list[dict]:
     """
-    Layer 1 cold-start: for each category in the cart, look up category_compatibility
-    to find compatible target categories, then return in-stock items from those categories,
-    ranked by boosted DESC.
+    Live Category-Scoped Semantic Selection (replaces static per-SKU priors):
+    1. For each item in the cart, identify its category and query category_compatibility
+       for compatible complement categories (excluding categories already in the cart).
+    2. Pool all in-stock catalog items belonging to those compatible categories.
+    3. Run dense embedding similarity between the cart's average representation and the pooled candidates.
+       Ties are broken toward closer price tiers to what's already in the cart.
+    4. Apply merchant boost multiplier (1.35x) to elevate featured partner inventory.
+    5. Return top_k candidates directly in-memory with zero disk persistence (never stale!).
 
-    Never shows a fabricated lift or statistical metric.
-    source = "category_match"
+    Never fabricates lift or statistical metrics.
+    source = "live_category" (or "category_match")
     """
     from backend.db import get_db
 
     if not cart_items:
         return []
 
-    cart_categories = list({i.get("category") for i in cart_items if i.get("category")})
-    if not cart_categories:
-        return []
+    if exclude_skus is None:
+        exclude_skus = set()
 
     conn = get_db()
     cursor = conn.cursor()
 
+    # Resolve categories and prices for cart items if missing
+    cart_skus = [i.get("sku") for i in cart_items if i.get("sku")]
+    cart_cats = set()
+    cart_prices = []
+    cart_sku_meta = {}
+
+    if cart_skus:
+        placeholders = ",".join(["?"] * len(cart_skus))
+        cursor.execute(
+            f"SELECT sku, name, category, price_paise, embedding FROM catalog WHERE sku IN ({placeholders})",
+            cart_skus
+        )
+        for r in cursor.fetchall():
+            cart_sku_meta[r["sku"]] = dict(r)
+            if r["category"]:
+                cart_cats.add(r["category"])
+            if r["price_paise"]:
+                cart_prices.append(r["price_paise"])
+
+    for i in cart_items:
+        if i.get("category"):
+            cart_cats.add(i["category"])
+        if i.get("price_paise"):
+            cart_prices.append(i["price_paise"])
+
+    cart_categories = list(cart_cats)
+    if not cart_categories:
+        conn.close()
+        return []
+
+    avg_cart_price = float(np.mean(cart_prices)) if cart_prices else 1000.0
+
+    # Query category_compatibility for compatible target categories (bidirectional UNION)
     cat_placeholders = ",".join(["?"] * len(cart_categories))
     cursor.execute(
         f"""
-        SELECT category_b AS compat_cat, reasoning
+        SELECT category_b AS compat_cat, category_a AS trigger_cat, reasoning
         FROM category_compatibility
         WHERE category_a IN ({cat_placeholders})
           AND category_b NOT IN ({cat_placeholders})
         UNION
-        SELECT category_a AS compat_cat, reasoning
+        SELECT category_a AS compat_cat, category_b AS trigger_cat, reasoning
         FROM category_compatibility
         WHERE category_b IN ({cat_placeholders})
           AND category_a NOT IN ({cat_placeholders})
@@ -511,47 +548,80 @@ def find_category_compat_candidates(
         conn.close()
         return []
 
-    # Shuffle the compatible categories to add variety
-    import random
-    compat_list = [dict(r) for r in compat_rows]
-    random.shuffle(compat_list)
+    compat_categories = list({r["compat_cat"] for r in compat_rows})
+    compat_reasoning = {r["compat_cat"]: r["reasoning"] for r in compat_rows}
+    compat_triggers = {r["compat_cat"]: r["trigger_cat"] for r in compat_rows}
 
-    compat_categories = [r["compat_cat"] for r in compat_list]
-    compat_reasoning = {r["compat_cat"]: r["reasoning"] for r in compat_list}
+    # Extract cart embedding representation (average normalized 384-d dense vector)
+    cart_vecs = []
+    for sku in cart_skus:
+        meta = cart_sku_meta.get(sku, {})
+        emb_str = meta.get("embedding")
+        if emb_str:
+            try:
+                vec = np.array(json.loads(emb_str), dtype=np.float32)
+                norm = np.linalg.norm(vec)
+                if norm > 0:
+                    cart_vecs.append(vec / norm)
+            except Exception:
+                pass
 
-    excluded = list(exclude_skus | {i["sku"] for i in cart_items if "sku" in i})
+    cart_query_vec = None
+    if cart_vecs:
+        avg_vec = np.mean(cart_vecs, axis=0)
+        norm = np.linalg.norm(avg_vec)
+        if norm > 0:
+            cart_query_vec = avg_vec / norm
+
+    # Pool all in-stock catalog items in compatible categories
+    excluded = list(exclude_skus | set(cart_skus))
     exc_placeholders = ",".join(["?"] * len(excluded)) if excluded else "NULL"
     cat_in = ",".join(["?"] * len(compat_categories))
 
     cursor.execute(
         f"""
-        SELECT sku, name, price_paise, category, boosted, image_url, description, metadata
+        SELECT sku, name, price_paise, category, boosted, image_url, description, metadata, embedding
         FROM catalog
         WHERE stock > 0
           AND category IN ({cat_in})
           {"AND sku NOT IN (" + exc_placeholders + ")" if excluded else ""}
-        ORDER BY boosted DESC, price_paise ASC
-        LIMIT ?
         """,
-        compat_categories + (excluded if excluded else []) + [top_k * 2]
+        compat_categories + (excluded if excluded else [])
     )
-    rows = cursor.fetchall()
+    candidate_rows = cursor.fetchall()
     conn.close()
 
-    results = []
-    seen_cats = defaultdict(int)
+    if not candidate_rows:
+        return []
 
-    for row in rows:
+    # Score candidates using cosine similarity, price tier proximity, and merchant boost
+    scored = []
+    for row in candidate_rows:
         cat = row["category"]
-        if seen_cats[cat] >= 2:
-            continue
-        seen_cats[cat] += 1
+        cand_price = row["price_paise"] or 0
 
+        # Embedding similarity
+        raw_sim = 0.50  # Default neutral baseline if embedding not available
+        if cart_query_vec is not None and row["embedding"]:
+            try:
+                cand_vec = np.array(json.loads(row["embedding"]), dtype=np.float32)
+                cand_norm = np.linalg.norm(cand_vec)
+                if cand_norm > 0:
+                    raw_sim = float(np.dot(cart_query_vec, cand_vec / cand_norm))
+            except Exception:
+                pass
+
+        # Price proximity factor: closer price tiers break ties favorably
+        price_diff_ratio = abs(cand_price - avg_cart_price) / max(1.0, avg_cart_price)
+        price_factor = 1.0 / (1.0 + 0.15 * min(price_diff_ratio, 10.0))
+
+        # Promotion boost lever (1.35x)
         boosted = bool(row["boosted"])
         boost_mul = 1.35 if boosted else 1.0
-        final_score = round(boost_mul, 4)
 
-        cat_reason = compat_reasoning.get(cat, f"Complementary {cat} item for your shopping trip.")
+        final_score = round(raw_sim * price_factor * boost_mul, 4)
+
+        cat_reason = compat_reasoning.get(cat, f"Complementary {cat} selection for your cart.")
         reason = f"Category match: {cat_reason}"
         if boosted:
             reason += " Featured partner recommendation."
@@ -563,10 +633,13 @@ def find_category_compat_candidates(
             except Exception:
                 pass
 
-        results.append({
+        trigger_sku = cart_skus[0] if cart_skus else ""
+        trigger_name = cart_sku_meta.get(trigger_sku, {}).get("name", "your cart")
+
+        scored.append({
             "sku": row["sku"],
             "name": row["name"],
-            "price_paise": row["price_paise"],
+            "price_paise": cand_price,
             "category": cat,
             "image_url": row["image_url"] or "",
             "description": row["description"] or "",
@@ -579,12 +652,36 @@ def find_category_compat_candidates(
             "co_occurrence_count": 0,
             "final_score": final_score,
             "boosted": boosted,
-            "trigger_sku": cart_items[0].get("sku", "") if cart_items else "",
-            "trigger_name": "your cart",
-            "reason": reason
+            "trigger_sku": trigger_sku,
+            "trigger_name": trigger_name,
+            "reason": reason,
+            "cosine_similarity": round(raw_sim, 4)
         })
 
-        if len(results) >= top_k:
-            break
+    # Sort descending by final_score
+    scored.sort(key=lambda x: x["final_score"], reverse=True)
 
-    return results
+    # Ensure category diversity: max 2 items per category in top recommendations
+    diverse_results = []
+    seen_cats = defaultdict(int)
+    for item in scored:
+        if seen_cats[item["category"]] < 2:
+            diverse_results.append(item)
+            seen_cats[item["category"]] += 1
+            if len(diverse_results) >= top_k:
+                break
+
+    # If diverse filter produced fewer than top_k, fill up to top_k
+    if len(diverse_results) < top_k:
+        seen_skus = {x["sku"] for x in diverse_results}
+        for item in scored:
+            if item["sku"] not in seen_skus:
+                diverse_results.append(item)
+                if len(diverse_results) >= top_k:
+                    break
+
+    return diverse_results
+
+
+# Backwards compatibility alias
+find_category_compat_candidates = find_live_category_candidates
