@@ -136,8 +136,41 @@ def update_payment_mandate_status(razorpay_order_id: str = None, cart_id: str = 
                                VALUES (?, ?, 0, ?)""",
                             (f"real_{pay_id}", json.dumps(skus), updated_at)
                         )
+                
+                # Check if this was an AI-driven recovered cart
+                cursor.execute("SELECT amount_paise, recovery_action, created_at FROM payment_mandates WHERE id = ?", (pay_id,))
+                pm_check = cursor.fetchone()
+                if pm_check and pm_check["recovery_action"] == "recovery_link_sent":
+                    # Query recovery attribution policy
+                    cursor.execute("SELECT recovery_attribution_percent, recovery_idle_threshold_minutes FROM policy_config WHERE id = 1")
+                    pol_row = cursor.fetchone()
+                    rec_factor = (pol_row["recovery_attribution_percent"] if pol_row and pol_row["recovery_attribution_percent"] is not None else 60) / 100.0
+                    rec_idle_min = pol_row["recovery_idle_threshold_minutes"] if pol_row and pol_row["recovery_idle_threshold_minutes"] is not None else 120
+
+                    # Check cart idle duration
+                    try:
+                        cursor.execute("SELECT created_at FROM cart_mandates WHERE id = ?", (associated_cart_id,))
+                        c_row = cursor.fetchone()
+                        if c_row:
+                            t_cart = datetime.fromisoformat(c_row["created_at"].replace("Z", "+00:00"))
+                            t_rec = datetime.fromisoformat(pm_check["created_at"].replace("Z", "+00:00"))
+                            idle_min = (t_rec - t_cart).total_seconds() / 60.0
+                        else:
+                            idle_min = 999.0
+                    except Exception:
+                        idle_min = 999.0
+
+                    if idle_min >= rec_idle_min:
+                        outcome_id = f"go_recov_{pm_check['id']}"
+                        incremental_paise = int(round(pm_check["amount_paise"] * rec_factor))
+                        cursor.execute(
+                            """INSERT OR REPLACE INTO growth_outcomes
+                               (id, action_id, outcome_type, before_paise, after_paise, incremental_paise, revenue_type, created_at)
+                               VALUES (?, ?, 'paid', 0, ?, ?, 'recovery', ?)""",
+                            (outcome_id, None, pm_check["amount_paise"], incremental_paise, updated_at)
+                        )
             except Exception as e:
-                print(f"Error logging real order to historical_orders: {e}")
+                print(f"Error logging real order / growth outcome: {e}")
 
         conn.commit()
 

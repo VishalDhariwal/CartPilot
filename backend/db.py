@@ -141,6 +141,86 @@ def init_db():
       created_at TEXT NOT NULL,
       PRIMARY KEY (category_a, category_b)
     );
+
+    -- AI Growth Agent: Next Best Action & opportunity detection ledger
+    CREATE TABLE IF NOT EXISTS growth_actions (
+      id TEXT PRIMARY KEY,
+      action_type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'detected',
+      opportunity_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      explanation TEXT NOT NULL,
+      affected_ref TEXT,
+      est_revenue_paise INTEGER DEFAULT 0,
+      confidence REAL DEFAULT 0.0,
+      recommended_action TEXT,
+      execution_ref TEXT,
+      mode TEXT DEFAULT 'manual',
+      created_at TEXT NOT NULL,
+      executed_at TEXT,
+      dismissed_at TEXT,
+      notes TEXT
+    );
+
+    -- AI Growth Agent: Verified empirical revenue attribution & learning store
+    CREATE TABLE IF NOT EXISTS growth_outcomes (
+      id TEXT PRIMARY KEY,
+      action_id TEXT,
+      outcome_type TEXT NOT NULL,
+      before_paise INTEGER DEFAULT 0,
+      after_paise INTEGER DEFAULT 0,
+      incremental_paise INTEGER DEFAULT 0,
+      revenue_type TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    -- AI Growth Agent: Managed promotion experiment lifecycle store
+    CREATE TABLE IF NOT EXISTS promotion_experiments (
+      id TEXT PRIMARY KEY,
+      sku TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, COMPLETED, FAILED, RETIRED, NO_ACTION
+      action_id TEXT,
+      baseline_stock INTEGER NOT NULL,
+      baseline_velocity_daily REAL NOT NULL,
+      baseline_days_of_inventory REAL NOT NULL,
+      baseline_orders_30d INTEGER NOT NULL,
+      buyer_relevance_score REAL NOT NULL,
+      experiment_horizon_days INTEGER NOT NULL DEFAULT 14,
+      started_at TEXT NOT NULL,
+      ends_at TEXT NOT NULL,
+      cooldown_until TEXT NOT NULL,
+      current_stock INTEGER,
+      units_liquidated INTEGER DEFAULT 0,
+      orders_during_experiment INTEGER DEFAULT 0,
+      realized_revenue_paise INTEGER DEFAULT 0,
+      outcome_status TEXT, -- 'effective', 'inconclusive', 'no_lift', 'pending'
+      control_skus TEXT DEFAULT '[]',
+      treatment_baseline_velocity REAL DEFAULT 0.0,
+      control_baseline_velocity REAL DEFAULT 0.0,
+      treatment_current_velocity REAL DEFAULT 0.0,
+      control_current_velocity REAL DEFAULT 0.0,
+      treatment_lift REAL,
+      control_lift REAL,
+      matched_control_lift_estimate REAL,
+      zero_baseline_treatment INTEGER DEFAULT 0,
+      opportunity_reason TEXT DEFAULT 'INVENTORY_RISK_WITH_DEMAND',
+      product_state TEXT DEFAULT 'UNDER_DISCOVERED',
+      stage1_score REAL DEFAULT 0.0,
+      stage2_llm_decision TEXT DEFAULT 'ACCEPT_FALLBACK',
+      stage2_llm_reasoning TEXT,
+      final_suitability_score REAL DEFAULT 0.0,
+      decision_confidence REAL DEFAULT 0.5,
+      decision_confidence_reason TEXT,
+      probability_source TEXT DEFAULT 'cold_start_heuristic',
+      is_empirical_probability INTEGER DEFAULT 0,
+      early_killed INTEGER DEFAULT 0,
+      early_kill_reason TEXT,
+      merchant_decision TEXT DEFAULT 'PENDING',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (sku) REFERENCES catalog(sku)
+    );
     ''')
 
     # ── Safe Column Alterations for Existing Databases ───────────────────
@@ -154,18 +234,102 @@ def init_db():
         ("catalog", "co_purchase_embedding", "TEXT"),  # Layer 2: item2vec co-purchase vectors
         ("intent_mandates", "channel", "TEXT NOT NULL DEFAULT 'web_chat'"),
         ("policy_config", "autonomy_threshold_paise", "INTEGER NOT NULL DEFAULT 500000"),
+        ("policy_config", "growth_mode", "TEXT NOT NULL DEFAULT 'manual'"),
+        ("policy_config", "recovery_idle_threshold_minutes", "INTEGER NOT NULL DEFAULT 120"),
+        ("policy_config", "recovery_attribution_percent", "INTEGER NOT NULL DEFAULT 60"),
+        ("policy_config", "max_active_promotions", "INTEGER NOT NULL DEFAULT 5"),
+        ("payment_mandates", "recovery_action", "TEXT"),
+        ("upsell_events", "action_id", "TEXT"),
         ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0"),
         ("basket_pairs", "retired", "INTEGER NOT NULL DEFAULT 0"),
         ("basket_pairs", "source", "TEXT NOT NULL DEFAULT 'ai_suggested'"),
         ("basket_pairs", "reasoning", "TEXT"),
         ("basket_pairs", "co_occurrence_count", "INTEGER DEFAULT 0"),
         ("basket_pairs", "confidence", "REAL"),
+        ("promotion_experiments", "control_skus", "TEXT DEFAULT '[]'"),
+        ("promotion_experiments", "treatment_baseline_velocity", "REAL DEFAULT 0.0"),
+        ("promotion_experiments", "control_baseline_velocity", "REAL DEFAULT 0.0"),
+        ("promotion_experiments", "treatment_current_velocity", "REAL DEFAULT 0.0"),
+        ("promotion_experiments", "control_current_velocity", "REAL DEFAULT 0.0"),
+        ("promotion_experiments", "treatment_lift", "REAL"),
+        ("promotion_experiments", "control_lift", "REAL"),
+        ("promotion_experiments", "matched_control_lift_estimate", "REAL"),
+        ("promotion_experiments", "zero_baseline_treatment", "INTEGER DEFAULT 0"),
+        ("promotion_experiments", "opportunity_reason", "TEXT DEFAULT 'INVENTORY_RISK_WITH_DEMAND'"),
+        ("promotion_experiments", "product_state", "TEXT DEFAULT 'UNDER_DISCOVERED'"),
+        ("promotion_experiments", "stage1_score", "REAL DEFAULT 0.0"),
+        ("promotion_experiments", "stage2_llm_decision", "TEXT DEFAULT 'ACCEPT_FALLBACK'"),
+        ("promotion_experiments", "stage2_llm_reasoning", "TEXT"),
+        ("promotion_experiments", "final_suitability_score", "REAL DEFAULT 0.0"),
+        ("promotion_experiments", "decision_confidence", "REAL DEFAULT 0.5"),
+        ("promotion_experiments", "decision_confidence_reason", "TEXT"),
+        ("promotion_experiments", "probability_source", "TEXT DEFAULT 'cold_start_heuristic'"),
+        ("promotion_experiments", "is_empirical_probability", "INTEGER DEFAULT 0"),
+        ("promotion_experiments", "early_killed", "INTEGER DEFAULT 0"),
+        ("promotion_experiments", "early_kill_reason", "TEXT"),
+        ("promotion_experiments", "merchant_decision", "TEXT DEFAULT 'PENDING'"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
             conn.commit()
         except Exception:
             pass
+
+    # Ensure existing verified paid upsells are populated in growth_outcomes
+    try:
+        cursor.execute("DELETE FROM growth_outcomes WHERE id LIKE 'go_legacy_%' OR id LIKE 'go_paid_%' OR id LIKE 'go_recov_%'")
+        cursor.execute("""
+            SELECT 
+                p.id as pay_id,
+                p.cart_id,
+                p.amount_paise as paid_paise,
+                c.total_paise as cart_total_paise,
+                min(u.cart_total_before_paise) as base_cart_paise,
+                p.created_at
+            FROM payment_mandates p
+            JOIN cart_mandates c ON p.cart_id = c.id
+            JOIN upsell_events u ON p.cart_id = u.cart_id AND u.accepted = 1
+            WHERE p.status = 'succeeded' 
+              AND (p.recovery_action IS NULL OR p.recovery_action != 'recovery_link_sent')
+            GROUP BY p.id, p.cart_id, p.amount_paise, c.total_paise, p.created_at
+        """)
+        for row in cursor.fetchall():
+            incremental = max(0, row["paid_paise"] - row["base_cart_paise"])
+            cursor.execute("""
+                INSERT OR REPLACE INTO growth_outcomes (id, action_id, outcome_type, before_paise, after_paise, incremental_paise, revenue_type, created_at)
+                VALUES (?, ?, 'paid', ?, ?, ?, 'cross_sell', ?)
+            """, (f"go_paid_{row['pay_id']}", None, row["base_cart_paise"], row["paid_paise"], incremental, row["created_at"]))
+
+        # Also sync settled recovery orders with 60% attribution factor on idle carts
+        cursor.execute("SELECT recovery_attribution_percent, recovery_idle_threshold_minutes FROM policy_config WHERE id = 1")
+        pol_row = cursor.fetchone()
+        rec_factor = (pol_row["recovery_attribution_percent"] if pol_row and pol_row["recovery_attribution_percent"] is not None else 60) / 100.0
+        rec_idle_min = pol_row["recovery_idle_threshold_minutes"] if pol_row and pol_row["recovery_idle_threshold_minutes"] is not None else 120
+
+        cursor.execute("""
+            SELECT p.id as pay_id, p.amount_paise, p.created_at, p.updated_at, c.created_at as cart_created_at
+            FROM payment_mandates p
+            JOIN cart_mandates c ON p.cart_id = c.id
+            WHERE p.status = 'succeeded' AND p.recovery_action = 'recovery_link_sent'
+        """)
+        for rrow in cursor.fetchall():
+            # Check idle eligibility
+            try:
+                t_cart = datetime.fromisoformat(rrow["cart_created_at"].replace("Z", "+00:00"))
+                t_rec = datetime.fromisoformat(rrow["created_at"].replace("Z", "+00:00"))
+                idle_minutes = (t_rec - t_cart).total_seconds() / 60.0
+            except Exception:
+                idle_minutes = 999.0
+
+            if idle_minutes >= rec_idle_min:
+                recov_incremental = int(round(rrow["amount_paise"] * rec_factor))
+                cursor.execute("""
+                    INSERT OR REPLACE INTO growth_outcomes (id, action_id, outcome_type, before_paise, after_paise, incremental_paise, revenue_type, created_at)
+                    VALUES (?, ?, 'paid', 0, ?, ?, 'recovery', ?)
+                """, (f"go_recov_{rrow['pay_id']}", None, rrow["amount_paise"], recov_incremental, rrow["updated_at"]))
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Error syncing verified paid growth outcomes: {e}")
 
     # Migrate legacy ai_suggested rows to retired = 1 (Retire per-SKU priors)
     try:

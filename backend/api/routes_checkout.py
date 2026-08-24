@@ -61,10 +61,11 @@ class UpdateCartRequest(BaseModel):
 
 def _record_upsell_event(cart_id: str, suggested_sku: str, accepted: bool,
                           cart_total_before: int, cart_total_after: int):
-    """Write a row to upsell_events for conversion tracking."""
+    """Write a row to upsell_events and record incremental revenue in growth_outcomes."""
     conn = get_db()
     cursor = conn.cursor()
     try:
+        now_str = datetime.utcnow().isoformat() + "Z"
         cursor.execute(
             """INSERT INTO upsell_events
                (cart_id, suggested_sku, accepted, cart_total_before_paise,
@@ -72,8 +73,19 @@ def _record_upsell_event(cart_id: str, suggested_sku: str, accepted: bool,
                VALUES (?, ?, ?, ?, ?, ?)""",
             (cart_id, suggested_sku, 1 if accepted else 0,
              cart_total_before, cart_total_after,
-             datetime.utcnow().isoformat() + "Z")
+             now_str)
         )
+        
+        if accepted:
+            inc_paise = max(0, cart_total_after - cart_total_before)
+            outcome_id = f"go_xs_{uuid.uuid4().hex[:10]}"
+            cursor.execute(
+                """INSERT INTO growth_outcomes
+                   (id, action_id, outcome_type, before_paise, after_paise, incremental_paise, revenue_type, created_at)
+                   VALUES (?, ?, 'accepted', ?, ?, ?, 'cross_sell', ?)""",
+                (outcome_id, None, cart_total_before, cart_total_after, inc_paise, now_str)
+            )
+
         conn.commit()
     finally:
         conn.close()

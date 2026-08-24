@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
   CheckCircle, XCircle, ShoppingBag, Banknote, RefreshCcw,
   FileText, Sparkles, AlertCircle, RotateCcw, Activity, Shield,
-  ArrowUpRight, Clock, PackageCheck, Layers
+  ArrowUpRight, Clock, PackageCheck, Layers, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 const BASE_URL = 'http://127.0.0.1:8000';
@@ -49,8 +49,33 @@ function TimelineDotIcon({ eventClass }) {
   return <FileText size={12} />;
 }
 
-/* ─── Single Order Ledger Slip Component ─────────────────────────────── */
-function OrderLedgerCard({ order }) {
+/* ─── Reusable Telemetry KPI Tooltip Component (1.2s delay) ───────── */
+function KpiTooltip({ title, category, description, formula, source, align }) {
+  return (
+    <div className={`kpi-hover-tooltip ${align ? `align-${align}` : ''}`}>
+      <div className="kpi-tooltip-header">
+        <div className="kpi-tooltip-title">{title}</div>
+        {category && <span className="kpi-tooltip-badge">{category}</span>}
+      </div>
+      <div className="kpi-tooltip-desc">{description}</div>
+      {formula && (
+        <div className="kpi-tooltip-formula-box">
+          <div className="kpi-tooltip-formula-label">CALCULATION / FORMULA</div>
+          <code>{formula}</code>
+        </div>
+      )}
+      {source && (
+        <div className="kpi-tooltip-source">
+          <span>Source:</span> <strong>{source}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Single Order Ledger Slip Component (Click to Expand) ─────────── */
+function OrderLedgerCard({ order, defaultExpanded = false }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const { intent, carts, payments, logs } = order;
 
   const latestPayment = payments[payments.length - 1];
@@ -91,11 +116,18 @@ function OrderLedgerCard({ order }) {
   const items = approvedCart ? parseItems(approvedCart.items) : [];
 
   return (
-    <div className="ledger-card">
-      {/* Header */}
-      <div className="ledger-card-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+    <div className={`ledger-card ${expanded ? 'expanded' : 'collapsed'}`}>
+      {/* Clickable Header Headline */}
+      <div
+        className="ledger-card-header"
+        onClick={() => setExpanded(!expanded)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded(!expanded); }}
+        title={expanded ? "Click to collapse details" : "Click to expand audit timeline & items"}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <div className="ledger-goal-title">{intent.goal || intent.raw_request}</div>
             <span className={`channel-badge ${intent.channel === 'mcp_agent' ? 'mcp' : 'web'}`}>
               {intent.channel === 'mcp_agent' ? '🤖 MCP External Agent' : '🌐 Buyer Web Chat'}
@@ -111,89 +143,108 @@ function OrderLedgerCard({ order }) {
                 <span>Final Value: <strong>{fmtRupees(latestCart.total_paise)}</strong></span>
               </>
             )}
+            {items.length > 0 && (
+              <>
+                <span>•</span>
+                <span>{items.length} {items.length === 1 ? 'item' : 'items'}</span>
+              </>
+            )}
+            <span>•</span>
+            <span>{logs.length} audit {logs.length === 1 ? 'event' : 'events'}</span>
             <span>•</span>
             <span>{fmtTime(intent.created_at)}</span>
           </div>
         </div>
 
-        <div className={`status-pill ${statusType}`}>
-          {statusType === 'completed' && <CheckCircle size={12} />}
-          {statusType === 'blocked' && <Shield size={12} />}
-          {statusType === 'refunded' && <RotateCcw size={12} />}
-          <span>{statusLabel}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          <div className={`status-pill ${statusType}`}>
+            {statusType === 'completed' && <CheckCircle size={12} />}
+            {statusType === 'blocked' && <Shield size={12} />}
+            {statusType === 'refunded' && <RotateCcw size={12} />}
+            <span>{statusLabel}</span>
+          </div>
+
+          <div className="ledger-expand-chevron">
+            {expanded ? <ChevronUp size={16} color="var(--ink-secondary)" /> : <ChevronDown size={16} color="var(--ink-secondary)" />}
+          </div>
         </div>
       </div>
 
-      {/* Items Strip with Real Image Thumbnails */}
-      {items.length > 0 && (
-        <div className="ledger-items-strip">
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--ink-muted)', flexShrink: 0 }}>
-            ITEMS ({items.length}):
-          </span>
-          {items.map((item, idx) => (
-            <div key={item.sku + idx} className="ledger-item-chip">
-              {item.image_url && (
-                <img
-                  src={item.image_url}
-                  alt={item.name}
-                  className="ledger-item-thumb"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              )}
-              <span className="ledger-item-title" title={item.name || item.sku}>
-                {item.name || item.sku}
+      {/* Expanded Details Body */}
+      {expanded && (
+        <div className="ledger-card-body">
+          {/* Items Strip with Real Image Thumbnails */}
+          {items.length > 0 && (
+            <div className="ledger-items-strip">
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--ink-muted)', flexShrink: 0 }}>
+                ITEMS ({items.length}):
               </span>
-              <span className="ledger-item-amt">
-                {item.qty > 1 ? `×${item.qty} ` : ''}{fmtRupees(item.price_paise * (item.qty || 1))}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Razorpay Mandate strip */}
-      {latestPayment && (
-        <div className="ledger-mandate-strip">
-          <span>Razorpay Order: <strong>{latestPayment.razorpay_order_id || '—'}</strong></span>
-          {latestPayment.razorpay_payment_id && (
-            <span>Payment ID: <strong>{latestPayment.razorpay_payment_id}</strong></span>
-          )}
-          {latestPayment.failure_reason && (
-            <span style={{ color: 'var(--alert-brick)' }}>
-              Failure: {latestPayment.failure_reason}
-            </span>
-          )}
-          {latestPayment.recovery_action && latestPayment.recovery_action !== 'refunded' && (
-            <span style={{ color: '#8C5B14' }}>
-              Recovery Advice: {latestPayment.recovery_action}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Audit Timeline */}
-      <div className="ledger-timeline">
-        {logs.map((log) => {
-          const ec = classifyEvent(log.event);
-          return (
-            <div key={log.id} className="timeline-row">
-              <div className={`timeline-dot ${ec}`}>
-                <TimelineDotIcon eventClass={ec} />
-              </div>
-              <div className="timeline-body">
-                <div className="timeline-event-name">
-                  <span>{log.event}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-muted)', fontWeight: 400 }}>
-                    ref: {log.ref_id.slice(-8)}
+              {items.map((item, idx) => (
+                <div key={item.sku + idx} className="ledger-item-chip">
+                  {item.image_url && (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="ledger-item-thumb"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  )}
+                  <span className="ledger-item-title" title={item.name || item.sku}>
+                    {item.name || item.sku}
+                  </span>
+                  <span className="ledger-item-amt">
+                    {item.qty > 1 ? `×${item.qty} ` : ''}{fmtRupees(item.price_paise * (item.qty || 1))}
                   </span>
                 </div>
-                <div className="timeline-detail-text">{log.detail}</div>
-                <div className="timeline-timestamp">{fmtTime(log.created_at)}</div>
-              </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          )}
+
+          {/* Razorpay Mandate strip */}
+          {latestPayment && (
+            <div className="ledger-mandate-strip">
+              <span>Razorpay Order: <strong>{latestPayment.razorpay_order_id || '—'}</strong></span>
+              {latestPayment.razorpay_payment_id && (
+                <span>Payment ID: <strong>{latestPayment.razorpay_payment_id}</strong></span>
+              )}
+              {latestPayment.failure_reason && (
+                <span style={{ color: 'var(--alert-brick)' }}>
+                  Failure: {latestPayment.failure_reason}
+                </span>
+              )}
+              {latestPayment.recovery_action && latestPayment.recovery_action !== 'refunded' && (
+                <span style={{ color: '#8C5B14' }}>
+                  Recovery Advice: {latestPayment.recovery_action}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Audit Timeline */}
+          <div className="ledger-timeline">
+            {logs.map((log) => {
+              const ec = classifyEvent(log.event);
+              return (
+                <div key={log.id} className="timeline-row">
+                  <div className={`timeline-dot ${ec}`}>
+                    <TimelineDotIcon eventClass={ec} />
+                  </div>
+                  <div className="timeline-body">
+                    <div className="timeline-event-name">
+                      <span>{log.event}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-muted)', fontWeight: 400 }}>
+                        ref: {log.ref_id.slice(-8)}
+                      </span>
+                    </div>
+                    <div className="timeline-detail-text">{log.detail}</div>
+                    <div className="timeline-timestamp">{fmtTime(log.created_at)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -205,6 +256,7 @@ export default function Dashboard() {
   const [filter, setFilter] = useState('all');
   const [upsellStats, setUpsellStats] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [expandAll, setExpandAll] = useState(false);
 
   const fetchUpsellStats = async () => {
     try {
@@ -337,60 +389,92 @@ export default function Dashboard() {
         <div className="kpi-card">
           <div className="kpi-header">
             <span>Gross Order Volume</span>
-            <Banknote size={15} />
+            <Banknote size={15} color="var(--ink-secondary)" />
           </div>
           <div className="kpi-value">₹{(stats.totalPaise / 100).toFixed(0)}</div>
           <div className="kpi-badge">
             <span>{stats.total} total agent intent mandates</span>
           </div>
+
+          <KpiTooltip
+            title="Gross Order Intent Volume (GMV)"
+            category="Intent Volume"
+            description="Total gross rupee value of all approved shopping carts initiated by human shoppers and autonomous MCP agents."
+            formula="∑(cart_mandates.total_paise WHERE status='approved')"
+            source="cart_mandates • intent_mandates"
+            align="left"
+          />
         </div>
 
         <div className="kpi-card">
           <div className="kpi-header">
             <span>AI Growth & Upsells</span>
-            <Sparkles size={15} color="var(--accent-mustard)" />
+            <Sparkles size={15} color="var(--ink-secondary)" />
           </div>
-          <div className="kpi-value" style={{ color: '#8C5B14' }}>
+          <div className="kpi-value">
             {upsellStats?.total_revenue_lift_rupees != null && upsellStats.total_revenue_lift_rupees > 0
               ? `+₹${Math.round(upsellStats.total_revenue_lift_rupees).toLocaleString('en-IN')}`
               : '+₹0'}
           </div>
-          <div className="kpi-badge mustard">
-            <span>{upsellStats?.accepted_count || 0} upsells picked across {upsellStats?.total_orders || 0} orders ({upsellStats?.conversion_rate_pct || 0}%)</span>
+          <div className="kpi-badge">
+            <span>{upsellStats?.accepted_count || 0} upsells picked ({upsellStats?.conversion_rate_pct || 0}% attach)</span>
           </div>
-        </div>
 
+          <KpiTooltip
+            title="Incremental AI Revenue Lift"
+            category="AI Growth Attribution"
+            description="Net additional basket revenue generated directly by Item2Vec and market basket cross-sell recommendations."
+            formula="∑(accepted_upsell_price_paise × qty)"
+            source="upsell_events • basket_pairs"
+          />
+        </div>
 
         <div className="kpi-card">
           <div className="kpi-header">
             <span>Settled Orders</span>
-            <CheckCircle size={15} color="var(--accent-teal)" />
+            <CheckCircle size={15} color="var(--ink-secondary)" />
           </div>
-          <div className="kpi-value" style={{ color: 'var(--accent-teal-dark)' }}>
+          <div className="kpi-value">
             {stats.completed}
           </div>
-          <div className="kpi-badge success">
+          <div className="kpi-badge">
             <span>Razorpay test payments captured ✓</span>
           </div>
+
+          <KpiTooltip
+            title="Settled & Captured Payments"
+            category="Payment Settlement"
+            description="Successfully completed transactions verified via HMAC signature on Razorpay capture webhooks."
+            formula="COUNT(payment_mandates WHERE status='succeeded')"
+            source="payment_mandates • Razorpay Webhook"
+          />
         </div>
 
         <div className="kpi-card">
           <div className="kpi-header">
             <span>Guardrail Interceptions</span>
-            <Shield size={15} color="var(--alert-brick)" />
+            <Shield size={15} color="var(--ink-secondary)" />
           </div>
-          <div className="kpi-value" style={{ color: 'var(--alert-brick)' }}>
+          <div className="kpi-value">
             {stats.blocked}
           </div>
-          <div className="kpi-badge alert">
+          <div className="kpi-badge">
             <span>Spend cap & policy breaches prevented</span>
           </div>
+
+          <KpiTooltip
+            title="Guardrail Interceptions"
+            category="Deterministic Safety"
+            description="High-risk transactions mathematically blocked for spend cap overruns, category restrictions, or out-of-stock items."
+            formula="COUNT(cart_mandates WHERE status='blocked')"
+            source="guardrail_policy • audit_log"
+          />
         </div>
 
         <div className="kpi-card">
           <div className="kpi-header">
             <span>Resolution Reversals</span>
-            <RotateCcw size={15} color="#8C5B14" />
+            <RotateCcw size={15} color="var(--ink-secondary)" />
           </div>
           <div className="kpi-value">
             {stats.refunded}
@@ -398,6 +482,15 @@ export default function Dashboard() {
           <div className="kpi-badge">
             <span>Refunded via AI Resolution Agent</span>
           </div>
+
+          <KpiTooltip
+            title="Resolution Reversals (Refunds)"
+            category="Autonomous Resolution"
+            description="Customer orders safely cancelled and refunded through the LLM Resolution Agent policy verification."
+            formula="COUNT(payment_mandates WHERE recovery_action='refunded')"
+            source="resolution_mandates • Razorpay Refunds"
+            align="right"
+          />
         </div>
       </div>
 
@@ -446,6 +539,16 @@ export default function Dashboard() {
         >
           🌐 Web Chat ({stats.webCount || 0})
         </button>
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+          <button
+            className="filter-pill"
+            style={{ fontWeight: 500, fontSize: '0.78rem' }}
+            onClick={() => setExpandAll(!expandAll)}
+          >
+            {expandAll ? 'Collapse All' : 'Expand All'}
+          </button>
+        </div>
       </div>
 
       {/* ── Order Ledger List ── */}
@@ -461,7 +564,11 @@ export default function Dashboard() {
       ) : (
         <div className="ledger-orders-stack">
           {filteredOrders.map(order => (
-            <OrderLedgerCard key={order.intent.id} order={order} />
+            <OrderLedgerCard
+              key={`${order.intent.id}_${expandAll}`}
+              order={order}
+              defaultExpanded={expandAll}
+            />
           ))}
         </div>
       )}
