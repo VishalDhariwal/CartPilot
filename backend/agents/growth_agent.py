@@ -672,7 +672,7 @@ def assess_legacy_boosts_observational(cursor) -> dict[str, Any]:
     velocity_data = calculate_inventory_velocity_metrics(cursor)
     sales_dict = velocity_data.get("sales", {})
 
-    cursor.execute("SELECT sku, name, category, price_paise, stock FROM catalog WHERE boosted = 1")
+    cursor.execute("SELECT sku, name, category, price_paise, stock FROM catalog WHERE boosted = 1 ORDER BY rowid DESC")
     boosted_rows = cursor.fetchall()
 
     cursor.execute("SELECT sku FROM promotion_experiments WHERE status = 'ACTIVE'")

@@ -184,7 +184,7 @@ def list_console_catalog(
             SELECT sku, name, price_paise, stock, category, merchant, boosted, image_url, description
             FROM catalog
             {where_sql}
-            ORDER BY boosted DESC, category ASC, name ASC
+            ORDER BY boosted DESC, rowid DESC
             LIMIT ? OFFSET ?
         """
         cursor.execute(query_sql, params + [limit, offset])
@@ -365,6 +365,7 @@ def get_growth_rules(
             {where_sql}
             ORDER BY 
               bp.muted ASC,
+              bp.computed_at DESC,
               COALESCE(bp.lift, 1.0) DESC,
               bp.co_occurrence_count DESC
             LIMIT ? OFFSET ?
@@ -662,7 +663,7 @@ def get_category_compatibility():
             """
             SELECT category_a, category_b, reasoning, editable, created_at
             FROM category_compatibility
-            ORDER BY category_a ASC, category_b ASC
+            ORDER BY rowid DESC
             """
         )
         pairs = [

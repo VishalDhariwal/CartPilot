@@ -43,6 +43,30 @@ import {
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
 
+/* ─── Reusable Telemetry KPI Tooltip Component (1.2s delay) ───────── */
+function KpiTooltip({ title, category, description, formula, source, align }) {
+  return (
+    <div className={`kpi-hover-tooltip ${align ? `align-${align}` : ''}`}>
+      <div className="kpi-tooltip-header">
+        <div className="kpi-tooltip-title">{title}</div>
+        {category && <span className="kpi-tooltip-badge">{category}</span>}
+      </div>
+      <div className="kpi-tooltip-desc">{description}</div>
+      {formula && (
+        <div className="kpi-tooltip-formula-box">
+          <div className="kpi-tooltip-formula-label">CALCULATION / FORMULA</div>
+          <code>{formula}</code>
+        </div>
+      )}
+      {source && (
+        <div className="kpi-tooltip-source">
+          <span>Source:</span> <strong>{source}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MerchantConsole() {
   const [activeTab, setActiveTab] = useState('growth-manager'); // 'growth-manager' | 'growth-rules' | 'catalog' | 'policy'
   const [loading, setLoading] = useState(false);
@@ -890,16 +914,18 @@ export default function MerchantConsole() {
 
   // ─── Filtered Timeline ───────────────────────────────────────────────────
   const filteredTimeline = useMemo(() => {
-    return growthTimeline.filter(evt => {
-      const matchesSearch = !timelineSearch.trim() ||
-        (evt.detail && evt.detail.toLowerCase().includes(timelineSearch.toLowerCase())) ||
-        (evt.event && evt.event.toLowerCase().includes(timelineSearch.toLowerCase())) ||
-        (evt.ref_id && evt.ref_id.toLowerCase().includes(timelineSearch.toLowerCase()));
-      const matchesFilter = timelineFilter === 'ALL' || 
-        (evt.event && evt.event.toUpperCase().includes(timelineFilter.toUpperCase())) ||
-        (evt.detail && evt.detail.toUpperCase().includes(timelineFilter.toUpperCase()));
-      return matchesSearch && matchesFilter;
-    });
+    return growthTimeline
+      .filter(evt => {
+        const matchesSearch = !timelineSearch.trim() ||
+          (evt.detail && evt.detail.toLowerCase().includes(timelineSearch.toLowerCase())) ||
+          (evt.event && evt.event.toLowerCase().includes(timelineSearch.toLowerCase())) ||
+          (evt.ref_id && evt.ref_id.toLowerCase().includes(timelineSearch.toLowerCase()));
+        const matchesFilter = timelineFilter === 'ALL' || 
+          (evt.event && evt.event.toUpperCase().includes(timelineFilter.toUpperCase())) ||
+          (evt.detail && evt.detail.toUpperCase().includes(timelineFilter.toUpperCase()));
+        return matchesSearch && matchesFilter;
+      })
+      .sort((a, b) => (new Date(b.created_at || 0) - new Date(a.created_at || 0)) || ((b.id || 0) - (a.id || 0)));
   }, [growthTimeline, timelineSearch, timelineFilter]);
 
   return (
@@ -957,9 +983,8 @@ export default function MerchantConsole() {
         <button
           className={`console-tab-btn ${activeTab === 'growth-manager' ? 'active' : ''}`}
           onClick={() => setActiveTab('growth-manager')}
-          style={{ borderColor: activeTab === 'growth-manager' ? '#059669' : undefined }}
         >
-          <Bot size={16} color={activeTab === 'growth-manager' ? '#059669' : undefined} />
+          <Bot size={16} />
           <span>AI Growth Manager</span>
           {growthOpportunities.length > 0 && (
             <span className="growth-tab-pill">
@@ -1144,7 +1169,7 @@ export default function MerchantConsole() {
               <div className="growth-kpi-card">
                 <div className="growth-kpi-label">
                   <span>Realized Gross Revenue</span>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--ink-muted)', fontWeight: 800 }}>CAPTURED CASH</span>
+                  <span className="growth-kpi-chip">Captured Cash</span>
                 </div>
                 <div className="growth-kpi-value">
                   ₹{(growthMetrics.realized_gross_revenue_rupees || growthMetrics.total_revenue_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -1152,54 +1177,82 @@ export default function MerchantConsole() {
                 <div className="growth-kpi-sub">
                   Across {growthMetrics.succeeded_payments_count || 0} settled payments (₹{(growthMetrics.organic_baseline_revenue_rupees || 0).toLocaleString('en-IN')} organic baseline)
                 </div>
+
+                <KpiTooltip
+                  title="Realized Gross Revenue (Captured Cash)"
+                  category="Settled Cash"
+                  description="Total rupee amount successfully captured and settled from customers through Razorpay payment rails."
+                  formula="∑(payment_mandates.amount_paise WHERE status='succeeded')"
+                  source="payment_mandates • Razorpay Settlement"
+                  align="left"
+                />
               </div>
 
               {/* Card 2: Observed AI Revenue */}
-              <div className="growth-kpi-card emerald">
+              <div className="growth-kpi-card">
                 <div className="growth-kpi-label">
                   <span>Observed AI Revenue</span>
-                  <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 800 }}>ATTRIBUTED LIFT</span>
+                  <span className="growth-kpi-chip">Attributed Lift</span>
                 </div>
-                <div className="growth-kpi-value emerald-val">
+                <div className="growth-kpi-value">
                   ₹{(growthMetrics.observed_ai_attributed_revenue_rupees || growthMetrics.observed_ai_revenue_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
-                <div className="growth-kpi-sub" style={{ lineHeight: 1.35 }}>
+                <div className="growth-kpi-sub">
                   Cross-Sell: ₹{(growthMetrics.cross_sell_revenue_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} · Recovery: ₹{(growthMetrics.recovery_attributed_revenue_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
-                <div style={{ fontSize: '0.66rem', color: '#065F46', marginTop: '4px', lineHeight: 1.4 }}>
-                  <span>Recovery attribution: 60% of eligible settled recovery order value (Gross Recovered Cash: ₹{(growthMetrics.gross_recovered_revenue_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} → Attributed: ₹{(growthMetrics.recovery_attributed_revenue_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })} on carts idle ≥ {growthMetrics.recovery_idle_threshold_minutes || 0}m).</span>
-                </div>
-                <div style={{ fontSize: '0.62rem', color: '#6B7280', marginTop: '3px', fontStyle: 'italic' }}>
-                  Gross Recovered Cash and Attributed Recovery Revenue are distinct metrics (60% attribution accounts for ~40% organic baseline).
-                </div>
+
+                <KpiTooltip
+                  title="Observed AI Attributed Revenue"
+                  category="AI Attribution"
+                  description="Direct monetary lift produced by CartPilot's 3-tier recommendation engine and autonomous cart recoveries."
+                  formula="Cross_Sell_Lift + (0.60 × Eligible_Settled_Recoveries)"
+                  source="upsell_events • cart_recovery_actions"
+                />
               </div>
 
               {/* Card 3: Recoverable Cart Value (At Risk) */}
-              <div className="growth-kpi-card amber">
+              <div className="growth-kpi-card">
                 <div className="growth-kpi-label">
                   <span>Recoverable Carts</span>
-                  <span style={{ fontSize: '0.68rem', color: '#D97706', fontWeight: 800 }}>AT RISK</span>
+                  <span className="growth-kpi-chip">At Risk</span>
                 </div>
-                <div className="growth-kpi-value" style={{ color: '#D97706' }}>
+                <div className="growth-kpi-value">
                   ₹{(growthMetrics.recoverable_cart_value_rupees || growthMetrics.estimated_opportunity_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
                 <div className="growth-kpi-sub">
                   {growthMetrics.recoverable_cart_count || 0} active abandoned customer carts eligible for recovery
                 </div>
+
+                <KpiTooltip
+                  title="Recoverable Carts (Pipeline Value)"
+                  category="Revenue Opportunity"
+                  description="Gross rupee value of active abandoned carts with approved guardrails and active payment links."
+                  formula="∑(cart_mandates.total_paise WHERE idle ≥ 10min AND status='approved')"
+                  source="cart_mandates • intent_mandates"
+                />
               </div>
 
               {/* Card 4: Inventory Exposure */}
-              <div className="growth-kpi-card blue">
+              <div className="growth-kpi-card">
                 <div className="growth-kpi-label">
                   <span>Inventory Exposure</span>
-                  <span style={{ fontSize: '0.68rem', color: '#2563EB', fontWeight: 800 }}>STAGNANT STOCK</span>
+                  <span className="growth-kpi-chip">Stagnant Stock</span>
                 </div>
-                <div className="growth-kpi-value" style={{ color: '#2563EB' }}>
+                <div className="growth-kpi-value">
                   ₹{(growthMetrics.inventory_exposure_value_rupees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
                 <div className="growth-kpi-sub">
                   Stock value of high-inventory SKUs with weak sales velocity
                 </div>
+
+                <KpiTooltip
+                  title="Inventory Exposure Value"
+                  category="Working Capital"
+                  description="Total tied-up capital in catalog items holding high stock but trailing category median sales velocity."
+                  formula="∑(price_paise × stock WHERE velocity < cat_median)"
+                  source="catalog • inventory_velocity_metrics"
+                  align="right"
+                />
               </div>
             </div>
           </div>
@@ -1211,7 +1264,7 @@ export default function MerchantConsole() {
               className={`growth-manager-nav-btn ${managerView === 'pipeline' ? 'active' : ''}`}
               onClick={() => setManagerView('pipeline')}
             >
-              <Zap size={14} color={managerView === 'pipeline' ? '#059669' : 'currentColor'} />
+              <Zap size={14} />
               <span>Opportunity Pipeline</span>
               <span className="growth-manager-nav-badge">
                 {growthOpportunities.length}
@@ -1223,9 +1276,9 @@ export default function MerchantConsole() {
               className={`growth-manager-nav-btn ${managerView === 'experiments' ? 'active' : ''}`}
               onClick={() => setManagerView('experiments')}
             >
-              <Activity size={14} color={managerView === 'experiments' ? '#2563EB' : 'currentColor'} />
+              <Activity size={14} />
               <span>Controlled Experiments (DiD)</span>
-              <span className="growth-manager-nav-badge blue">
+              <span className="growth-manager-nav-badge">
                 {promotionExperiments.length}
               </span>
             </button>
@@ -1235,10 +1288,10 @@ export default function MerchantConsole() {
               className={`growth-manager-nav-btn ${managerView === 'legacy' ? 'active' : ''}`}
               onClick={() => setManagerView('legacy')}
             >
-              <Shield size={14} color={managerView === 'legacy' ? '#D97706' : 'currentColor'} />
+              <Shield size={14} />
               <span>Legacy Boosts Queue</span>
               {legacyAssessments.length > 0 && (
-                <span className="growth-manager-nav-badge warning">
+                <span className="growth-manager-nav-badge">
                   {legacyAssessments.length}
                 </span>
               )}
@@ -2613,27 +2666,61 @@ export default function MerchantConsole() {
               <div className="kpi-label">Total Catalog SKUs</div>
               <div className="kpi-value">{catalogSummary.total_items}</div>
               <div className="kpi-sub">Synced from merchant inventory</div>
+
+              <KpiTooltip
+                title="Total Catalog SKUs"
+                category="Catalog Inventory"
+                description="Total unique product units registered in the active store catalog and available for vector search."
+                formula="COUNT(DISTINCT sku FROM catalog)"
+                source="catalog table"
+                align="left"
+              />
             </div>
             <div className="console-kpi-card">
               <div className="kpi-label">Active Promoted Items</div>
-              <div className="kpi-value" style={{ color: 'var(--accent-mustard)' }}>
+              <div className="kpi-value">
                 {catalogSummary.boosted_items}
               </div>
               <div className="kpi-sub">1.35x rank uplift applied</div>
+
+              <KpiTooltip
+                title="Active Promoted Items"
+                category="Search Boost Multiplier"
+                description="Products receiving a 1.35x rank multiplier in buyer semantic discovery and recommendation scoring."
+                formula="1.35 × CosineSimilarity(query, sku)"
+                source="catalog.boosted = 1"
+              />
             </div>
             <div className="console-kpi-card">
               <div className="kpi-label">Out of Stock SKUs</div>
-              <div className="kpi-value" style={{ color: 'var(--alert-brick)' }}>
+              <div className="kpi-value">
                 {catalogSummary.out_of_stock_items}
               </div>
               <div className="kpi-sub">Triggers Substitution Agent</div>
+
+              <KpiTooltip
+                title="Out of Stock SKUs"
+                category="Inventory Availability"
+                description="Catalog products with zero stock that autonomously trigger semantic alternative proposals."
+                formula="COUNT(sku FROM catalog WHERE stock = 0)"
+                source="catalog.stock = 0"
+              />
             </div>
             <div className="console-kpi-card">
               <div className="kpi-label">Distinct Categories</div>
-              <div className="kpi-value" style={{ color: 'var(--accent-teal)' }}>
+              <div className="kpi-value">
                 {catalogSummary.categories_count}
               </div>
               <div className="kpi-sub">Governed by policy whitelist</div>
+
+              <KpiTooltip
+                title="Distinct Categories"
+                category="Taxonomy Governance"
+                description="Unique product categories validated against the merchant category policy whitelist."
+                formula="COUNT(DISTINCT category FROM catalog)"
+                source="catalog • policy_config"
+                align="right"
+              />
             </div>
           </div>
 
@@ -2805,34 +2892,68 @@ export default function MerchantConsole() {
           <div className="console-kpi-grid">
             <div className="console-kpi-card">
               <div className="kpi-label">Active Growth Rules</div>
-              <div className="kpi-value" style={{ color: 'var(--accent-teal)' }}>
+              <div className="kpi-value">
                 {rulesSummary.active_rules}
               </div>
               <div className="kpi-sub">
                 {rulesSummary.verified_rules || 0} Data-Verified · {rulesSummary.category_compat_rules || 0} Category Graph (Live)
               </div>
+
+              <KpiTooltip
+                title="Active Growth Rules"
+                category="Rule Pipeline"
+                description="Total active cross-sell association rules currently powering Tier 1 and Tier 2 recommendations."
+                formula="Data_Verified_Rules + Category_Compat_Graph_Rules"
+                source="basket_pairs • category_compatibility"
+                align="left"
+              />
             </div>
 
             <div className="console-kpi-card">
               <div className="kpi-label">Total Customer Orders</div>
               <div className="kpi-value">{rulesSummary.total_orders || 0}</div>
               <div className="kpi-sub">Across customer shopping sessions</div>
+
+              <KpiTooltip
+                title="Total Customer Orders"
+                category="Traffic Volume"
+                description="Total shopping sessions that reached cart proposal or order settlement."
+                formula="COUNT(DISTINCT intent_id FROM intent_mandates)"
+                source="intent_mandates table"
+              />
             </div>
 
             <div className="console-kpi-card">
               <div className="kpi-label">Upsell Attachment Rate</div>
-              <div className="kpi-value" style={{ color: 'var(--accent-mustard)' }}>
+              <div className="kpi-value">
                 {rulesSummary.overall_conversion_pct}%
               </div>
               <div className="kpi-sub">{rulesSummary.total_accepted || 0} upsells picked across {rulesSummary.total_orders || 0} orders</div>
+
+              <KpiTooltip
+                title="Upsell Attachment Rate"
+                category="Conversion Efficiency"
+                description="Percentage of recommended cross-sell products accepted by customers into their final carts."
+                formula="(Accepted_Upsells / Total_Offered_Upsells) × 100%"
+                source="upsell_events.accepted = 1"
+              />
             </div>
 
             <div className="console-kpi-card">
               <div className="kpi-label">Attributable Revenue Lift</div>
-              <div className="kpi-value" style={{ color: '#16A34A' }}>
+              <div className="kpi-value">
                 ₹{rulesSummary.total_revenue_lift_rupees.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
               </div>
               <div className="kpi-sub">Incremental revenue generated</div>
+
+              <KpiTooltip
+                title="Attributable Revenue Lift"
+                category="Incremental GMV"
+                description="Cumulative gross rupee lift added to customer baskets exclusively through accepted recommendations."
+                formula="∑(cart_total_after_paise - cart_total_before_paise)"
+                source="upsell_events.total_revenue_lift_paise"
+                align="right"
+              />
             </div>
           </div>
 
@@ -2843,7 +2964,7 @@ export default function MerchantConsole() {
               className={`growth-subtab-btn ${growthSubTab === 'live_preview' ? 'active' : ''}`}
               onClick={() => setGrowthSubTab('live_preview')}
             >
-              <Sparkles size={14} color={growthSubTab === 'live_preview' ? 'var(--accent-teal)' : 'currentColor'} />
+              <Sparkles size={14} />
               <span>Live Recommendation Preview (Sandbox)</span>
             </button>
             <button
@@ -2851,8 +2972,9 @@ export default function MerchantConsole() {
               className={`growth-subtab-btn ${growthSubTab === 'verified' ? 'active' : ''}`}
               onClick={() => { setGrowthSubTab('verified'); setRuleStatusFilter('data_verified'); }}
             >
-              <CheckCircle2 size={14} color={growthSubTab === 'verified' ? '#16A34A' : 'currentColor'} />
-              <span>Data-Verified Association Rules ({rulesSummary.verified_rules || 0})</span>
+              <CheckCircle2 size={14} />
+              <span>Data-Verified Association Rules</span>
+              <span className="growth-manager-nav-badge">{rulesSummary.verified_rules || 0}</span>
             </button>
             <button
               type="button"
@@ -2860,7 +2982,8 @@ export default function MerchantConsole() {
               onClick={() => { setGrowthSubTab('retired'); setRuleStatusFilter('retired'); }}
             >
               <Archive size={14} />
-              <span>Retired Legacy Priors ({rulesSummary.retired_priors || 0})</span>
+              <span>Retired Legacy Priors</span>
+              <span className="growth-manager-nav-badge">{rulesSummary.retired_priors || 0}</span>
             </button>
           </div>
 
@@ -3482,7 +3605,7 @@ export default function MerchantConsole() {
                     <h3 className="console-card-title">Scalable Layer 2: Co-Purchase Embeddings (item2vec)</h3>
                   </div>
                   <p className="console-card-desc">
-                    Trained over real order sequences only (<span style={{ fontFamily: 'var(--font-mono)' }}>is_synthetic = 0</span>). Requires $\ge 50$ real completed orders.
+                    Trained over real order sequences only (<span style={{ fontFamily: 'var(--font-mono)' }}>is_synthetic = 0</span>). Requires ≥ {embeddingStatus.min_orders_required || 10} real completed orders.
                   </p>
                 </div>
 
@@ -3513,7 +3636,7 @@ export default function MerchantConsole() {
                 </div>
               </div>
 
-              <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', background: 'var(--bg-paper-tint)', borderTop: '1px solid var(--hairline)' }}>
+              <div style={{ padding: '1rem 1.25rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', background: '#F9FAFB', borderTop: '1px solid #E5E7EB' }}>
                 <div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Real Orders</div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--ink)' }}>{embeddingStatus.real_order_count}</div>

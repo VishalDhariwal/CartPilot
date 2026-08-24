@@ -111,7 +111,7 @@ def get_ucp_profile():
             "guardrail_validation": True,
             "upsell_engine": True,
             "checkout_razorpay_test": True,
-            "refund_reversal": True,
+            "refund_reversal": False,
             "audit_trail": True
         },
         "mcp_endpoint": "/mcp",
@@ -148,7 +148,6 @@ CartPilot enables autonomous AI buyers to discover products, itemize carts withi
 - add_item_to_cart(cart_id, sku, qty): Add items to cart with mandatory guardrail re-validation.
 - checkout(cart_id): Generate real Razorpay test-mode order and checkout payment link.
 - check_payment_status(cart_id): Poll live webhook-driven payment status.
-- cancel_order(cart_id, reason): Submit cancellation request for automated policy-verified refund.
 - get_order_audit_trail(cart_id): Inspect full explainable mandate chain & audit ledger.
 
 ## Authenticated Merchant Growth MCP:
@@ -418,16 +417,16 @@ def get_dashboard():
     cursor = conn.cursor()
 
     try:
-        cursor.execute("SELECT * FROM intent_mandates ORDER BY created_at DESC LIMIT 50")
+        cursor.execute("SELECT * FROM intent_mandates ORDER BY created_at DESC LIMIT 500")
         intents = [dict(row) for row in cursor.fetchall()]
 
-        cursor.execute("SELECT * FROM cart_mandates ORDER BY created_at DESC LIMIT 50")
+        cursor.execute("SELECT * FROM cart_mandates ORDER BY created_at DESC LIMIT 1000")
         carts = [dict(row) for row in cursor.fetchall()]
 
-        cursor.execute("SELECT * FROM payment_mandates ORDER BY created_at DESC LIMIT 50")
+        cursor.execute("SELECT * FROM payment_mandates ORDER BY created_at DESC LIMIT 1000")
         payments = [dict(row) for row in cursor.fetchall()]
 
-        cursor.execute("SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 100")
+        cursor.execute("SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 2000")
         audit_logs = [dict(row) for row in cursor.fetchall()]
 
         return {

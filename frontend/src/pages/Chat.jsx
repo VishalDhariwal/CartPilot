@@ -19,6 +19,7 @@ const createDefaultSession = (title = 'New Shopping Chat') => ({
   messages: [
     {
       role: 'agent',
+      isWelcome: true,
       content: 'Hello! I am your CartPilot personal shopping agent. Tell me what you need (e.g. "I want a new perfume and body cream", "buy me an iPhone charger and sunglasses"), and I will curate your cart with live receipts, spend cap verification, and smart recommendations.'
     }
   ],
@@ -721,12 +722,14 @@ function ChatHistorySidebar({
   searchQuery,
   onSearchChange
 }) {
-  const filteredSessions = sessions.filter(s => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (s.title && s.title.toLowerCase().includes(q)) ||
-      (s.messages && s.messages.some(m => m.content && m.content.toLowerCase().includes(q)));
-  });
+  const filteredSessions = sessions
+    .filter(s => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (s.title && s.title.toLowerCase().includes(q)) ||
+        (s.messages && s.messages.some(m => m.content && m.content.toLowerCase().includes(q)));
+    })
+    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
 
   return (
     <aside className={`chat-history-sidebar ${!isOpen ? 'collapsed' : ''}`} aria-label="Chat History">
@@ -814,6 +817,98 @@ function ChatHistorySidebar({
         )}
       </div>
     </aside>
+  );
+}
+
+/* ─── Authentic Welcome Hero Card Component ────────────────────────── */
+function WelcomeHeroCard({ onSelectPrompt }) {
+  const samplePrompts = [
+    {
+      emoji: '💄',
+      category: 'Beauty & Fragrances',
+      prompt: 'I want Essence Mascara and Dior Sauvage perfume within ₹3,500'
+    },
+    {
+      emoji: '📱',
+      category: 'Electronics & Style',
+      prompt: 'Buy me an iPhone charger and luxury sunglasses under ₹2,000'
+    },
+    {
+      emoji: '🥑',
+      category: 'Gourmet Groceries',
+      prompt: 'I need Arabica coffee beans, organic apples, and fresh milk'
+    },
+    {
+      emoji: '🛋️',
+      category: 'Home & Living',
+      prompt: 'Find a modern bedside table lamp and scented candles under ₹4,000'
+    }
+  ];
+
+  return (
+    <div className="welcome-hero-card">
+      <div className="welcome-hero-header">
+        <div className="welcome-agent-identity">
+          <div className="welcome-avatar-icon">
+            <Sparkles size={18} />
+          </div>
+          <div>
+            <div className="welcome-agent-title">CartPilot Shopping Concierge</div>
+            <div className="welcome-agent-subtitle">Explainable Agentic Commerce • Live Catalog Sync</div>
+          </div>
+        </div>
+
+        <div className="welcome-status-pill">
+          <span className="pulse-dot" />
+          <span>Active & Guardrail Protected</span>
+        </div>
+      </div>
+
+      <div className="welcome-hero-body">
+        Hello! I am your <strong>CartPilot</strong> personal shopping agent. Tell me what you need in plain natural language, and I will curate your cart with live receipts, spend cap verification, and smart recommendations.
+      </div>
+
+      <div className="welcome-prompts-section">
+        <div className="welcome-prompts-title">
+          <Sparkles size={12} color="var(--accent-mustard)" />
+          <span>Try a curated shopping prompt:</span>
+        </div>
+
+        <div className="welcome-chips-grid">
+          {samplePrompts.map((item, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className="welcome-chip-btn"
+              onClick={() => onSelectPrompt(item.prompt)}
+              title={`Click to try: "${item.prompt}"`}
+            >
+              <span className="welcome-chip-emoji">{item.emoji}</span>
+              <div className="welcome-chip-content">
+                <div className="welcome-chip-label">{item.category}</div>
+                <div className="welcome-chip-text">{item.prompt}</div>
+              </div>
+              <ArrowRight size={13} color="var(--ink-muted)" style={{ marginTop: 2, flexShrink: 0 }} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="welcome-badges-row">
+        <span className="welcome-badge-tag">
+          <Shield size={12} color="var(--accent-teal)" />
+          <span>Spend Cap Guarantee</span>
+        </span>
+        <span className="welcome-badge-tag">
+          <CheckCircle size={12} color="var(--accent-teal)" />
+          <span>Zero Hallucinated Prices</span>
+        </span>
+        <span className="welcome-badge-tag">
+          <ShoppingBag size={12} color="var(--accent-teal)" />
+          <span>Razorpay Test Checkout</span>
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -1107,6 +1202,81 @@ export default function Chat() {
     if (!query.trim() || loading) return;
 
     const userText = query.trim();
+    setQuery('');
+    appendMessage('user', userText);
+    setLoading(true);
+    setPaymentData(null);
+    setPaymentStatus(null);
+    setSubstituteCandidates([]);
+    setUpsellCandidates([]);
+
+    try {
+      const res = await fetch(`${BASE_URL}/checkout/agent-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: userText,
+          spend_cap_paise: spendCapPaise,
+          conversation_history: messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
+          current_cart: (phase === 'proposal' && activeCartData?.proposed_items) ? activeCartData.proposed_items : []
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Server error');
+
+      if (data.intent?.spend_cap_paise) {
+        setSpendCapPaise(data.intent.spend_cap_paise);
+      }
+
+      // Handle Substitution offer
+      if (data.status === 'substitute_offered') {
+        const cands = data.substitute?.candidates || (data.substitute ? [data.substitute] : []);
+        setSubstituteCandidates(cands);
+        setActiveCartData(data);
+        setPhase('proposal');
+        appendMessage('agent', `I noticed **${data.oos_item.name}** is out of stock. I found the closest in-stock alternatives for you:`);
+        setLoading(false);
+        return;
+      }
+
+      // Handle Guardrail Blocked
+      if (data.status === 'blocked') {
+        appendMessage('agent', `🚫 **Guardrail Blocked**: ${data.reason}`, { isAlert: true });
+        setPhase('idle');
+        setLoading(false);
+        return;
+      }
+
+      // Cart Approved
+      setActiveCartData(data);
+
+      // Handle Upsell Candidates
+      const cands = data.upsell ? (data.upsell.candidates || [data.upsell]) : [];
+      setUpsellCandidates(cands);
+
+      const msgText = data.upsell
+        ? `I itemized your cart below! Customers who purchased these items also frequently added:`
+        : `I itemized your cart below:`;
+
+      appendMessage('agent', msgText, {
+        cartData: data,
+        upsellCandidates: cands,
+        phase: 'proposal'
+      });
+
+      setPhase('proposal');
+    } catch (err) {
+      appendMessage('agent', `❌ Error: ${err.message}`, { isAlert: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ─── Submit Quick Starter Prompt from Welcome Card ─────────────────── */
+  const handleQuickPrompt = async (promptText) => {
+    if (loading || !promptText) return;
+    const userText = promptText.trim();
     setQuery('');
     appendMessage('user', userText);
     setLoading(true);
@@ -1576,6 +1746,8 @@ export default function Chat() {
                 <div key={i} className={`msg-row ${msg.role}`}>
                   {msg.role === 'user' ? (
                     <div className="user-bubble">{msg.content}</div>
+                  ) : (msg.isWelcome || (i === 0 && !messageCartData && messages.length === 1)) ? (
+                    <WelcomeHeroCard onSelectPrompt={handleQuickPrompt} />
                   ) : (
                     <div className={`agent-bubble ${msg.isAlert ? 'alert-bubble' : msg.isSuccess ? 'success-bubble' : ''}`}>
                       <p style={{ whiteSpace: 'pre-line' }}>{msg.content}</p>

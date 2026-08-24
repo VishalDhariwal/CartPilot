@@ -12,8 +12,7 @@ Tools exposed:
   5. add_item_to_cart: Dynamic cart expansion with mandatory guardrail re-validation
   6. checkout: Finalization with real Razorpay test-mode order & payment link creation
   7. check_payment_status: Live polling of webhook-driven payment mandate state
-  8. cancel_order: Resolution Agent policy verification & automated Razorpay test refund
-  9. get_order_audit_trail: Full explainable mandate chain & audit ledger
+  8. get_order_audit_trail: Full explainable mandate chain & audit ledger
 """
 
 import os
@@ -24,7 +23,10 @@ from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 
+import sys
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 from backend.db import get_db
@@ -521,67 +523,22 @@ def check_payment_status(cart_id: str) -> Dict[str, Any]:
     }
 
 
-@buyer_mcp.tool()
 def cancel_order(
-    cart_id: str,
-    reason: str
+    cart_id: Optional[str] = None,
+    reason: Optional[str] = None,
+    *args,
+    **kwargs
 ) -> Dict[str, Any]:
     """
-    Submit an order cancellation request.
-    Evaluates policy with Resolution Agent and triggers an automated Razorpay test refund if payment was settled.
+    Temporarily disabled for MCP clients.
+    Order cancellation and refunds are supported via the web chat resolution interface (/resolution/cancel).
     """
-    state = get_cart_state(cart_id)
-    if not state or not state["cart"]:
-        return {"error": f"Cart '{cart_id}' not found."}
-
-    cart = state["cart"]
-    payment = state.get("payment")
-
-    # Evaluate cancellation policy
-    decision = decide_resolution(
-        cart=cart,
-        payment=payment,
-        buyer_reason=reason,
-        hours_since_order=0.1
-    )
-
-    if decision["action"] == "refund":
-        if payment and payment["status"] == "succeeded" and payment.get("razorpay_payment_id"):
-            refund_resp = execute_refund(
-                payment_id=payment["id"],
-                razorpay_payment_id=payment["razorpay_payment_id"],
-                amount_paise=payment["amount_paise"],
-                reason=decision["reason"]
-            )
-            return {
-                "status": "refunded",
-                "cart_id": cart_id,
-                "resolution_reason": decision["reason"],
-                "refund_id": refund_resp.get("id"),
-                "amount_refunded_rupees": round(payment["amount_paise"] / 100, 2)
-            }
-        else:
-            conn = get_db()
-            cursor = conn.cursor()
-            cursor.execute("UPDATE cart_mandates SET status = 'cancelled', reversible = 0 WHERE id = ?", (cart_id,))
-            if payment:
-                cursor.execute("UPDATE payment_mandates SET status = 'cancelled' WHERE id = ?", (payment["id"],))
-            create_audit_log(cursor, "cart", cart_id, "Order Cancelled via MCP Agent", f"Reason: {decision['reason']}")
-            conn.commit()
-            conn.close()
-            return {
-                "status": "cancelled",
-                "cart_id": cart_id,
-                "resolution_reason": decision["reason"],
-                "message": "Order cancelled successfully prior to payment capture."
-            }
-    else:
-        return {
-            "status": "denied",
-            "cart_id": cart_id,
-            "resolution_reason": decision["reason"],
-            "action": decision["action"]
-        }
+    return {
+        "error": "cancel_order is temporarily unavailable through MCP.",
+        "status": "unavailable",
+        "cart_id": cart_id,
+        "message": "Order cancellation and refunds are currently only supported via the web chat console at /resolution/cancel."
+    }
 
 
 @buyer_mcp.tool()
@@ -603,15 +560,26 @@ def get_order_audit_trail(cart_id: str) -> Dict[str, Any]:
             SELECT id, ref_type, ref_id, event, detail, created_at
             FROM audit_log
             WHERE ref_id = ? OR ref_id = ? OR ref_id = ?
-            ORDER BY id ASC
+            ORDER BY id DESC
             """,
             (cart_id, intent_id, (state["payment"]["id"] if state.get("payment") else "NULL"))
         )
         logs = [dict(r) for r in cursor.fetchall()]
 
+        intent = state.get("intent")
+        channel = "web_chat"
+        if intent:
+            if isinstance(intent, dict):
+                channel = intent.get("channel", "web_chat")
+            elif hasattr(intent, "__getitem__"):
+                try:
+                    channel = intent["channel"]
+                except Exception:
+                    channel = "web_chat"
+
         return {
             "cart_id": cart_id,
-            "channel": state.get("intent", {}).get("channel", "web_chat"),
+            "channel": channel,
             "intent_mandate": state.get("intent"),
             "cart_mandate": state.get("cart"),
             "payment_mandate": state.get("payment"),

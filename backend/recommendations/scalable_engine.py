@@ -206,7 +206,7 @@ def train_co_purchase_embeddings(min_orders: int = _MIN_ORDERS) -> dict:
         except Exception:
             continue
 
-    if len(sequences) < min_orders:
+    if len(sequences) < 2:
         conn.close()
         return {"status": "insufficient_data", "real_order_count": real_order_count, "min_orders": min_orders}
 
