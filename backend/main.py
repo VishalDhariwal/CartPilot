@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db import init_db, get_db
-from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery, routes_console
+from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery, routes_console, routes_growth
 
 
 
@@ -75,6 +75,11 @@ def startup_event():
 
     threading.Thread(target=_bg_embeddings, daemon=True).start()
 
+    # Start Autonomous AI Growth Worker (5-minute background loop)
+    import asyncio
+    from backend.agents.growth_worker import run_autonomous_growth_worker
+    asyncio.create_task(run_autonomous_growth_worker(interval_seconds=300))
+
 
 # Include routers
 app.include_router(routes_checkout.router, prefix="/checkout", tags=["Checkout"])
@@ -82,22 +87,24 @@ app.include_router(routes_webhook.router, prefix="/webhook", tags=["Webhook"])
 app.include_router(routes_resolution.router, prefix="/resolution", tags=["Resolution"])
 app.include_router(routes_recovery.router, prefix="/recovery", tags=["Recovery"])
 app.include_router(routes_console.router, prefix="/api/console", tags=["Merchant Console"])
+app.include_router(routes_growth.router, prefix="/api/growth", tags=["AI Growth Agent"])
 
-# Mount Remote Model Context Protocol (MCP) Server for external AI buyers
-from backend.mcp_server import mcp
-app.mount("/mcp", mcp.http_app(transport="streamable-http"))
+# Mount Remote Model Context Protocol (MCP) Servers
+from backend.mcp_server import buyer_mcp, merchant_mcp
+app.mount("/mcp/merchant", merchant_mcp.http_app(transport="streamable-http"))
+app.mount("/mcp", buyer_mcp.http_app(transport="streamable-http"))
 
 
 @app.get("/.well-known/ucp", tags=["Universal Commerce Protocol"])
 def get_ucp_profile():
     """
     Universal Commerce Protocol (UCP) Discovery Profile.
-    Publishes merchant capabilities, guardrail boundaries, and remote MCP endpoint.
+    Publishes merchant capabilities, guardrail boundaries, and remote MCP endpoint for AI buyers.
     """
     return {
         "ucp_version": "1.0",
         "merchant_name": "CartPilot Merchant Store",
-        "description": "Explainable Autonomous Commerce Server with 3-Tier Growth & Guardrail Governance",
+        "description": "Explainable Autonomous Commerce Engine with 3-Tier Recommendations & Guardrail Governance",
         "capabilities": {
             "catalog_search": True,
             "cart_mandate": True,
@@ -127,13 +134,13 @@ def get_llms_txt():
     from fastapi.responses import PlainTextResponse
     content = """# CartPilot — Agentic Commerce Server
 
-CartPilot enables autonomous AI buyers and shopping agents to discover products, itemize carts within budget spend caps, receive grounded recommendations, and execute Razorpay test-mode transactions with complete explainability.
+CartPilot enables autonomous AI buyers to discover products, itemize carts within budget spend caps, receive grounded recommendations, and execute Razorpay test-mode transactions with complete explainability.
 
-## MCP Server Endpoint
+## MCP Server Endpoint (Public Buyer Tools)
 - Remote MCP Endpoint: /mcp (Streamable HTTP & SSE)
 - Transport: streamable-http
 
-## Available MCP Tools:
+## Available MCP Buyer Tools:
 - search_catalog(query, category, max_price_paise): Discover in-stock catalog products.
 - get_product(sku): Fetch full product specs, pricing, and live inventory.
 - propose_cart(intent_text, spend_cap_paise): Build a cart from natural language with strict spend cap & stock verification.
@@ -143,6 +150,10 @@ CartPilot enables autonomous AI buyers and shopping agents to discover products,
 - check_payment_status(cart_id): Poll live webhook-driven payment status.
 - cancel_order(cart_id, reason): Submit cancellation request for automated policy-verified refund.
 - get_order_audit_trail(cart_id): Inspect full explainable mandate chain & audit ledger.
+
+## Authenticated Merchant Growth MCP:
+- Protected Endpoint: /mcp/merchant (Requires Bearer/merchant_token authorization)
+- Merchant Tools: get_growth_opportunities, get_growth_metrics, execute_growth_action
 
 ## Policy & Guardrail Guarantees:
 Every cart is validated against buyer spend caps and live catalog inventory before payment links are created. All actions are logged to an append-only audit ledger.

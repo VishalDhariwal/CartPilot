@@ -211,6 +211,7 @@ def list_console_catalog(
             "total": total_filtered,
             "page": page,
             "limit": limit,
+            "has_more": (offset + limit) < total_filtered,
             "summary": {
                 "total_items": total_items,
                 "boosted_items": boosted_count,
@@ -292,10 +293,12 @@ def toggle_item_boost(req: ToggleBoostRequest):
 @router.get("/growth-rules", tags=["Merchant Console"])
 def get_growth_rules(
     q: Optional[str] = None,
-    status: Optional[str] = "all"  # "all", "data_verified", "retired", "active", "muted"
+    status: Optional[str] = "all",  # "all", "data_verified", "retired", "active", "muted"
+    page: int = 1,
+    limit: int = 50
 ):
     """
-    Returns market basket association rules.
+    Returns market basket association rules with server-side pagination.
     - Active view: Only data-verified empirical rules (retired = 0, source = 'data_verified')
     - Retired view: Legacy static per-SKU priors (retired = 1) kept for audit history.
     """
@@ -315,11 +318,24 @@ def get_growth_rules(
         elif status == "muted":
             where_clauses.append("bp.muted = 1 AND (bp.retired IS NULL OR bp.retired = 0)")
         elif status == "data_verified":
-            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0)")
+            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0) AND bp.co_occurrence_count >= 8 AND bp.lift > 1.2")
         else:  # "all" or "active"
-            where_clauses.append("(bp.retired IS NULL OR bp.retired = 0) AND bp.source = 'data_verified'")
+            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0) AND bp.co_occurrence_count >= 8 AND bp.lift > 1.2")
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        # Total count for server-side pagination
+        count_sql = f"""
+            SELECT COUNT(*)
+            FROM basket_pairs bp
+            JOIN catalog c_a ON c_a.sku = bp.sku_a
+            JOIN catalog c_b ON c_b.sku = bp.sku_b
+            {where_sql}
+        """
+        cursor.execute(count_sql, params)
+        total_filtered_rules = cursor.fetchone()[0]
+
+        offset = (max(1, page) - 1) * limit
 
         sql = f"""
             SELECT 
@@ -351,8 +367,9 @@ def get_growth_rules(
               bp.muted ASC,
               COALESCE(bp.lift, 1.0) DESC,
               bp.co_occurrence_count DESC
+            LIMIT ? OFFSET ?
         """
-        cursor.execute(sql, params)
+        cursor.execute(sql, params + [limit, offset])
         rows = cursor.fetchall()
 
         # Fetch per-target-SKU empirical metrics from upsell_events
@@ -385,7 +402,7 @@ def get_growth_rules(
         muted_count = 0
 
         # Query all summary counts across DB
-        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'data_verified' AND (retired IS NULL OR retired = 0)")
+        cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'data_verified' AND (retired IS NULL OR retired = 0) AND co_occurrence_count >= 8 AND lift > 1.2")
         db_verified_count = cursor.fetchone()[0]
 
         cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE retired = 1 OR source = 'ai_suggested'")
@@ -473,8 +490,12 @@ def get_growth_rules(
 
         return {
             "rules": rules,
+            "total": total_filtered_rules,
+            "page": page,
+            "limit": limit,
+            "has_more": (offset + limit) < total_filtered_rules,
             "summary": {
-                "total_rules": len(rules),
+                "total_rules": total_filtered_rules,
                 "active_rules": total_active_live_rules,
                 "verified_rules": db_verified_count,
                 "category_compat_rules": db_category_compat_count,
@@ -689,23 +710,26 @@ def generate_category_compat_graph():
 @router.delete("/category-compat/{category_a}/{category_b}", tags=["Merchant Console"])
 def delete_category_compat_pair(category_a: str, category_b: str):
     """
-    Deletes a category compatibility pair and marks it as merchant-locked (editable = 0)
-    so future automatic generations do not recreate it.
+    Deletes a category compatibility pair (in both directions) and records audit log.
     """
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cat_a, cat_b = sorted([category_a, category_b])
-        # Delete canonical pair
+        # Delete both directions to ensure bidirectional cleanup
         cursor.execute(
-            "DELETE FROM category_compatibility WHERE category_a = ? AND category_b = ?",
-            (cat_a, cat_b)
+            """
+            DELETE FROM category_compatibility 
+            WHERE (category_a = ? AND category_b = ?) 
+               OR (category_a = ? AND category_b = ?)
+            """,
+            (category_a, category_b, category_b, category_a)
         )
+        deleted_count = cursor.rowcount
         conn.commit()
 
         _log_console_audit(
             "category_compat", f"{category_a}__{category_b}", "Category Compatibility Pair Removed",
-            f"Merchant removed compatibility between '{category_a}' and '{category_b}'."
+            f"Merchant removed compatibility between '{category_a}' and '{category_b}' ({deleted_count} record(s) deleted)."
         )
         return {
             "status": "success",

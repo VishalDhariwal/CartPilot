@@ -18,6 +18,7 @@ Tools exposed:
 
 import os
 import json
+import hmac
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
@@ -42,9 +43,24 @@ from backend.integrations.razorpay_client import create_order, create_payment_li
 from backend.agents.resolution_agent import decide_resolution
 
 
-# Initialize FastMCP Server
-mcp = FastMCP(
-    name="CartPilot",
+# ─── FAST MCP SERVER INITIALIZATION ──────────────────────────────────────────
+
+MERCHANT_AUTH_KEY = os.environ.get("CARTPILOT_MERCHANT_KEY", "cartpilot_merchant_secret_key_v1")
+
+
+def verify_merchant_auth(token: Optional[str]) -> bool:
+    """
+    Constant-time comparison for merchant credential verification.
+    """
+    if not token or not isinstance(token, str):
+        return False
+    expected = os.environ.get("CARTPILOT_MERCHANT_KEY", "cartpilot_merchant_secret_key_v1")
+    return hmac.compare_digest(token.strip(), expected.strip())
+
+
+# 1. Public Buyer MCP Server (Standard Shopping & Commerce)
+buyer_mcp = FastMCP(
+    name="CartPilot Buyer Agent",
     instructions="""
 You are interacting with CartPilot — an autonomous, explainable agentic commerce backend.
 You have access to real merchant inventory, guardrail-governed cart mandates, a 3-tier recommendation/upsell engine, and Razorpay test checkout.
@@ -57,8 +73,23 @@ Standard Shopping Workflow:
 """
 )
 
+# 2. Authenticated Merchant Growth MCP Server (Administration & Autonomy Levers)
+merchant_mcp = FastMCP(
+    name="CartPilot Merchant Growth Agent",
+    instructions="""
+You are interacting with CartPilot Merchant Growth Agent.
+This interface requires valid merchant authorization credentials (`merchant_token`).
+You can inspect live revenue growth opportunities, monitor real-time AI attribution metrics, and dispatch Next Best Actions.
+"""
+)
 
-@mcp.tool()
+# Backwards compatibility alias
+mcp = buyer_mcp
+
+
+# ─── BUYER TOOLS (REGISTERED ON BUYER_MCP) ───────────────────────────────────
+
+@buyer_mcp.tool()
 def search_catalog(
     query: str,
     category: Optional[str] = None,
@@ -120,7 +151,7 @@ def search_catalog(
         conn.close()
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def get_product(sku: str) -> Dict[str, Any]:
     """
     Retrieve complete specifications, live inventory, and pricing for a specific SKU.
@@ -161,7 +192,7 @@ def get_product(sku: str) -> Dict[str, Any]:
         conn.close()
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def propose_cart(
     intent_text: str,
     spend_cap_paise: int = 1000000
@@ -260,7 +291,7 @@ def propose_cart(
     }
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def get_upsell_suggestions(cart_id: str) -> Dict[str, Any]:
     """
     Retrieve ranked 3-tier growth recommendations for an existing cart.
@@ -298,7 +329,7 @@ def get_upsell_suggestions(cart_id: str) -> Dict[str, Any]:
     }
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def add_item_to_cart(
     cart_id: str,
     sku: str,
@@ -392,7 +423,7 @@ def add_item_to_cart(
         conn.close()
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def checkout(cart_id: str) -> Dict[str, Any]:
     """
     Finalize an approved cart mandate: creates a real Razorpay test-mode Order and Payment Link.
@@ -467,54 +498,61 @@ def checkout(cart_id: str) -> Dict[str, Any]:
     }
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def check_payment_status(cart_id: str) -> Dict[str, Any]:
     """
-    Poll the live state of an order's Payment Mandate (updated in real-time via Razorpay webhooks).
+    Poll live payment mandate status for an order.
+    Returns status: 'created', 'succeeded', 'failed', or 'cancelled'.
     """
     state = get_cart_state(cart_id)
-    if not state or not state["cart"]:
-        return {"error": f"Cart '{cart_id}' not found."}
+    if not state or not state["payment"]:
+        return {"error": f"No payment mandate found for cart '{cart_id}'."}
 
-    payment = state.get("payment")
-    if not payment:
-        return {
-            "cart_id": cart_id,
-            "payment_status": "not_initiated",
-            "message": "Checkout has not been finalized yet for this cart."
-        }
-
+    pm = state["payment"]
     return {
+        "payment_id": pm["id"],
         "cart_id": cart_id,
-        "payment_mandate_id": payment["id"],
-        "razorpay_order_id": payment["razorpay_order_id"],
-        "payment_status": payment["status"],
-        "amount_paise": payment["amount_paise"],
-        "amount_rupees": round(payment["amount_paise"] / 100, 2),
-        "failure_reason": payment.get("failure_reason"),
-        "recovery_action": payment.get("recovery_action"),
-        "updated_at": payment["updated_at"]
+        "amount_rupees": round(pm["amount_paise"] / 100, 2),
+        "status": pm["status"],
+        "failure_reason": pm.get("failure_reason"),
+        "razorpay_payment_id": pm.get("razorpay_payment_id"),
+        "created_at": pm["created_at"],
+        "updated_at": pm["updated_at"]
     }
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def cancel_order(
     cart_id: str,
-    reason: str = "Customer requested order cancellation"
+    reason: str
 ) -> Dict[str, Any]:
     """
-    Submit a cancellation/refund request.
-    Evaluates policy reversibility via Resolution Agent and executes automated Razorpay refund if eligible.
+    Submit an order cancellation request.
+    Evaluates policy with Resolution Agent and triggers an automated Razorpay test refund if payment was settled.
     """
     state = get_cart_state(cart_id)
     if not state or not state["cart"]:
         return {"error": f"Cart '{cart_id}' not found."}
 
-    decision = decide_resolution(reason, state)
-    if decision["action"] == "cancel":
-        payment = state.get("payment")
+    cart = state["cart"]
+    payment = state.get("payment")
+
+    # Evaluate cancellation policy
+    decision = decide_resolution(
+        cart=cart,
+        payment=payment,
+        buyer_reason=reason,
+        hours_since_order=0.1
+    )
+
+    if decision["action"] == "refund":
         if payment and payment["status"] == "succeeded" and payment.get("razorpay_payment_id"):
-            refund_resp = execute_refund(cart_id)
+            refund_resp = execute_refund(
+                payment_id=payment["id"],
+                razorpay_payment_id=payment["razorpay_payment_id"],
+                amount_paise=payment["amount_paise"],
+                reason=decision["reason"]
+            )
             return {
                 "status": "refunded",
                 "cart_id": cart_id,
@@ -523,7 +561,6 @@ def cancel_order(
                 "amount_refunded_rupees": round(payment["amount_paise"] / 100, 2)
             }
         else:
-            # Order cancelled before settlement
             conn = get_db()
             cursor = conn.cursor()
             cursor.execute("UPDATE cart_mandates SET status = 'cancelled', reversible = 0 WHERE id = ?", (cart_id,))
@@ -547,7 +584,7 @@ def cancel_order(
         }
 
 
-@mcp.tool()
+@buyer_mcp.tool()
 def get_order_audit_trail(cart_id: str) -> Dict[str, Any]:
     """
     Return the full cryptographic and explainability mandate chain for an order:
@@ -560,7 +597,6 @@ def get_order_audit_trail(cart_id: str) -> Dict[str, Any]:
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # Fetch audit events related to this cart or its intent
         intent_id = state["cart"]["intent_id"]
         cursor.execute(
             """
@@ -585,5 +621,71 @@ def get_order_audit_trail(cart_id: str) -> Dict[str, Any]:
         conn.close()
 
 
+# ─── MERCHANT GROWTH TOOLS (REGISTERED ON MERCHANT_MCP WITH AUTH) ───────────
+
+@merchant_mcp.tool()
+def get_growth_opportunities(
+    merchant_token: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Merchant Growth Tool (Requires merchant_token):
+    Returns live revenue growth opportunities detected by the AI Growth Agent:
+    abandoned cart recoveries, high-lift cross-sells, inventory velocity boosts, and conversion reviews.
+    """
+    if not verify_merchant_auth(merchant_token):
+        return {
+            "error": "Unauthorized: Invalid or missing merchant_token. Merchant authorization required to access growth opportunities."
+        }
+
+    from backend.agents.growth_agent import detect_all_opportunities
+    opps = detect_all_opportunities()
+    return {
+        "count": len(opps),
+        "opportunities": opps
+    }
+
+
+@merchant_mcp.tool()
+def get_growth_metrics(
+    merchant_token: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Merchant Growth Tool (Requires merchant_token):
+    Returns live revenue attribution metrics distinguishing:
+    - OBSERVED AI Incremental Revenue (cross-sell lift + recovered cart payments)
+    - ESTIMATED Revenue Opportunity (potential value in idle carts & slow-moving stock)
+    """
+    if not verify_merchant_auth(merchant_token):
+        return {
+            "error": "Unauthorized: Invalid or missing merchant_token. Merchant authorization required to access growth metrics."
+        }
+
+    from backend.agents.growth_agent import get_growth_metrics as fetch_metrics
+    return fetch_metrics()
+
+
+@merchant_mcp.tool()
+def execute_growth_action(
+    action_type: str,
+    target_id: str,
+    merchant_token: Optional[str] = None,
+    mode: str = "manual"
+) -> Dict[str, Any]:
+    """
+    Merchant Growth Tool (Requires merchant_token):
+    Executes a Next Best Action:
+    - action_type='RECOVER_CART', target_id='<cart_id>': reissues Razorpay checkout link for an abandoned cart
+    - action_type='PROMOTE_PRODUCT', target_id='<sku>': enables 1.35x merchant promotion boost in search
+    - action_type='CROSS_SELL', target_id='<sku>': prioritizes cross-sell recommendation
+    """
+    if not verify_merchant_auth(merchant_token):
+        return {
+            "error": "Unauthorized: Invalid or missing merchant_token. Merchant authorization required to execute growth actions."
+        }
+
+    from backend.agents.growth_agent import execute_growth_action as run_action
+    return run_action(action_type=action_type, target_id=target_id, mode=mode)
+
+
 if __name__ == "__main__":
-    mcp.run()
+    buyer_mcp.run()
