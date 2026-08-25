@@ -1,0 +1,257 @@
+import json
+from datetime import datetime
+import uuid
+from backend.db import get_db
+
+def create_audit_log(cursor, ref_type: str, ref_id: str, event: str, detail: str):
+    cursor.execute(
+        "INSERT INTO audit_log (ref_type, ref_id, event, detail, created_at) VALUES (?, ?, ?, ?, ?)",
+        (ref_type, ref_id, event, detail, datetime.utcnow().isoformat() + "Z")
+    )
+
+def create_intent_mandate(raw_request: str, goal: str, spend_cap_paise: int, channel: str = "web_chat") -> dict:
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        intent_id = f"intent_{uuid.uuid4().hex}"
+        created_at = datetime.utcnow().isoformat() + "Z"
+
+        cursor.execute(
+            "INSERT INTO intent_mandates (id, raw_request, goal, spend_cap_paise, channel, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (intent_id, raw_request, goal, spend_cap_paise, channel, created_at)
+        )
+        create_audit_log(cursor, "intent", intent_id, "Intent Created", f"Goal: {goal}, Cap: {spend_cap_paise} paise, Channel: {channel}")
+        
+        conn.commit()
+        return {
+            "id": intent_id,
+            "raw_request": raw_request,
+            "goal": goal,
+            "spend_cap_paise": spend_cap_paise,
+            "channel": channel,
+            "created_at": created_at
+        }
+    finally:
+        conn.close()
+
+def create_cart_mandate(intent_id: str, items: list, total_paise: int, status: str, reason: str, reversible: bool) -> dict:
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cart_id = f"cart_{uuid.uuid4().hex}"
+        created_at = datetime.utcnow().isoformat() + "Z"
+        
+        cursor.execute(
+            "INSERT INTO cart_mandates (id, intent_id, items, total_paise, status, reason, reversible, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (cart_id, intent_id, json.dumps(items), total_paise, status, reason, 1 if reversible else 0, created_at)
+        )
+        
+        event_name = "Cart Approved" if status == "approved" else "Cart Blocked"
+        create_audit_log(cursor, "cart", cart_id, event_name, reason)
+        
+        conn.commit()
+        return {
+            "id": cart_id,
+            "intent_id": intent_id,
+            "items": items,
+            "total_paise": total_paise,
+            "status": status,
+            "reason": reason,
+            "reversible": reversible,
+            "created_at": created_at
+        }
+    finally:
+        conn.close()
+
+def create_payment_mandate(cart_id: str, razorpay_order_id: str, amount_paise: int) -> dict:
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        pay_id = f"pay_{uuid.uuid4().hex}"
+        created_at = datetime.utcnow().isoformat() + "Z"
+        
+        cursor.execute(
+            "INSERT INTO payment_mandates (id, cart_id, razorpay_order_id, amount_paise, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (pay_id, cart_id, razorpay_order_id, amount_paise, "created", created_at, created_at)
+        )
+        
+        create_audit_log(cursor, "payment", pay_id, "Payment Mandate Created", f"Order ID: {razorpay_order_id}, Amount: {amount_paise}")
+        
+        conn.commit()
+        return {
+            "id": pay_id,
+            "cart_id": cart_id,
+            "razorpay_order_id": razorpay_order_id,
+            "amount_paise": amount_paise,
+            "status": "created",
+            "created_at": created_at
+        }
+    finally:
+        conn.close()
+
+def update_payment_mandate_status(razorpay_order_id: str = None, cart_id: str = None, status: str = "succeeded", failure_reason: str = None, payment_id: str = None, recovery_action: str = None):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        row = None
+        if razorpay_order_id:
+            cursor.execute("SELECT id, cart_id, status FROM payment_mandates WHERE razorpay_order_id = ?", (razorpay_order_id,))
+            row = cursor.fetchone()
+        if not row and cart_id:
+            cursor.execute("SELECT id, cart_id, status FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+            row = cursor.fetchone()
+            
+        if not row:
+            return None
+        
+        pay_id = row["id"]
+        associated_cart_id = row["cart_id"]
+
+        # If already in desired status with same payment_id, don't duplicate audit log
+        if row["status"] == status and status == "succeeded":
+            return pay_id
+            
+        updated_at = datetime.utcnow().isoformat() + "Z"
+        
+        cursor.execute(
+            "UPDATE payment_mandates SET status = ?, failure_reason = ?, razorpay_payment_id = COALESCE(?, razorpay_payment_id), recovery_action = COALESCE(?, recovery_action), updated_at = ? WHERE id = ?",
+            (status, failure_reason, payment_id, recovery_action, updated_at, pay_id)
+        )
+        
+        event_name = f"Payment {status.capitalize()}"
+        detail = failure_reason if failure_reason else f"Payment succeeded with ID {payment_id}"
+        create_audit_log(cursor, "payment", pay_id, event_name, detail)
+        
+        # When payment succeeds, feed real order data into historical_orders (is_synthetic = 0)
+        if status == "succeeded" and associated_cart_id:
+            try:
+                cursor.execute("SELECT items FROM cart_mandates WHERE id = ?", (associated_cart_id,))
+                cart_row = cursor.fetchone()
+                if cart_row and cart_row["items"]:
+                    cart_items = json.loads(cart_row["items"])
+                    skus = [item["sku"] for item in cart_items if "sku" in item]
+                    if len(skus) >= 1:
+                        cursor.execute(
+                            """INSERT OR REPLACE INTO historical_orders (order_id, items, is_synthetic, created_at)
+                               VALUES (?, ?, 0, ?)""",
+                            (f"real_{pay_id}", json.dumps(skus), updated_at)
+                        )
+                
+                # Check if this was an AI-driven recovered cart
+                cursor.execute("SELECT amount_paise, recovery_action, created_at FROM payment_mandates WHERE id = ?", (pay_id,))
+                pm_check = cursor.fetchone()
+                if pm_check and pm_check["recovery_action"] == "recovery_link_sent":
+                    # Query recovery attribution policy
+                    cursor.execute("SELECT recovery_attribution_percent, recovery_idle_threshold_minutes FROM policy_config WHERE id = 1")
+                    pol_row = cursor.fetchone()
+                    rec_factor = (pol_row["recovery_attribution_percent"] if pol_row and pol_row["recovery_attribution_percent"] is not None else 60) / 100.0
+                    rec_idle_min = pol_row["recovery_idle_threshold_minutes"] if pol_row and pol_row["recovery_idle_threshold_minutes"] is not None else 120
+
+                    # Check cart idle duration
+                    try:
+                        cursor.execute("SELECT created_at FROM cart_mandates WHERE id = ?", (associated_cart_id,))
+                        c_row = cursor.fetchone()
+                        if c_row:
+                            t_cart = datetime.fromisoformat(c_row["created_at"].replace("Z", "+00:00"))
+                            t_rec = datetime.fromisoformat(pm_check["created_at"].replace("Z", "+00:00"))
+                            idle_min = (t_rec - t_cart).total_seconds() / 60.0
+                        else:
+                            idle_min = 999.0
+                    except Exception:
+                        idle_min = 999.0
+
+                    if idle_min >= rec_idle_min:
+                        outcome_id = f"go_recov_{pm_check['id']}"
+                        incremental_paise = int(round(pm_check["amount_paise"] * rec_factor))
+                        cursor.execute(
+                            """INSERT OR REPLACE INTO growth_outcomes
+                               (id, action_id, outcome_type, before_paise, after_paise, incremental_paise, revenue_type, created_at)
+                               VALUES (?, ?, 'paid', 0, ?, ?, 'recovery', ?)""",
+                            (outcome_id, None, pm_check["amount_paise"], incremental_paise, updated_at)
+                        )
+            except Exception as e:
+                print(f"Error logging real order / growth outcome: {e}")
+
+        conn.commit()
+
+        # Recompute lift pairs with newly added real order data
+        if status == "succeeded":
+            try:
+                from backend.recommendations.lift_engine import compute_lift_pairs
+                compute_lift_pairs()
+            except Exception as e:
+                print(f"Error recomputing lift pairs: {e}")
+
+        return pay_id
+    finally:
+        conn.close()
+
+
+
+def get_cart_state(cart_id: str) -> dict:
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM cart_mandates WHERE id = ?", (cart_id,))
+        cart = cursor.fetchone()
+        if not cart:
+            return None
+            
+        cursor.execute("SELECT * FROM intent_mandates WHERE id = ?", (cart["intent_id"],))
+        intent = cursor.fetchone()
+
+        cursor.execute("SELECT * FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+        payment = cursor.fetchone()
+
+        cursor.execute("SELECT * FROM refunds WHERE cart_id = ? ORDER BY created_at ASC", (cart_id,))
+        refunds = [dict(r) for r in cursor.fetchall()]
+        
+        return {
+            "intent": dict(intent) if intent else None,
+            "cart": dict(cart),
+            "payment": dict(payment) if payment else None,
+            "refunds": refunds
+        }
+    finally:
+        conn.close()
+
+def get_recovery_message(cart_id: str) -> dict:
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT status, failure_reason, recovery_action FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+        payment = cursor.fetchone()
+        if not payment:
+            return None
+        return dict(payment)
+    finally:
+        conn.close()
+
+def append_audit_log(ref_type: str, ref_id: str, event_name: str, detail: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        create_audit_log(cursor, ref_type, ref_id, event_name, detail)
+        conn.commit()
+    finally:
+        conn.close()
+
+def execute_refund(cart_id: str, requested_amount_paise: int = None, reason: str = "Customer request") -> dict:
+    """
+    Authoritatively delegates cancellation & refund execution to the deterministic Resolution Engine.
+    """
+    from backend.engine.resolution_engine import create_and_execute_refund
+    result = create_and_execute_refund(cart_id, requested_amount_paise, reason)
+    if result.get("status") in ["denied", "failed"]:
+        raise ValueError(result.get("reason", "Refund operation not authorized or failed."))
+    return {
+        "id": result.get("refund_id"),
+        "status": result.get("refund_status") or result.get("status"),
+        "order_status": result.get("order_status"),
+        "cancellation_status": result.get("cancellation_status"),
+        "fulfillment_status": result.get("fulfillment_status"),
+        "return_status": result.get("return_status"),
+        "refund_status": result.get("refund_status"),
+        "amount": result.get("amount_refunded_paise"),
+        "reason": result.get("reason")
+    }

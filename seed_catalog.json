@@ -1,0 +1,8002 @@
+[
+  {
+    "sku": "TEC-GRO-0001",
+    "name": "Milk Lite 655",
+    "price_paise": 21759,
+    "stock": 98,
+    "category": "grocery",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0002",
+    "name": "Jeans Max 979",
+    "price_paise": 195041,
+    "stock": 52,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0003",
+    "name": "Socks Premium 693",
+    "price_paise": 167640,
+    "stock": 44,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0004",
+    "name": "T-Shirt Modern 998",
+    "price_paise": 109243,
+    "stock": 66,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0005",
+    "name": "Belt Premium 684",
+    "price_paise": 66085,
+    "stock": 99,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0006",
+    "name": "Hat Plus 149",
+    "price_paise": 84819,
+    "stock": 58,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0007",
+    "name": "Socks Classic 990",
+    "price_paise": 58268,
+    "stock": 10,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0008",
+    "name": "Socks Essential 402",
+    "price_paise": 118149,
+    "stock": 89,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0009",
+    "name": "Scarf Premium 548",
+    "price_paise": 185006,
+    "stock": 31,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-HOM-0010",
+    "name": "Sofa Classic 668",
+    "price_paise": 148389,
+    "stock": 67,
+    "category": "home",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-KIT-0011",
+    "name": "Toaster Premium 503",
+    "price_paise": 181483,
+    "stock": 74,
+    "category": "kitchenware",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0012",
+    "name": "Socks Essential 825",
+    "price_paise": 47824,
+    "stock": 51,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0013",
+    "name": "Belt Pro 889",
+    "price_paise": 89804,
+    "stock": 48,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0014",
+    "name": "Scarf Vintage 194",
+    "price_paise": 27242,
+    "stock": 8,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0015",
+    "name": "Belt Essential 863",
+    "price_paise": 73814,
+    "stock": 35,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0016",
+    "name": "Jacket Vintage 804",
+    "price_paise": 128820,
+    "stock": 70,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0017",
+    "name": "Jacket Classic 688",
+    "price_paise": 143124,
+    "stock": 54,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-HOM-0018",
+    "name": "Rug Plus 792",
+    "price_paise": 79322,
+    "stock": 41,
+    "category": "home",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-KIT-0019",
+    "name": "Blender Pro 520",
+    "price_paise": 185334,
+    "stock": 95,
+    "category": "kitchenware",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0020",
+    "name": "Hat Max 927",
+    "price_paise": 41189,
+    "stock": 50,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0021",
+    "name": "Hat Essential 460",
+    "price_paise": 29035,
+    "stock": 23,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0022",
+    "name": "Hat Essential 289",
+    "price_paise": 183760,
+    "stock": 38,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-HOM-0023",
+    "name": "Sofa Classic 126",
+    "price_paise": 138069,
+    "stock": 14,
+    "category": "home",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0024",
+    "name": "Jacket Modern 599",
+    "price_paise": 22858,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0025",
+    "name": "Shoes Modern 939",
+    "price_paise": 107250,
+    "stock": 37,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0026",
+    "name": "Sunglasses Lite 204",
+    "price_paise": 197150,
+    "stock": 28,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-ELE-0027",
+    "name": "Laptop Essential 104",
+    "price_paise": 7134113,
+    "stock": 82,
+    "category": "electronics",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-ELE-0028",
+    "name": "Headphones Classic 428",
+    "price_paise": 130860,
+    "stock": 3,
+    "category": "electronics",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0029",
+    "name": "Jeans Ultra 530",
+    "price_paise": 138628,
+    "stock": 66,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0030",
+    "name": "Sunglasses Ultra 618",
+    "price_paise": 26526,
+    "stock": 59,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0031",
+    "name": "Sunglasses Essential 776",
+    "price_paise": 19117,
+    "stock": 11,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-KIT-0032",
+    "name": "Microwave Max 951",
+    "price_paise": 93902,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0033",
+    "name": "Socks Ultra 399",
+    "price_paise": 13295,
+    "stock": 9,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0034",
+    "name": "Hat Lite 329",
+    "price_paise": 94606,
+    "stock": 51,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0035",
+    "name": "Belt Plus 779",
+    "price_paise": 55757,
+    "stock": 66,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0036",
+    "name": "Shoes Essential 355",
+    "price_paise": 133105,
+    "stock": 16,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0037",
+    "name": "Shoes Plus 611",
+    "price_paise": 109011,
+    "stock": 8,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0038",
+    "name": "Hat Modern 492",
+    "price_paise": 58035,
+    "stock": 10,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0039",
+    "name": "T-Shirt Pro 646",
+    "price_paise": 190150,
+    "stock": 27,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0040",
+    "name": "Sunglasses Pro 374",
+    "price_paise": 77622,
+    "stock": 7,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0041",
+    "name": "Scarf Modern 631",
+    "price_paise": 86973,
+    "stock": 79,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0042",
+    "name": "Hat Vintage 337",
+    "price_paise": 50931,
+    "stock": 31,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0043",
+    "name": "Belt Vintage 349",
+    "price_paise": 63531,
+    "stock": 39,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0044",
+    "name": "Hat Pro 885",
+    "price_paise": 88576,
+    "stock": 81,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0045",
+    "name": "Gloves Max 352",
+    "price_paise": 153549,
+    "stock": 74,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0046",
+    "name": "Gloves Pro 720",
+    "price_paise": 195930,
+    "stock": 33,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0047",
+    "name": "Belt Lite 101",
+    "price_paise": 137858,
+    "stock": 65,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0048",
+    "name": "T-Shirt Lite 138",
+    "price_paise": 21397,
+    "stock": 19,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0049",
+    "name": "Gloves Modern 389",
+    "price_paise": 89177,
+    "stock": 41,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "TEC-FAS-0050",
+    "name": "Jacket Classic 866",
+    "price_paise": 15274,
+    "stock": 65,
+    "category": "fashion",
+    "merchant": "TechHaven"
+  },
+  {
+    "sku": "GAM-KIT-0051",
+    "name": "Microwave Pro 850",
+    "price_paise": 188427,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0052",
+    "name": "Blender Classic 702",
+    "price_paise": 61150,
+    "stock": 74,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0053",
+    "name": "Pan Essential 933",
+    "price_paise": 66854,
+    "stock": 41,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0054",
+    "name": "Kettle Plus 376",
+    "price_paise": 161475,
+    "stock": 76,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-HOM-0055",
+    "name": "Bed Lite 961",
+    "price_paise": 57023,
+    "stock": 56,
+    "category": "home",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0056",
+    "name": "Kettle Max 808",
+    "price_paise": 36698,
+    "stock": 99,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0057",
+    "name": "Pot Plus 156",
+    "price_paise": 102524,
+    "stock": 61,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0058",
+    "name": "Toaster Essential 276",
+    "price_paise": 94864,
+    "stock": 44,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0059",
+    "name": "Microwave Essential 906",
+    "price_paise": 142920,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0060",
+    "name": "Pan Modern 130",
+    "price_paise": 43599,
+    "stock": 65,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0061",
+    "name": "Blender Max 291",
+    "price_paise": 59162,
+    "stock": 38,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0062",
+    "name": "Pan Classic 640",
+    "price_paise": 31557,
+    "stock": 26,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0063",
+    "name": "Pan Premium 620",
+    "price_paise": 53048,
+    "stock": 56,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0064",
+    "name": "Spatula Modern 299",
+    "price_paise": 95383,
+    "stock": 38,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0065",
+    "name": "Blender Pro 132",
+    "price_paise": 22219,
+    "stock": 51,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0066",
+    "name": "Toaster Vintage 820",
+    "price_paise": 137535,
+    "stock": 73,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0067",
+    "name": "Mixer Plus 675",
+    "price_paise": 54631,
+    "stock": 90,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0068",
+    "name": "Kettle Lite 612",
+    "price_paise": 170785,
+    "stock": 48,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-ELE-0069",
+    "name": "Smartwatch Premium 646",
+    "price_paise": 110493,
+    "stock": 41,
+    "category": "electronics",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0070",
+    "name": "Toaster Premium 754",
+    "price_paise": 19413,
+    "stock": 28,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0071",
+    "name": "Knife Modern 398",
+    "price_paise": 116901,
+    "stock": 72,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0072",
+    "name": "Spatula Ultra 370",
+    "price_paise": 15706,
+    "stock": 98,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0073",
+    "name": "Knife Max 600",
+    "price_paise": 179239,
+    "stock": 83,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0074",
+    "name": "Oven Ultra 875",
+    "price_paise": 182423,
+    "stock": 32,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0075",
+    "name": "Kettle Plus 609",
+    "price_paise": 154505,
+    "stock": 1,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0076",
+    "name": "Knife Pro 168",
+    "price_paise": 194335,
+    "stock": 52,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0077",
+    "name": "Blender Max 602",
+    "price_paise": 178462,
+    "stock": 36,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0078",
+    "name": "Spatula Essential 849",
+    "price_paise": 127559,
+    "stock": 99,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0079",
+    "name": "Oven Vintage 694",
+    "price_paise": 54393,
+    "stock": 88,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0080",
+    "name": "Mixer Modern 864",
+    "price_paise": 45651,
+    "stock": 64,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0081",
+    "name": "Mixer Modern 810",
+    "price_paise": 98592,
+    "stock": 32,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0082",
+    "name": "Knife Max 337",
+    "price_paise": 60592,
+    "stock": 44,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0083",
+    "name": "Spatula Max 693",
+    "price_paise": 178073,
+    "stock": 4,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0084",
+    "name": "Toaster Modern 679",
+    "price_paise": 55328,
+    "stock": 3,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0085",
+    "name": "Pot Vintage 165",
+    "price_paise": 152632,
+    "stock": 33,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-GRO-0086",
+    "name": "Cheese Lite 977",
+    "price_paise": 43453,
+    "stock": 57,
+    "category": "grocery",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0087",
+    "name": "Blender Classic 823",
+    "price_paise": 125761,
+    "stock": 82,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0088",
+    "name": "Blender Lite 644",
+    "price_paise": 130020,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0089",
+    "name": "Knife Lite 156",
+    "price_paise": 25906,
+    "stock": 22,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0090",
+    "name": "Blender Max 150",
+    "price_paise": 195169,
+    "stock": 93,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0091",
+    "name": "Toaster Essential 378",
+    "price_paise": 177246,
+    "stock": 33,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-ELE-0092",
+    "name": "Tablet Essential 594",
+    "price_paise": 159597,
+    "stock": 3,
+    "category": "electronics",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-ELE-0093",
+    "name": "Earbuds Max 589",
+    "price_paise": 98844,
+    "stock": 36,
+    "category": "electronics",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0094",
+    "name": "Pot Modern 449",
+    "price_paise": 161058,
+    "stock": 62,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0095",
+    "name": "Oven Max 208",
+    "price_paise": 59234,
+    "stock": 29,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0096",
+    "name": "Pan Plus 655",
+    "price_paise": 162317,
+    "stock": 63,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0097",
+    "name": "Oven Lite 118",
+    "price_paise": 107599,
+    "stock": 1,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0098",
+    "name": "Spatula Plus 376",
+    "price_paise": 42084,
+    "stock": 96,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0099",
+    "name": "Pan Pro 690",
+    "price_paise": 175406,
+    "stock": 34,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "GAM-KIT-0100",
+    "name": "Pan Max 109",
+    "price_paise": 119522,
+    "stock": 49,
+    "category": "kitchenware",
+    "merchant": "GamerGear"
+  },
+  {
+    "sku": "OFF-KIT-0101",
+    "name": "Mixer Classic 616",
+    "price_paise": 132729,
+    "stock": 20,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-HOM-0102",
+    "name": "Table Classic 758",
+    "price_paise": 148550,
+    "stock": 98,
+    "category": "home",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0103",
+    "name": "Kettle Classic 454",
+    "price_paise": 69469,
+    "stock": 88,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0104",
+    "name": "Pot Essential 951",
+    "price_paise": 63047,
+    "stock": 74,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0105",
+    "name": "Pot Ultra 961",
+    "price_paise": 97374,
+    "stock": 7,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-FAS-0106",
+    "name": "Scarf Modern 476",
+    "price_paise": 106259,
+    "stock": 54,
+    "category": "fashion",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0107",
+    "name": "Blender Vintage 283",
+    "price_paise": 99271,
+    "stock": 29,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0108",
+    "name": "Oven Classic 467",
+    "price_paise": 88440,
+    "stock": 4,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-HOM-0109",
+    "name": "Rug Essential 168",
+    "price_paise": 186936,
+    "stock": 12,
+    "category": "home",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0110",
+    "name": "Pot Lite 391",
+    "price_paise": 154968,
+    "stock": 67,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0111",
+    "name": "Mixer Max 779",
+    "price_paise": 169032,
+    "stock": 51,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-FAS-0112",
+    "name": "Shoes Classic 894",
+    "price_paise": 39980,
+    "stock": 3,
+    "category": "fashion",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0113",
+    "name": "Pan Lite 968",
+    "price_paise": 90012,
+    "stock": 15,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0114",
+    "name": "Toaster Pro 896",
+    "price_paise": 194897,
+    "stock": 9,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0115",
+    "name": "Mixer Max 845",
+    "price_paise": 149799,
+    "stock": 42,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0116",
+    "name": "Spatula Essential 871",
+    "price_paise": 199424,
+    "stock": 16,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0117",
+    "name": "Spatula Vintage 573",
+    "price_paise": 47365,
+    "stock": 79,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0118",
+    "name": "Pot Ultra 832",
+    "price_paise": 71707,
+    "stock": 34,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-ELE-0119",
+    "name": "Earbuds Plus 430",
+    "price_paise": 144770,
+    "stock": 22,
+    "category": "electronics",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-FAS-0120",
+    "name": "Gloves Vintage 943",
+    "price_paise": 117484,
+    "stock": 79,
+    "category": "fashion",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0121",
+    "name": "Blender Pro 817",
+    "price_paise": 62920,
+    "stock": 46,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-HOM-0122",
+    "name": "Sofa Pro 795",
+    "price_paise": 24535,
+    "stock": 42,
+    "category": "home",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-ELE-0123",
+    "name": "Earbuds Ultra 677",
+    "price_paise": 138269,
+    "stock": 10,
+    "category": "electronics",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0124",
+    "name": "Pot Plus 212",
+    "price_paise": 48200,
+    "stock": 99,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0125",
+    "name": "Microwave Pro 802",
+    "price_paise": 65712,
+    "stock": 79,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0126",
+    "name": "Toaster Plus 513",
+    "price_paise": 100900,
+    "stock": 60,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0127",
+    "name": "Oven Lite 189",
+    "price_paise": 45464,
+    "stock": 9,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0128",
+    "name": "Blender Pro 775",
+    "price_paise": 24445,
+    "stock": 78,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-HOM-0129",
+    "name": "Table Ultra 335",
+    "price_paise": 68747,
+    "stock": 3,
+    "category": "home",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0130",
+    "name": "Blender Ultra 498",
+    "price_paise": 184177,
+    "stock": 0,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0131",
+    "name": "Pot Essential 271",
+    "price_paise": 48924,
+    "stock": 65,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-FAS-0132",
+    "name": "Socks Vintage 290",
+    "price_paise": 23129,
+    "stock": 56,
+    "category": "fashion",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0133",
+    "name": "Kettle Ultra 972",
+    "price_paise": 34989,
+    "stock": 25,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-FAS-0134",
+    "name": "Gloves Lite 302",
+    "price_paise": 45499,
+    "stock": 89,
+    "category": "fashion",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0135",
+    "name": "Knife Max 566",
+    "price_paise": 54454,
+    "stock": 78,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0136",
+    "name": "Spatula Premium 613",
+    "price_paise": 13433,
+    "stock": 35,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0137",
+    "name": "Pot Modern 364",
+    "price_paise": 70625,
+    "stock": 72,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0138",
+    "name": "Mixer Premium 386",
+    "price_paise": 141503,
+    "stock": 23,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0139",
+    "name": "Knife Lite 781",
+    "price_paise": 198098,
+    "stock": 54,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0140",
+    "name": "Pan Lite 301",
+    "price_paise": 146508,
+    "stock": 13,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0141",
+    "name": "Pot Lite 610",
+    "price_paise": 21121,
+    "stock": 42,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0142",
+    "name": "Pan Modern 311",
+    "price_paise": 47156,
+    "stock": 27,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-ELE-0143",
+    "name": "Smartphone Vintage 315",
+    "price_paise": 1415007,
+    "stock": 44,
+    "category": "electronics",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0144",
+    "name": "Spatula Premium 826",
+    "price_paise": 116206,
+    "stock": 80,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0145",
+    "name": "Kettle Ultra 877",
+    "price_paise": 142818,
+    "stock": 29,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0146",
+    "name": "Mixer Pro 315",
+    "price_paise": 47857,
+    "stock": 87,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0147",
+    "name": "Mixer Lite 155",
+    "price_paise": 175314,
+    "stock": 32,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0148",
+    "name": "Oven Plus 659",
+    "price_paise": 122548,
+    "stock": 64,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0149",
+    "name": "Spatula Plus 361",
+    "price_paise": 141314,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "OFF-KIT-0150",
+    "name": "Oven Essential 765",
+    "price_paise": 25015,
+    "stock": 85,
+    "category": "kitchenware",
+    "merchant": "OfficeSuppliesCo"
+  },
+  {
+    "sku": "HOM-FAS-0151",
+    "name": "Scarf Vintage 124",
+    "price_paise": 111618,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-HOM-0152",
+    "name": "Rug Vintage 636",
+    "price_paise": 34148,
+    "stock": 30,
+    "category": "home",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0153",
+    "name": "Sunglasses Pro 369",
+    "price_paise": 22789,
+    "stock": 4,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0154",
+    "name": "Jeans Classic 379",
+    "price_paise": 29274,
+    "stock": 65,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0155",
+    "name": "Shoes Lite 623",
+    "price_paise": 183097,
+    "stock": 81,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0156",
+    "name": "Jeans Lite 675",
+    "price_paise": 91506,
+    "stock": 82,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0157",
+    "name": "Hat Pro 218",
+    "price_paise": 73121,
+    "stock": 72,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0158",
+    "name": "T-Shirt Lite 661",
+    "price_paise": 195838,
+    "stock": 89,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0159",
+    "name": "Belt Lite 503",
+    "price_paise": 75516,
+    "stock": 15,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0160",
+    "name": "Scarf Modern 723",
+    "price_paise": 183891,
+    "stock": 0,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0161",
+    "name": "Socks Classic 736",
+    "price_paise": 98313,
+    "stock": 82,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0162",
+    "name": "Jacket Max 324",
+    "price_paise": 156248,
+    "stock": 55,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-GRO-0163",
+    "name": "Wheat Vintage 335",
+    "price_paise": 23544,
+    "stock": 21,
+    "category": "grocery",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0164",
+    "name": "Shoes Essential 550",
+    "price_paise": 68658,
+    "stock": 99,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0165",
+    "name": "T-Shirt Lite 123",
+    "price_paise": 63756,
+    "stock": 99,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0166",
+    "name": "Gloves Classic 832",
+    "price_paise": 36613,
+    "stock": 95,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-HOM-0167",
+    "name": "Table Ultra 611",
+    "price_paise": 157046,
+    "stock": 30,
+    "category": "home",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0168",
+    "name": "Jacket Pro 408",
+    "price_paise": 120207,
+    "stock": 87,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0169",
+    "name": "Sunglasses Vintage 729",
+    "price_paise": 108993,
+    "stock": 76,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0170",
+    "name": "Shoes Max 744",
+    "price_paise": 107765,
+    "stock": 90,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-HOM-0171",
+    "name": "Lamp Essential 114",
+    "price_paise": 186201,
+    "stock": 78,
+    "category": "home",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0172",
+    "name": "Gloves Ultra 220",
+    "price_paise": 195432,
+    "stock": 48,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0173",
+    "name": "Shoes Ultra 259",
+    "price_paise": 142147,
+    "stock": 2,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0174",
+    "name": "Belt Premium 197",
+    "price_paise": 99911,
+    "stock": 96,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0175",
+    "name": "Sunglasses Premium 112",
+    "price_paise": 103357,
+    "stock": 87,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0176",
+    "name": "Gloves Essential 908",
+    "price_paise": 100030,
+    "stock": 0,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0177",
+    "name": "Sunglasses Ultra 580",
+    "price_paise": 111063,
+    "stock": 29,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0178",
+    "name": "Hat Lite 861",
+    "price_paise": 106953,
+    "stock": 46,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0179",
+    "name": "Shoes Pro 486",
+    "price_paise": 100171,
+    "stock": 64,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0180",
+    "name": "Hat Essential 916",
+    "price_paise": 26447,
+    "stock": 97,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0181",
+    "name": "Belt Essential 615",
+    "price_paise": 22350,
+    "stock": 83,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0182",
+    "name": "Sunglasses Modern 384",
+    "price_paise": 90236,
+    "stock": 51,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0183",
+    "name": "Socks Pro 210",
+    "price_paise": 23175,
+    "stock": 49,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-HOM-0184",
+    "name": "Sofa Essential 177",
+    "price_paise": 67976,
+    "stock": 90,
+    "category": "home",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0185",
+    "name": "Sunglasses Ultra 768",
+    "price_paise": 122107,
+    "stock": 11,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0186",
+    "name": "Hat Ultra 977",
+    "price_paise": 196297,
+    "stock": 47,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-HOM-0187",
+    "name": "Lamp Vintage 899",
+    "price_paise": 165065,
+    "stock": 19,
+    "category": "home",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0188",
+    "name": "Jacket Modern 543",
+    "price_paise": 131234,
+    "stock": 18,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0189",
+    "name": "Scarf Plus 925",
+    "price_paise": 153395,
+    "stock": 70,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0190",
+    "name": "Shoes Essential 405",
+    "price_paise": 181612,
+    "stock": 19,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0191",
+    "name": "Socks Max 881",
+    "price_paise": 186399,
+    "stock": 9,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0192",
+    "name": "Socks Classic 583",
+    "price_paise": 120488,
+    "stock": 35,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0193",
+    "name": "Jeans Vintage 742",
+    "price_paise": 195113,
+    "stock": 99,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-KIT-0194",
+    "name": "Knife Ultra 929",
+    "price_paise": 118423,
+    "stock": 67,
+    "category": "kitchenware",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-KIT-0195",
+    "name": "Spatula Lite 413",
+    "price_paise": 186548,
+    "stock": 49,
+    "category": "kitchenware",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0196",
+    "name": "Gloves Max 625",
+    "price_paise": 127971,
+    "stock": 29,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0197",
+    "name": "T-Shirt Essential 555",
+    "price_paise": 159646,
+    "stock": 62,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-FAS-0198",
+    "name": "Shoes Essential 649",
+    "price_paise": 39900,
+    "stock": 54,
+    "category": "fashion",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-GRO-0199",
+    "name": "Butter Plus 205",
+    "price_paise": 24314,
+    "stock": 90,
+    "category": "grocery",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "HOM-ELE-0200",
+    "name": "Tablet Ultra 433",
+    "price_paise": 128987,
+    "stock": 34,
+    "category": "electronics",
+    "merchant": "HomeEssentials"
+  },
+  {
+    "sku": "FAS-KIT-0201",
+    "name": "Microwave Max 147",
+    "price_paise": 146529,
+    "stock": 36,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0202",
+    "name": "Mixer Max 497",
+    "price_paise": 140091,
+    "stock": 13,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0203",
+    "name": "Toaster Ultra 562",
+    "price_paise": 28112,
+    "stock": 39,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0204",
+    "name": "Kettle Lite 579",
+    "price_paise": 90551,
+    "stock": 45,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0205",
+    "name": "Microwave Essential 895",
+    "price_paise": 98763,
+    "stock": 49,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0206",
+    "name": "Kettle Modern 840",
+    "price_paise": 185799,
+    "stock": 64,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0207",
+    "name": "Kettle Ultra 353",
+    "price_paise": 50133,
+    "stock": 4,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0208",
+    "name": "Blender Essential 174",
+    "price_paise": 71929,
+    "stock": 52,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-FAS-0209",
+    "name": "T-Shirt Vintage 840",
+    "price_paise": 144335,
+    "stock": 90,
+    "category": "fashion",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-HOM-0210",
+    "name": "Mirror Modern 241",
+    "price_paise": 32471,
+    "stock": 43,
+    "category": "home",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0211",
+    "name": "Pot Modern 811",
+    "price_paise": 114619,
+    "stock": 80,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0212",
+    "name": "Kettle Lite 544",
+    "price_paise": 135418,
+    "stock": 93,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0213",
+    "name": "Microwave Essential 159",
+    "price_paise": 113210,
+    "stock": 3,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-GRO-0214",
+    "name": "Butter Vintage 126",
+    "price_paise": 39789,
+    "stock": 22,
+    "category": "grocery",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-FAS-0215",
+    "name": "Socks Max 663",
+    "price_paise": 64916,
+    "stock": 34,
+    "category": "fashion",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0216",
+    "name": "Oven Modern 136",
+    "price_paise": 194345,
+    "stock": 73,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0217",
+    "name": "Spatula Essential 873",
+    "price_paise": 114895,
+    "stock": 7,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0218",
+    "name": "Pot Pro 844",
+    "price_paise": 53485,
+    "stock": 87,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-ELE-0219",
+    "name": "Monitor Plus 310",
+    "price_paise": 102993,
+    "stock": 14,
+    "category": "electronics",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0220",
+    "name": "Oven Premium 927",
+    "price_paise": 178435,
+    "stock": 88,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-FAS-0221",
+    "name": "Jeans Plus 816",
+    "price_paise": 162770,
+    "stock": 2,
+    "category": "fashion",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0222",
+    "name": "Knife Lite 519",
+    "price_paise": 192667,
+    "stock": 70,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0223",
+    "name": "Toaster Premium 934",
+    "price_paise": 35544,
+    "stock": 61,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0224",
+    "name": "Knife Classic 664",
+    "price_paise": 117133,
+    "stock": 25,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0225",
+    "name": "Blender Pro 607",
+    "price_paise": 78926,
+    "stock": 12,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0226",
+    "name": "Blender Premium 986",
+    "price_paise": 18284,
+    "stock": 19,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-FAS-0227",
+    "name": "Hat Premium 785",
+    "price_paise": 147694,
+    "stock": 29,
+    "category": "fashion",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-ELE-0228",
+    "name": "Monitor Max 653",
+    "price_paise": 91572,
+    "stock": 65,
+    "category": "electronics",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0229",
+    "name": "Mixer Ultra 750",
+    "price_paise": 183481,
+    "stock": 18,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0230",
+    "name": "Mixer Plus 583",
+    "price_paise": 23956,
+    "stock": 85,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0231",
+    "name": "Pot Max 350",
+    "price_paise": 178060,
+    "stock": 72,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0232",
+    "name": "Knife Pro 481",
+    "price_paise": 83661,
+    "stock": 99,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0233",
+    "name": "Microwave Ultra 248",
+    "price_paise": 35562,
+    "stock": 90,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0234",
+    "name": "Kettle Lite 733",
+    "price_paise": 89656,
+    "stock": 26,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0235",
+    "name": "Blender Max 145",
+    "price_paise": 172180,
+    "stock": 56,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0236",
+    "name": "Spatula Essential 708",
+    "price_paise": 21319,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0237",
+    "name": "Spatula Lite 753",
+    "price_paise": 29470,
+    "stock": 41,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0238",
+    "name": "Pan Max 812",
+    "price_paise": 93027,
+    "stock": 97,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-ELE-0239",
+    "name": "Tablet Ultra 885",
+    "price_paise": 87800,
+    "stock": 73,
+    "category": "electronics",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0240",
+    "name": "Pan Premium 799",
+    "price_paise": 193036,
+    "stock": 54,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0241",
+    "name": "Microwave Modern 573",
+    "price_paise": 189285,
+    "stock": 11,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0242",
+    "name": "Kettle Ultra 719",
+    "price_paise": 153664,
+    "stock": 10,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0243",
+    "name": "Pot Ultra 802",
+    "price_paise": 189839,
+    "stock": 27,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0244",
+    "name": "Oven Pro 514",
+    "price_paise": 122119,
+    "stock": 83,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-ELE-0245",
+    "name": "Smartwatch Pro 413",
+    "price_paise": 152272,
+    "stock": 94,
+    "category": "electronics",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0246",
+    "name": "Blender Ultra 579",
+    "price_paise": 147181,
+    "stock": 87,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0247",
+    "name": "Kettle Vintage 296",
+    "price_paise": 118994,
+    "stock": 99,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-GRO-0248",
+    "name": "Bread Max 519",
+    "price_paise": 5876,
+    "stock": 11,
+    "category": "grocery",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0249",
+    "name": "Microwave Lite 464",
+    "price_paise": 109007,
+    "stock": 75,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "FAS-KIT-0250",
+    "name": "Pan Ultra 129",
+    "price_paise": 56063,
+    "stock": 93,
+    "category": "kitchenware",
+    "merchant": "FashionHub"
+  },
+  {
+    "sku": "SNE-GRO-0251",
+    "name": "Tomatoes Plus 330",
+    "price_paise": 16135,
+    "stock": 55,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0252",
+    "name": "Cheese Plus 457",
+    "price_paise": 23624,
+    "stock": 91,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0253",
+    "name": "Cheese Pro 730",
+    "price_paise": 35306,
+    "stock": 85,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0254",
+    "name": "Wheat Modern 740",
+    "price_paise": 6391,
+    "stock": 59,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0255",
+    "name": "Bananas Modern 243",
+    "price_paise": 43705,
+    "stock": 3,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0256",
+    "name": "Apples Ultra 626",
+    "price_paise": 11126,
+    "stock": 91,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0257",
+    "name": "Butter Modern 666",
+    "price_paise": 47355,
+    "stock": 28,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-KIT-0258",
+    "name": "Oven Vintage 614",
+    "price_paise": 146204,
+    "stock": 47,
+    "category": "kitchenware",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0259",
+    "name": "Milk Pro 558",
+    "price_paise": 34720,
+    "stock": 57,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-ELE-0260",
+    "name": "Keyboard Vintage 414",
+    "price_paise": 130291,
+    "stock": 96,
+    "category": "electronics",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-ELE-0261",
+    "name": "Monitor Plus 909",
+    "price_paise": 193037,
+    "stock": 62,
+    "category": "electronics",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-FAS-0262",
+    "name": "Belt Modern 773",
+    "price_paise": 114205,
+    "stock": 24,
+    "category": "fashion",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0263",
+    "name": "Bananas Classic 347",
+    "price_paise": 7426,
+    "stock": 100,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0264",
+    "name": "Cheese Vintage 618",
+    "price_paise": 26898,
+    "stock": 48,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0265",
+    "name": "Tomatoes Classic 426",
+    "price_paise": 42484,
+    "stock": 83,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-FAS-0266",
+    "name": "Scarf Pro 384",
+    "price_paise": 156969,
+    "stock": 88,
+    "category": "fashion",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0267",
+    "name": "Bananas Lite 681",
+    "price_paise": 29778,
+    "stock": 67,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0268",
+    "name": "Bananas Classic 419",
+    "price_paise": 14422,
+    "stock": 64,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0269",
+    "name": "Bananas Classic 807",
+    "price_paise": 28160,
+    "stock": 1,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0270",
+    "name": "Bananas Plus 401",
+    "price_paise": 9858,
+    "stock": 63,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0271",
+    "name": "Wheat Lite 167",
+    "price_paise": 3379,
+    "stock": 7,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-FAS-0272",
+    "name": "Gloves Classic 757",
+    "price_paise": 50394,
+    "stock": 26,
+    "category": "fashion",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-HOM-0273",
+    "name": "Chair Classic 363",
+    "price_paise": 174079,
+    "stock": 55,
+    "category": "home",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0274",
+    "name": "Rice Max 113",
+    "price_paise": 23371,
+    "stock": 37,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0275",
+    "name": "Tomatoes Pro 160",
+    "price_paise": 3279,
+    "stock": 4,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-FAS-0276",
+    "name": "Sunglasses Premium 620",
+    "price_paise": 142020,
+    "stock": 27,
+    "category": "fashion",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-HOM-0277",
+    "name": "Cushion Max 123",
+    "price_paise": 77461,
+    "stock": 45,
+    "category": "home",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-FAS-0278",
+    "name": "Scarf Lite 527",
+    "price_paise": 135027,
+    "stock": 87,
+    "category": "fashion",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0279",
+    "name": "Butter Max 148",
+    "price_paise": 10443,
+    "stock": 77,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0280",
+    "name": "Bananas Plus 601",
+    "price_paise": 29668,
+    "stock": 17,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0281",
+    "name": "Butter Modern 403",
+    "price_paise": 47812,
+    "stock": 25,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0282",
+    "name": "Bananas Lite 208",
+    "price_paise": 3919,
+    "stock": 75,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-HOM-0283",
+    "name": "Bed Classic 367",
+    "price_paise": 118819,
+    "stock": 28,
+    "category": "home",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0284",
+    "name": "Eggs Classic 424",
+    "price_paise": 13279,
+    "stock": 10,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-FAS-0285",
+    "name": "Jeans Ultra 419",
+    "price_paise": 31511,
+    "stock": 26,
+    "category": "fashion",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0286",
+    "name": "Rice Essential 797",
+    "price_paise": 37273,
+    "stock": 93,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0287",
+    "name": "Bananas Ultra 115",
+    "price_paise": 25577,
+    "stock": 79,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-HOM-0288",
+    "name": "Rug Classic 736",
+    "price_paise": 10692,
+    "stock": 86,
+    "category": "home",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0289",
+    "name": "Eggs Ultra 421",
+    "price_paise": 36863,
+    "stock": 46,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0290",
+    "name": "Milk Plus 473",
+    "price_paise": 9049,
+    "stock": 13,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0291",
+    "name": "Butter Modern 772",
+    "price_paise": 42477,
+    "stock": 7,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-FAS-0292",
+    "name": "T-Shirt Plus 612",
+    "price_paise": 74555,
+    "stock": 96,
+    "category": "fashion",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0293",
+    "name": "Rice Essential 566",
+    "price_paise": 4846,
+    "stock": 86,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0294",
+    "name": "Bananas Vintage 895",
+    "price_paise": 28079,
+    "stock": 70,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-ELE-0295",
+    "name": "Monitor Max 163",
+    "price_paise": 110478,
+    "stock": 46,
+    "category": "electronics",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0296",
+    "name": "Bread Pro 762",
+    "price_paise": 29950,
+    "stock": 19,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0297",
+    "name": "Milk Lite 714",
+    "price_paise": 16843,
+    "stock": 52,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0298",
+    "name": "Tomatoes Plus 312",
+    "price_paise": 24690,
+    "stock": 69,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0299",
+    "name": "Bananas Plus 159",
+    "price_paise": 13376,
+    "stock": 34,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "SNE-GRO-0300",
+    "name": "Bread Ultra 482",
+    "price_paise": 14690,
+    "stock": 50,
+    "category": "grocery",
+    "merchant": "SneakerWorld"
+  },
+  {
+    "sku": "KIT-FAS-0301",
+    "name": "T-Shirt Lite 615",
+    "price_paise": 73831,
+    "stock": 60,
+    "category": "fashion",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-KIT-0302",
+    "name": "Oven Vintage 247",
+    "price_paise": 27906,
+    "stock": 38,
+    "category": "kitchenware",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0303",
+    "name": "Chair Lite 627",
+    "price_paise": 18188,
+    "stock": 46,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0304",
+    "name": "Bed Modern 795",
+    "price_paise": 28070,
+    "stock": 26,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0305",
+    "name": "Curtains Premium 680",
+    "price_paise": 120025,
+    "stock": 23,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0306",
+    "name": "Chair Essential 536",
+    "price_paise": 159170,
+    "stock": 39,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0307",
+    "name": "Cushion Ultra 785",
+    "price_paise": 25150,
+    "stock": 100,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0308",
+    "name": "Table Plus 288",
+    "price_paise": 97296,
+    "stock": 0,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0309",
+    "name": "Sofa Classic 739",
+    "price_paise": 72396,
+    "stock": 35,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0310",
+    "name": "Sofa Ultra 744",
+    "price_paise": 69813,
+    "stock": 28,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-GRO-0311",
+    "name": "Bananas Pro 696",
+    "price_paise": 9682,
+    "stock": 79,
+    "category": "grocery",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0312",
+    "name": "Bed Lite 251",
+    "price_paise": 22296,
+    "stock": 56,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0313",
+    "name": "Sofa Premium 884",
+    "price_paise": 29548,
+    "stock": 31,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-KIT-0314",
+    "name": "Toaster Premium 638",
+    "price_paise": 84162,
+    "stock": 37,
+    "category": "kitchenware",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0315",
+    "name": "Bed Plus 564",
+    "price_paise": 193128,
+    "stock": 92,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0316",
+    "name": "Rug Lite 310",
+    "price_paise": 49476,
+    "stock": 50,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0317",
+    "name": "Sofa Premium 349",
+    "price_paise": 115422,
+    "stock": 69,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0318",
+    "name": "Lamp Modern 612",
+    "price_paise": 24059,
+    "stock": 39,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0319",
+    "name": "Cushion Max 762",
+    "price_paise": 21092,
+    "stock": 6,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0320",
+    "name": "Cushion Modern 879",
+    "price_paise": 85932,
+    "stock": 37,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0321",
+    "name": "Lamp Essential 742",
+    "price_paise": 192460,
+    "stock": 1,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0322",
+    "name": "Chair Max 409",
+    "price_paise": 82333,
+    "stock": 76,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0323",
+    "name": "Curtains Classic 206",
+    "price_paise": 125649,
+    "stock": 81,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0324",
+    "name": "Table Ultra 957",
+    "price_paise": 36961,
+    "stock": 54,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0325",
+    "name": "Rug Classic 717",
+    "price_paise": 12453,
+    "stock": 8,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0326",
+    "name": "Bed Classic 167",
+    "price_paise": 136464,
+    "stock": 89,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0327",
+    "name": "Lamp Ultra 712",
+    "price_paise": 75355,
+    "stock": 71,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0328",
+    "name": "Cushion Plus 476",
+    "price_paise": 159010,
+    "stock": 83,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0329",
+    "name": "Rug Max 961",
+    "price_paise": 112871,
+    "stock": 54,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-ELE-0330",
+    "name": "Keyboard Classic 206",
+    "price_paise": 93212,
+    "stock": 89,
+    "category": "electronics",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0331",
+    "name": "Cushion Max 653",
+    "price_paise": 190205,
+    "stock": 83,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-FAS-0332",
+    "name": "Jacket Premium 956",
+    "price_paise": 179573,
+    "stock": 50,
+    "category": "fashion",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-GRO-0333",
+    "name": "Milk Modern 442",
+    "price_paise": 28633,
+    "stock": 7,
+    "category": "grocery",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-FAS-0334",
+    "name": "T-Shirt Modern 201",
+    "price_paise": 57034,
+    "stock": 5,
+    "category": "fashion",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-ELE-0335",
+    "name": "Smartphone Plus 822",
+    "price_paise": 2483065,
+    "stock": 55,
+    "category": "electronics",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0336",
+    "name": "Bed Premium 126",
+    "price_paise": 53487,
+    "stock": 54,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0337",
+    "name": "Chair Essential 834",
+    "price_paise": 20186,
+    "stock": 79,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0338",
+    "name": "Bed Essential 740",
+    "price_paise": 29397,
+    "stock": 93,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-GRO-0339",
+    "name": "Butter Classic 153",
+    "price_paise": 28071,
+    "stock": 56,
+    "category": "grocery",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0340",
+    "name": "Curtains Plus 538",
+    "price_paise": 151287,
+    "stock": 69,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0341",
+    "name": "Curtains Classic 323",
+    "price_paise": 107936,
+    "stock": 47,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0342",
+    "name": "Curtains Lite 110",
+    "price_paise": 29913,
+    "stock": 17,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0343",
+    "name": "Mirror Classic 627",
+    "price_paise": 188585,
+    "stock": 60,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0344",
+    "name": "Bed Premium 429",
+    "price_paise": 186729,
+    "stock": 80,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0345",
+    "name": "Curtains Modern 745",
+    "price_paise": 67163,
+    "stock": 99,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0346",
+    "name": "Bed Plus 770",
+    "price_paise": 66673,
+    "stock": 59,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0347",
+    "name": "Rug Vintage 405",
+    "price_paise": 42648,
+    "stock": 63,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0348",
+    "name": "Mirror Vintage 536",
+    "price_paise": 180542,
+    "stock": 38,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-ELE-0349",
+    "name": "Laptop Plus 389",
+    "price_paise": 7740942,
+    "stock": 11,
+    "category": "electronics",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "KIT-HOM-0350",
+    "name": "Rug Premium 671",
+    "price_paise": 46658,
+    "stock": 69,
+    "category": "home",
+    "merchant": "KitchenKing"
+  },
+  {
+    "sku": "BOO-GRO-0351",
+    "name": "Tomatoes Plus 711",
+    "price_paise": 19120,
+    "stock": 69,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0352",
+    "name": "Milk Vintage 576",
+    "price_paise": 45176,
+    "stock": 62,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-HOM-0353",
+    "name": "Rug Ultra 127",
+    "price_paise": 85557,
+    "stock": 9,
+    "category": "home",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0354",
+    "name": "Eggs Premium 817",
+    "price_paise": 34354,
+    "stock": 38,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-HOM-0355",
+    "name": "Cushion Pro 786",
+    "price_paise": 39677,
+    "stock": 27,
+    "category": "home",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0356",
+    "name": "Apples Essential 969",
+    "price_paise": 31758,
+    "stock": 32,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0357",
+    "name": "Butter Premium 118",
+    "price_paise": 39009,
+    "stock": 48,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0358",
+    "name": "Milk Plus 852",
+    "price_paise": 25776,
+    "stock": 85,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0359",
+    "name": "Bread Essential 399",
+    "price_paise": 4772,
+    "stock": 69,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0360",
+    "name": "Bread Plus 214",
+    "price_paise": 29701,
+    "stock": 53,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0361",
+    "name": "Apples Premium 618",
+    "price_paise": 49895,
+    "stock": 20,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-HOM-0362",
+    "name": "Bed Lite 246",
+    "price_paise": 123443,
+    "stock": 86,
+    "category": "home",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0363",
+    "name": "Bananas Max 920",
+    "price_paise": 17100,
+    "stock": 33,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0364",
+    "name": "Eggs Pro 250",
+    "price_paise": 3660,
+    "stock": 43,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0365",
+    "name": "Bananas Pro 414",
+    "price_paise": 21562,
+    "stock": 57,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0366",
+    "name": "Milk Plus 839",
+    "price_paise": 21283,
+    "stock": 91,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0367",
+    "name": "Apples Lite 895",
+    "price_paise": 43707,
+    "stock": 59,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0368",
+    "name": "Wheat Lite 173",
+    "price_paise": 47298,
+    "stock": 53,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0369",
+    "name": "Milk Pro 841",
+    "price_paise": 28515,
+    "stock": 95,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0370",
+    "name": "Apples Plus 162",
+    "price_paise": 35062,
+    "stock": 23,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0371",
+    "name": "Bread Max 627",
+    "price_paise": 32813,
+    "stock": 90,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-ELE-0372",
+    "name": "Charger Vintage 454",
+    "price_paise": 174298,
+    "stock": 99,
+    "category": "electronics",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-ELE-0373",
+    "name": "Charger Classic 903",
+    "price_paise": 59324,
+    "stock": 49,
+    "category": "electronics",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0374",
+    "name": "Apples Plus 351",
+    "price_paise": 35674,
+    "stock": 0,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0375",
+    "name": "Milk Vintage 754",
+    "price_paise": 19225,
+    "stock": 3,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0376",
+    "name": "Butter Modern 609",
+    "price_paise": 35336,
+    "stock": 87,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0377",
+    "name": "Butter Classic 375",
+    "price_paise": 6791,
+    "stock": 83,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-ELE-0378",
+    "name": "Headphones Essential 291",
+    "price_paise": 117146,
+    "stock": 82,
+    "category": "electronics",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0379",
+    "name": "Butter Plus 243",
+    "price_paise": 35967,
+    "stock": 53,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0380",
+    "name": "Wheat Max 305",
+    "price_paise": 25644,
+    "stock": 5,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-HOM-0381",
+    "name": "Chair Premium 411",
+    "price_paise": 175163,
+    "stock": 51,
+    "category": "home",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0382",
+    "name": "Rice Plus 852",
+    "price_paise": 37634,
+    "stock": 65,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0383",
+    "name": "Wheat Essential 893",
+    "price_paise": 21312,
+    "stock": 10,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0384",
+    "name": "Rice Lite 875",
+    "price_paise": 19820,
+    "stock": 59,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0385",
+    "name": "Tomatoes Plus 797",
+    "price_paise": 14508,
+    "stock": 5,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-FAS-0386",
+    "name": "Gloves Classic 747",
+    "price_paise": 193655,
+    "stock": 34,
+    "category": "fashion",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0387",
+    "name": "Eggs Modern 292",
+    "price_paise": 48248,
+    "stock": 98,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0388",
+    "name": "Cheese Modern 433",
+    "price_paise": 45151,
+    "stock": 41,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0389",
+    "name": "Eggs Pro 251",
+    "price_paise": 43182,
+    "stock": 63,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0390",
+    "name": "Eggs Ultra 175",
+    "price_paise": 26051,
+    "stock": 63,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0391",
+    "name": "Milk Classic 911",
+    "price_paise": 9584,
+    "stock": 69,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-ELE-0392",
+    "name": "Laptop Classic 963",
+    "price_paise": 5529496,
+    "stock": 61,
+    "category": "electronics",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0393",
+    "name": "Milk Max 361",
+    "price_paise": 23142,
+    "stock": 97,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0394",
+    "name": "Eggs Lite 273",
+    "price_paise": 42422,
+    "stock": 17,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0395",
+    "name": "Bread Lite 173",
+    "price_paise": 28064,
+    "stock": 47,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-HOM-0396",
+    "name": "Lamp Modern 222",
+    "price_paise": 33716,
+    "stock": 8,
+    "category": "home",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0397",
+    "name": "Cheese Premium 358",
+    "price_paise": 32190,
+    "stock": 93,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0398",
+    "name": "Apples Vintage 961",
+    "price_paise": 22388,
+    "stock": 76,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0399",
+    "name": "Wheat Pro 648",
+    "price_paise": 43618,
+    "stock": 30,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "BOO-GRO-0400",
+    "name": "Cheese Ultra 447",
+    "price_paise": 31092,
+    "stock": 15,
+    "category": "grocery",
+    "merchant": "BookWorm"
+  },
+  {
+    "sku": "PET-KIT-0401",
+    "name": "Microwave Ultra 586",
+    "price_paise": 20126,
+    "stock": 96,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0402",
+    "name": "Microwave Vintage 537",
+    "price_paise": 133178,
+    "stock": 52,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-HOM-0403",
+    "name": "Sofa Classic 820",
+    "price_paise": 110999,
+    "stock": 65,
+    "category": "home",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0404",
+    "name": "Kettle Max 517",
+    "price_paise": 25188,
+    "stock": 30,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0405",
+    "name": "Oven Essential 825",
+    "price_paise": 115881,
+    "stock": 8,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0406",
+    "name": "Kettle Plus 415",
+    "price_paise": 61854,
+    "stock": 50,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0407",
+    "name": "Toaster Ultra 825",
+    "price_paise": 154296,
+    "stock": 40,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-ELE-0408",
+    "name": "Earbuds Ultra 835",
+    "price_paise": 80628,
+    "stock": 59,
+    "category": "electronics",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0409",
+    "name": "Toaster Max 808",
+    "price_paise": 25408,
+    "stock": 4,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0410",
+    "name": "Oven Classic 853",
+    "price_paise": 147768,
+    "stock": 97,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0411",
+    "name": "Microwave Max 384",
+    "price_paise": 106865,
+    "stock": 83,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0412",
+    "name": "Mixer Vintage 531",
+    "price_paise": 117402,
+    "stock": 42,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0413",
+    "name": "Spatula Ultra 338",
+    "price_paise": 48261,
+    "stock": 10,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-HOM-0414",
+    "name": "Chair Plus 487",
+    "price_paise": 68537,
+    "stock": 80,
+    "category": "home",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0415",
+    "name": "Mixer Essential 495",
+    "price_paise": 159826,
+    "stock": 29,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0416",
+    "name": "Microwave Classic 228",
+    "price_paise": 136774,
+    "stock": 40,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0417",
+    "name": "Pan Plus 254",
+    "price_paise": 72866,
+    "stock": 83,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0418",
+    "name": "Oven Premium 482",
+    "price_paise": 157614,
+    "stock": 4,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0419",
+    "name": "Knife Ultra 764",
+    "price_paise": 177896,
+    "stock": 40,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0420",
+    "name": "Knife Premium 881",
+    "price_paise": 33344,
+    "stock": 31,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-HOM-0421",
+    "name": "Curtains Classic 514",
+    "price_paise": 163019,
+    "stock": 56,
+    "category": "home",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0422",
+    "name": "Oven Classic 432",
+    "price_paise": 151337,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-ELE-0423",
+    "name": "Smartwatch Classic 241",
+    "price_paise": 160982,
+    "stock": 31,
+    "category": "electronics",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-GRO-0424",
+    "name": "Eggs Max 988",
+    "price_paise": 29296,
+    "stock": 38,
+    "category": "grocery",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0425",
+    "name": "Pot Pro 516",
+    "price_paise": 164410,
+    "stock": 20,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0426",
+    "name": "Blender Pro 944",
+    "price_paise": 182659,
+    "stock": 40,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-FAS-0427",
+    "name": "Sunglasses Vintage 310",
+    "price_paise": 164502,
+    "stock": 99,
+    "category": "fashion",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0428",
+    "name": "Knife Lite 565",
+    "price_paise": 199764,
+    "stock": 62,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0429",
+    "name": "Blender Plus 465",
+    "price_paise": 103774,
+    "stock": 50,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0430",
+    "name": "Mixer Vintage 504",
+    "price_paise": 69384,
+    "stock": 94,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0431",
+    "name": "Kettle Essential 934",
+    "price_paise": 80967,
+    "stock": 51,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0432",
+    "name": "Pan Premium 745",
+    "price_paise": 44131,
+    "stock": 63,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0433",
+    "name": "Microwave Classic 546",
+    "price_paise": 145696,
+    "stock": 94,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-ELE-0434",
+    "name": "Charger Classic 268",
+    "price_paise": 132538,
+    "stock": 75,
+    "category": "electronics",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-FAS-0435",
+    "name": "Socks Max 190",
+    "price_paise": 51710,
+    "stock": 47,
+    "category": "fashion",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-FAS-0436",
+    "name": "Belt Lite 285",
+    "price_paise": 25026,
+    "stock": 35,
+    "category": "fashion",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0437",
+    "name": "Pot Plus 103",
+    "price_paise": 111594,
+    "stock": 50,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-GRO-0438",
+    "name": "Bananas Plus 559",
+    "price_paise": 24681,
+    "stock": 84,
+    "category": "grocery",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0439",
+    "name": "Toaster Modern 192",
+    "price_paise": 23792,
+    "stock": 81,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0440",
+    "name": "Pan Pro 856",
+    "price_paise": 13088,
+    "stock": 62,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-ELE-0441",
+    "name": "Smartphone Premium 523",
+    "price_paise": 1707166,
+    "stock": 45,
+    "category": "electronics",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0442",
+    "name": "Toaster Vintage 527",
+    "price_paise": 187671,
+    "stock": 22,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0443",
+    "name": "Pot Premium 835",
+    "price_paise": 117653,
+    "stock": 61,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0444",
+    "name": "Microwave Premium 410",
+    "price_paise": 51298,
+    "stock": 45,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0445",
+    "name": "Knife Plus 210",
+    "price_paise": 193988,
+    "stock": 53,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-HOM-0446",
+    "name": "Sofa Premium 674",
+    "price_paise": 29795,
+    "stock": 4,
+    "category": "home",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0447",
+    "name": "Microwave Essential 906",
+    "price_paise": 56788,
+    "stock": 60,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0448",
+    "name": "Blender Lite 853",
+    "price_paise": 87778,
+    "stock": 58,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0449",
+    "name": "Blender Max 106",
+    "price_paise": 168586,
+    "stock": 97,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "PET-KIT-0450",
+    "name": "Pot Pro 379",
+    "price_paise": 117429,
+    "stock": 28,
+    "category": "kitchenware",
+    "merchant": "PetPalace"
+  },
+  {
+    "sku": "OUT-HOM-0451",
+    "name": "Sofa Modern 690",
+    "price_paise": 133811,
+    "stock": 68,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0452",
+    "name": "Bed Plus 807",
+    "price_paise": 199981,
+    "stock": 33,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0453",
+    "name": "Clock Lite 623",
+    "price_paise": 19945,
+    "stock": 44,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0454",
+    "name": "Rug Plus 281",
+    "price_paise": 116638,
+    "stock": 68,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0455",
+    "name": "Curtains Pro 301",
+    "price_paise": 134343,
+    "stock": 5,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0456",
+    "name": "Sofa Pro 233",
+    "price_paise": 129837,
+    "stock": 94,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0457",
+    "name": "Sofa Pro 386",
+    "price_paise": 84767,
+    "stock": 75,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0458",
+    "name": "Table Essential 664",
+    "price_paise": 31050,
+    "stock": 44,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0459",
+    "name": "Bed Plus 345",
+    "price_paise": 136491,
+    "stock": 2,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-FAS-0460",
+    "name": "Scarf Premium 757",
+    "price_paise": 70380,
+    "stock": 37,
+    "category": "fashion",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0461",
+    "name": "Table Vintage 488",
+    "price_paise": 132357,
+    "stock": 36,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-KIT-0462",
+    "name": "Pan Max 438",
+    "price_paise": 130953,
+    "stock": 35,
+    "category": "kitchenware",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0463",
+    "name": "Clock Classic 165",
+    "price_paise": 58352,
+    "stock": 57,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0464",
+    "name": "Table Premium 430",
+    "price_paise": 83967,
+    "stock": 49,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0465",
+    "name": "Table Max 361",
+    "price_paise": 171841,
+    "stock": 41,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0466",
+    "name": "Curtains Max 830",
+    "price_paise": 180282,
+    "stock": 19,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0467",
+    "name": "Curtains Plus 821",
+    "price_paise": 151989,
+    "stock": 33,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0468",
+    "name": "Curtains Essential 111",
+    "price_paise": 139004,
+    "stock": 13,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0469",
+    "name": "Bed Max 875",
+    "price_paise": 193489,
+    "stock": 62,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0470",
+    "name": "Rug Premium 855",
+    "price_paise": 72276,
+    "stock": 72,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-GRO-0471",
+    "name": "Milk Ultra 363",
+    "price_paise": 41208,
+    "stock": 62,
+    "category": "grocery",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0472",
+    "name": "Table Pro 311",
+    "price_paise": 77433,
+    "stock": 83,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0473",
+    "name": "Mirror Plus 517",
+    "price_paise": 182172,
+    "stock": 39,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0474",
+    "name": "Curtains Ultra 364",
+    "price_paise": 81731,
+    "stock": 51,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0475",
+    "name": "Mirror Classic 428",
+    "price_paise": 89290,
+    "stock": 72,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-GRO-0476",
+    "name": "Bread Lite 133",
+    "price_paise": 37424,
+    "stock": 77,
+    "category": "grocery",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0477",
+    "name": "Bed Max 958",
+    "price_paise": 119818,
+    "stock": 44,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0478",
+    "name": "Rug Premium 689",
+    "price_paise": 73618,
+    "stock": 93,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0479",
+    "name": "Sofa Essential 874",
+    "price_paise": 141850,
+    "stock": 50,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0480",
+    "name": "Bed Premium 497",
+    "price_paise": 164101,
+    "stock": 58,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0481",
+    "name": "Sofa Classic 865",
+    "price_paise": 15184,
+    "stock": 72,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0482",
+    "name": "Cushion Premium 206",
+    "price_paise": 132319,
+    "stock": 19,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-KIT-0483",
+    "name": "Pot Vintage 335",
+    "price_paise": 118282,
+    "stock": 29,
+    "category": "kitchenware",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0484",
+    "name": "Lamp Pro 622",
+    "price_paise": 128539,
+    "stock": 14,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0485",
+    "name": "Cushion Modern 140",
+    "price_paise": 173454,
+    "stock": 84,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0486",
+    "name": "Chair Ultra 919",
+    "price_paise": 177203,
+    "stock": 78,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0487",
+    "name": "Curtains Lite 889",
+    "price_paise": 164487,
+    "stock": 86,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0488",
+    "name": "Mirror Premium 894",
+    "price_paise": 119861,
+    "stock": 75,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-ELE-0489",
+    "name": "Mouse Plus 210",
+    "price_paise": 81346,
+    "stock": 96,
+    "category": "electronics",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0490",
+    "name": "Mirror Max 669",
+    "price_paise": 134920,
+    "stock": 77,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0491",
+    "name": "Sofa Lite 122",
+    "price_paise": 155565,
+    "stock": 59,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0492",
+    "name": "Chair Max 207",
+    "price_paise": 130140,
+    "stock": 82,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0493",
+    "name": "Curtains Vintage 338",
+    "price_paise": 22306,
+    "stock": 63,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0494",
+    "name": "Curtains Classic 605",
+    "price_paise": 116094,
+    "stock": 19,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0495",
+    "name": "Curtains Essential 281",
+    "price_paise": 64583,
+    "stock": 86,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-ELE-0496",
+    "name": "Tablet Plus 624",
+    "price_paise": 165507,
+    "stock": 37,
+    "category": "electronics",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0497",
+    "name": "Clock Lite 871",
+    "price_paise": 180904,
+    "stock": 29,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-ELE-0498",
+    "name": "Mouse Premium 575",
+    "price_paise": 183548,
+    "stock": 62,
+    "category": "electronics",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0499",
+    "name": "Rug Premium 346",
+    "price_paise": 90064,
+    "stock": 9,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "OUT-HOM-0500",
+    "name": "Lamp Essential 785",
+    "price_paise": 40495,
+    "stock": 85,
+    "category": "home",
+    "merchant": "OutdoorAdventures"
+  },
+  {
+    "sku": "BEA-FAS-0501",
+    "name": "Socks Premium 899",
+    "price_paise": 52556,
+    "stock": 55,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-KIT-0502",
+    "name": "Mixer Essential 593",
+    "price_paise": 91583,
+    "stock": 40,
+    "category": "kitchenware",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0503",
+    "name": "Gloves Plus 558",
+    "price_paise": 195003,
+    "stock": 99,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0504",
+    "name": "Belt Vintage 224",
+    "price_paise": 58015,
+    "stock": 27,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0505",
+    "name": "Jeans Max 478",
+    "price_paise": 72860,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0506",
+    "name": "T-Shirt Classic 366",
+    "price_paise": 38656,
+    "stock": 69,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-ELE-0507",
+    "name": "Laptop Lite 188",
+    "price_paise": 8953954,
+    "stock": 70,
+    "category": "electronics",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0508",
+    "name": "Belt Max 179",
+    "price_paise": 92104,
+    "stock": 29,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0509",
+    "name": "Scarf Essential 579",
+    "price_paise": 107590,
+    "stock": 42,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0510",
+    "name": "Gloves Lite 386",
+    "price_paise": 108176,
+    "stock": 60,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0511",
+    "name": "Hat Premium 217",
+    "price_paise": 55853,
+    "stock": 3,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0512",
+    "name": "Socks Vintage 335",
+    "price_paise": 137478,
+    "stock": 81,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0513",
+    "name": "Belt Max 391",
+    "price_paise": 28934,
+    "stock": 92,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0514",
+    "name": "Scarf Plus 133",
+    "price_paise": 101133,
+    "stock": 1,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0515",
+    "name": "Jacket Classic 741",
+    "price_paise": 167254,
+    "stock": 14,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0516",
+    "name": "Jacket Modern 735",
+    "price_paise": 75991,
+    "stock": 87,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0517",
+    "name": "Socks Max 145",
+    "price_paise": 25137,
+    "stock": 30,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0518",
+    "name": "Belt Lite 791",
+    "price_paise": 138801,
+    "stock": 12,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0519",
+    "name": "Sunglasses Vintage 251",
+    "price_paise": 116082,
+    "stock": 71,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0520",
+    "name": "Sunglasses Ultra 953",
+    "price_paise": 156746,
+    "stock": 20,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0521",
+    "name": "Belt Plus 609",
+    "price_paise": 188239,
+    "stock": 50,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0522",
+    "name": "Jacket Premium 536",
+    "price_paise": 144577,
+    "stock": 60,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0523",
+    "name": "Jeans Pro 672",
+    "price_paise": 21870,
+    "stock": 3,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0524",
+    "name": "T-Shirt Lite 358",
+    "price_paise": 72038,
+    "stock": 36,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-GRO-0525",
+    "name": "Apples Lite 327",
+    "price_paise": 48412,
+    "stock": 6,
+    "category": "grocery",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0526",
+    "name": "T-Shirt Premium 542",
+    "price_paise": 125637,
+    "stock": 37,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0527",
+    "name": "Belt Plus 716",
+    "price_paise": 59225,
+    "stock": 64,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0528",
+    "name": "Jacket Essential 547",
+    "price_paise": 126447,
+    "stock": 10,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0529",
+    "name": "T-Shirt Modern 960",
+    "price_paise": 79418,
+    "stock": 20,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0530",
+    "name": "Shoes Ultra 808",
+    "price_paise": 141811,
+    "stock": 53,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0531",
+    "name": "Sunglasses Ultra 461",
+    "price_paise": 147823,
+    "stock": 64,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0532",
+    "name": "Hat Essential 574",
+    "price_paise": 60208,
+    "stock": 60,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0533",
+    "name": "Scarf Essential 769",
+    "price_paise": 143312,
+    "stock": 13,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0534",
+    "name": "Sunglasses Essential 427",
+    "price_paise": 195152,
+    "stock": 26,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0535",
+    "name": "Scarf Pro 520",
+    "price_paise": 196148,
+    "stock": 49,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0536",
+    "name": "Hat Max 731",
+    "price_paise": 124065,
+    "stock": 24,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0537",
+    "name": "Hat Premium 154",
+    "price_paise": 190946,
+    "stock": 41,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0538",
+    "name": "Scarf Vintage 514",
+    "price_paise": 37107,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0539",
+    "name": "Jeans Essential 989",
+    "price_paise": 83293,
+    "stock": 46,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0540",
+    "name": "Socks Vintage 318",
+    "price_paise": 43560,
+    "stock": 3,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-GRO-0541",
+    "name": "Bread Essential 218",
+    "price_paise": 39573,
+    "stock": 76,
+    "category": "grocery",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0542",
+    "name": "Hat Max 813",
+    "price_paise": 29748,
+    "stock": 11,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0543",
+    "name": "Gloves Classic 840",
+    "price_paise": 111643,
+    "stock": 13,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0544",
+    "name": "T-Shirt Ultra 530",
+    "price_paise": 119230,
+    "stock": 55,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0545",
+    "name": "Shoes Premium 723",
+    "price_paise": 193038,
+    "stock": 2,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0546",
+    "name": "Belt Pro 283",
+    "price_paise": 143393,
+    "stock": 70,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-GRO-0547",
+    "name": "Butter Plus 866",
+    "price_paise": 26594,
+    "stock": 3,
+    "category": "grocery",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0548",
+    "name": "Hat Lite 807",
+    "price_paise": 144954,
+    "stock": 53,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-KIT-0549",
+    "name": "Oven Plus 863",
+    "price_paise": 47184,
+    "stock": 10,
+    "category": "kitchenware",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "BEA-FAS-0550",
+    "name": "Jacket Classic 144",
+    "price_paise": 187462,
+    "stock": 77,
+    "category": "fashion",
+    "merchant": "BeautyBliss"
+  },
+  {
+    "sku": "AUT-ELE-0551",
+    "name": "Laptop Essential 529",
+    "price_paise": 8915448,
+    "stock": 82,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-GRO-0552",
+    "name": "Wheat Pro 458",
+    "price_paise": 27644,
+    "stock": 14,
+    "category": "grocery",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0553",
+    "name": "Headphones Ultra 712",
+    "price_paise": 143474,
+    "stock": 57,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0554",
+    "name": "Smartphone Lite 449",
+    "price_paise": 2626810,
+    "stock": 55,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0555",
+    "name": "Mouse Modern 869",
+    "price_paise": 82248,
+    "stock": 96,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0556",
+    "name": "Mouse Premium 405",
+    "price_paise": 102384,
+    "stock": 2,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0557",
+    "name": "Laptop Lite 355",
+    "price_paise": 6344163,
+    "stock": 65,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0558",
+    "name": "Charger Ultra 653",
+    "price_paise": 73430,
+    "stock": 17,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0559",
+    "name": "Smartphone Plus 369",
+    "price_paise": 2385758,
+    "stock": 97,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-FAS-0560",
+    "name": "Gloves Lite 865",
+    "price_paise": 121336,
+    "stock": 26,
+    "category": "fashion",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0561",
+    "name": "Smartwatch Lite 369",
+    "price_paise": 72946,
+    "stock": 12,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0562",
+    "name": "Headphones Vintage 843",
+    "price_paise": 98548,
+    "stock": 36,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-HOM-0563",
+    "name": "Cushion Pro 137",
+    "price_paise": 65745,
+    "stock": 28,
+    "category": "home",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0564",
+    "name": "Monitor Vintage 831",
+    "price_paise": 123623,
+    "stock": 76,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-KIT-0565",
+    "name": "Pan Premium 554",
+    "price_paise": 167878,
+    "stock": 0,
+    "category": "kitchenware",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0566",
+    "name": "Monitor Premium 828",
+    "price_paise": 195285,
+    "stock": 93,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0567",
+    "name": "Charger Modern 356",
+    "price_paise": 87568,
+    "stock": 0,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-FAS-0568",
+    "name": "Sunglasses Plus 925",
+    "price_paise": 56821,
+    "stock": 88,
+    "category": "fashion",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0569",
+    "name": "Charger Modern 111",
+    "price_paise": 174774,
+    "stock": 20,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0570",
+    "name": "Monitor Lite 490",
+    "price_paise": 191822,
+    "stock": 62,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0571",
+    "name": "Mouse Premium 775",
+    "price_paise": 137162,
+    "stock": 37,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0572",
+    "name": "Earbuds Ultra 300",
+    "price_paise": 133413,
+    "stock": 82,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-HOM-0573",
+    "name": "Sofa Ultra 225",
+    "price_paise": 146288,
+    "stock": 76,
+    "category": "home",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0574",
+    "name": "Keyboard Classic 362",
+    "price_paise": 54228,
+    "stock": 57,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0575",
+    "name": "Smartphone Lite 349",
+    "price_paise": 1714769,
+    "stock": 76,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-GRO-0576",
+    "name": "Rice Vintage 552",
+    "price_paise": 22153,
+    "stock": 75,
+    "category": "grocery",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0577",
+    "name": "Keyboard Modern 309",
+    "price_paise": 130788,
+    "stock": 3,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-FAS-0578",
+    "name": "Shoes Plus 550",
+    "price_paise": 195675,
+    "stock": 83,
+    "category": "fashion",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0579",
+    "name": "Mouse Vintage 495",
+    "price_paise": 58203,
+    "stock": 7,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0580",
+    "name": "Earbuds Vintage 491",
+    "price_paise": 114103,
+    "stock": 30,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0581",
+    "name": "Smartphone Classic 930",
+    "price_paise": 1280459,
+    "stock": 83,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0582",
+    "name": "Tablet Modern 124",
+    "price_paise": 50198,
+    "stock": 10,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-KIT-0583",
+    "name": "Pot Premium 461",
+    "price_paise": 172321,
+    "stock": 31,
+    "category": "kitchenware",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0584",
+    "name": "Earbuds Lite 216",
+    "price_paise": 103927,
+    "stock": 37,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0585",
+    "name": "Monitor Pro 523",
+    "price_paise": 190081,
+    "stock": 38,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-HOM-0586",
+    "name": "Chair Plus 302",
+    "price_paise": 66687,
+    "stock": 0,
+    "category": "home",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0587",
+    "name": "Charger Plus 652",
+    "price_paise": 96664,
+    "stock": 71,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0588",
+    "name": "Mouse Pro 986",
+    "price_paise": 142112,
+    "stock": 72,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0589",
+    "name": "Charger Max 797",
+    "price_paise": 136461,
+    "stock": 60,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-KIT-0590",
+    "name": "Spatula Max 199",
+    "price_paise": 68823,
+    "stock": 21,
+    "category": "kitchenware",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0591",
+    "name": "Earbuds Essential 709",
+    "price_paise": 87662,
+    "stock": 54,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-KIT-0592",
+    "name": "Toaster Essential 386",
+    "price_paise": 142273,
+    "stock": 42,
+    "category": "kitchenware",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0593",
+    "name": "Tablet Classic 566",
+    "price_paise": 167305,
+    "stock": 49,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0594",
+    "name": "Tablet Plus 812",
+    "price_paise": 198318,
+    "stock": 23,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0595",
+    "name": "Mouse Premium 715",
+    "price_paise": 118273,
+    "stock": 20,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0596",
+    "name": "Headphones Premium 136",
+    "price_paise": 174456,
+    "stock": 97,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-HOM-0597",
+    "name": "Sofa Ultra 691",
+    "price_paise": 21358,
+    "stock": 12,
+    "category": "home",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0598",
+    "name": "Tablet Modern 940",
+    "price_paise": 163658,
+    "stock": 4,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-GRO-0599",
+    "name": "Butter Vintage 467",
+    "price_paise": 22786,
+    "stock": 87,
+    "category": "grocery",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "AUT-ELE-0600",
+    "name": "Smartphone Essential 323",
+    "price_paise": 1695811,
+    "stock": 8,
+    "category": "electronics",
+    "merchant": "AutoPartsPro"
+  },
+  {
+    "sku": "TOY-ELE-0601",
+    "name": "Monitor Lite 330",
+    "price_paise": 67944,
+    "stock": 62,
+    "category": "electronics",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-FAS-0602",
+    "name": "Hat Vintage 720",
+    "price_paise": 172481,
+    "stock": 71,
+    "category": "fashion",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0603",
+    "name": "Microwave Modern 666",
+    "price_paise": 136839,
+    "stock": 30,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0604",
+    "name": "Spatula Lite 480",
+    "price_paise": 87123,
+    "stock": 68,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0605",
+    "name": "Pan Ultra 548",
+    "price_paise": 175287,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0606",
+    "name": "Toaster Classic 429",
+    "price_paise": 71471,
+    "stock": 66,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0607",
+    "name": "Pan Pro 160",
+    "price_paise": 38916,
+    "stock": 76,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0608",
+    "name": "Mixer Premium 814",
+    "price_paise": 180003,
+    "stock": 86,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-GRO-0609",
+    "name": "Bananas Premium 279",
+    "price_paise": 40043,
+    "stock": 45,
+    "category": "grocery",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-FAS-0610",
+    "name": "Hat Classic 904",
+    "price_paise": 161563,
+    "stock": 74,
+    "category": "fashion",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0611",
+    "name": "Kettle Premium 310",
+    "price_paise": 101470,
+    "stock": 84,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0612",
+    "name": "Mixer Essential 452",
+    "price_paise": 160803,
+    "stock": 49,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0613",
+    "name": "Pan Modern 628",
+    "price_paise": 29960,
+    "stock": 71,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-FAS-0614",
+    "name": "T-Shirt Essential 581",
+    "price_paise": 185853,
+    "stock": 88,
+    "category": "fashion",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0615",
+    "name": "Pan Premium 576",
+    "price_paise": 54324,
+    "stock": 96,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-GRO-0616",
+    "name": "Milk Vintage 664",
+    "price_paise": 21566,
+    "stock": 75,
+    "category": "grocery",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0617",
+    "name": "Spatula Classic 970",
+    "price_paise": 198448,
+    "stock": 92,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0618",
+    "name": "Spatula Classic 716",
+    "price_paise": 51860,
+    "stock": 100,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0619",
+    "name": "Kettle Max 600",
+    "price_paise": 161957,
+    "stock": 23,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0620",
+    "name": "Blender Pro 983",
+    "price_paise": 68692,
+    "stock": 36,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0621",
+    "name": "Toaster Essential 900",
+    "price_paise": 119561,
+    "stock": 66,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0622",
+    "name": "Pan Vintage 451",
+    "price_paise": 41958,
+    "stock": 81,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0623",
+    "name": "Microwave Modern 493",
+    "price_paise": 128895,
+    "stock": 36,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-GRO-0624",
+    "name": "Wheat Lite 529",
+    "price_paise": 35389,
+    "stock": 1,
+    "category": "grocery",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0625",
+    "name": "Pan Lite 980",
+    "price_paise": 61204,
+    "stock": 83,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0626",
+    "name": "Pan Max 403",
+    "price_paise": 38704,
+    "stock": 12,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-FAS-0627",
+    "name": "T-Shirt Essential 808",
+    "price_paise": 25409,
+    "stock": 71,
+    "category": "fashion",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0628",
+    "name": "Mixer Premium 649",
+    "price_paise": 133055,
+    "stock": 89,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0629",
+    "name": "Spatula Ultra 632",
+    "price_paise": 39045,
+    "stock": 18,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0630",
+    "name": "Kettle Max 304",
+    "price_paise": 149816,
+    "stock": 3,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0631",
+    "name": "Pan Classic 319",
+    "price_paise": 77773,
+    "stock": 15,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0632",
+    "name": "Spatula Lite 490",
+    "price_paise": 148374,
+    "stock": 47,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0633",
+    "name": "Kettle Premium 384",
+    "price_paise": 191885,
+    "stock": 79,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0634",
+    "name": "Spatula Plus 183",
+    "price_paise": 137832,
+    "stock": 29,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0635",
+    "name": "Oven Premium 643",
+    "price_paise": 188350,
+    "stock": 79,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0636",
+    "name": "Pan Pro 931",
+    "price_paise": 45455,
+    "stock": 3,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0637",
+    "name": "Spatula Pro 546",
+    "price_paise": 197726,
+    "stock": 10,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0638",
+    "name": "Oven Pro 377",
+    "price_paise": 108394,
+    "stock": 46,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0639",
+    "name": "Kettle Lite 295",
+    "price_paise": 136304,
+    "stock": 19,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0640",
+    "name": "Kettle Ultra 796",
+    "price_paise": 14233,
+    "stock": 33,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-GRO-0641",
+    "name": "Bread Premium 285",
+    "price_paise": 24248,
+    "stock": 44,
+    "category": "grocery",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-ELE-0642",
+    "name": "Mouse Classic 454",
+    "price_paise": 151492,
+    "stock": 30,
+    "category": "electronics",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0643",
+    "name": "Blender Essential 831",
+    "price_paise": 170976,
+    "stock": 93,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0644",
+    "name": "Mixer Modern 845",
+    "price_paise": 47424,
+    "stock": 20,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-FAS-0645",
+    "name": "Shoes Plus 335",
+    "price_paise": 166285,
+    "stock": 97,
+    "category": "fashion",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0646",
+    "name": "Toaster Plus 939",
+    "price_paise": 44395,
+    "stock": 78,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-ELE-0647",
+    "name": "Laptop Pro 488",
+    "price_paise": 5545909,
+    "stock": 10,
+    "category": "electronics",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-KIT-0648",
+    "name": "Toaster Vintage 852",
+    "price_paise": 195413,
+    "stock": 38,
+    "category": "kitchenware",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-HOM-0649",
+    "name": "Curtains Premium 939",
+    "price_paise": 193603,
+    "stock": 0,
+    "category": "home",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "TOY-HOM-0650",
+    "name": "Bed Lite 891",
+    "price_paise": 12177,
+    "stock": 50,
+    "category": "home",
+    "merchant": "ToyUniverse"
+  },
+  {
+    "sku": "MUS-HOM-0651",
+    "name": "Rug Ultra 840",
+    "price_paise": 29279,
+    "stock": 30,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0652",
+    "name": "Bed Premium 484",
+    "price_paise": 104492,
+    "stock": 97,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-GRO-0653",
+    "name": "Eggs Essential 361",
+    "price_paise": 31611,
+    "stock": 21,
+    "category": "grocery",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0654",
+    "name": "Cushion Essential 699",
+    "price_paise": 32070,
+    "stock": 12,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0655",
+    "name": "Bed Essential 332",
+    "price_paise": 20100,
+    "stock": 33,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0656",
+    "name": "Bed Premium 979",
+    "price_paise": 126757,
+    "stock": 21,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0657",
+    "name": "Lamp Premium 466",
+    "price_paise": 76350,
+    "stock": 40,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0658",
+    "name": "Lamp Pro 431",
+    "price_paise": 11251,
+    "stock": 72,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0659",
+    "name": "Table Modern 965",
+    "price_paise": 37865,
+    "stock": 3,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0660",
+    "name": "Clock Plus 787",
+    "price_paise": 25495,
+    "stock": 16,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0661",
+    "name": "Mirror Pro 786",
+    "price_paise": 198577,
+    "stock": 86,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0662",
+    "name": "Rug Essential 516",
+    "price_paise": 149107,
+    "stock": 96,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0663",
+    "name": "Table Vintage 197",
+    "price_paise": 187020,
+    "stock": 2,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0664",
+    "name": "Bed Premium 376",
+    "price_paise": 126336,
+    "stock": 30,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0665",
+    "name": "Cushion Essential 945",
+    "price_paise": 142615,
+    "stock": 15,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0666",
+    "name": "Mirror Ultra 367",
+    "price_paise": 23192,
+    "stock": 95,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0667",
+    "name": "Table Essential 742",
+    "price_paise": 179757,
+    "stock": 9,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0668",
+    "name": "Rug Max 189",
+    "price_paise": 153834,
+    "stock": 3,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0669",
+    "name": "Bed Premium 460",
+    "price_paise": 192761,
+    "stock": 28,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0670",
+    "name": "Mirror Ultra 226",
+    "price_paise": 129737,
+    "stock": 76,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0671",
+    "name": "Table Plus 741",
+    "price_paise": 25187,
+    "stock": 46,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0672",
+    "name": "Sofa Ultra 278",
+    "price_paise": 47615,
+    "stock": 35,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0673",
+    "name": "Rug Ultra 417",
+    "price_paise": 185801,
+    "stock": 67,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0674",
+    "name": "Clock Ultra 290",
+    "price_paise": 163934,
+    "stock": 62,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0675",
+    "name": "Lamp Premium 490",
+    "price_paise": 136931,
+    "stock": 70,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0676",
+    "name": "Clock Vintage 321",
+    "price_paise": 142233,
+    "stock": 75,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0677",
+    "name": "Rug Classic 413",
+    "price_paise": 153567,
+    "stock": 94,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0678",
+    "name": "Clock Essential 101",
+    "price_paise": 67497,
+    "stock": 17,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0679",
+    "name": "Chair Vintage 219",
+    "price_paise": 40599,
+    "stock": 83,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0680",
+    "name": "Cushion Ultra 628",
+    "price_paise": 125567,
+    "stock": 74,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0681",
+    "name": "Clock Essential 189",
+    "price_paise": 24129,
+    "stock": 34,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-KIT-0682",
+    "name": "Spatula Ultra 188",
+    "price_paise": 104821,
+    "stock": 56,
+    "category": "kitchenware",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0683",
+    "name": "Clock Modern 458",
+    "price_paise": 44428,
+    "stock": 85,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0684",
+    "name": "Table Vintage 510",
+    "price_paise": 38672,
+    "stock": 93,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0685",
+    "name": "Chair Lite 765",
+    "price_paise": 88422,
+    "stock": 17,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-FAS-0686",
+    "name": "T-Shirt Vintage 155",
+    "price_paise": 46534,
+    "stock": 27,
+    "category": "fashion",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0687",
+    "name": "Mirror Vintage 480",
+    "price_paise": 107781,
+    "stock": 100,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0688",
+    "name": "Mirror Vintage 654",
+    "price_paise": 125989,
+    "stock": 42,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0689",
+    "name": "Sofa Classic 285",
+    "price_paise": 143167,
+    "stock": 72,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0690",
+    "name": "Mirror Vintage 763",
+    "price_paise": 119239,
+    "stock": 27,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0691",
+    "name": "Cushion Pro 844",
+    "price_paise": 41817,
+    "stock": 62,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-GRO-0692",
+    "name": "Milk Vintage 781",
+    "price_paise": 9262,
+    "stock": 90,
+    "category": "grocery",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0693",
+    "name": "Cushion Lite 653",
+    "price_paise": 41558,
+    "stock": 90,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-ELE-0694",
+    "name": "Smartphone Premium 768",
+    "price_paise": 2755099,
+    "stock": 5,
+    "category": "electronics",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-KIT-0695",
+    "name": "Oven Max 818",
+    "price_paise": 109656,
+    "stock": 91,
+    "category": "kitchenware",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0696",
+    "name": "Rug Essential 967",
+    "price_paise": 179307,
+    "stock": 51,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0697",
+    "name": "Lamp Plus 332",
+    "price_paise": 24084,
+    "stock": 37,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0698",
+    "name": "Clock Max 999",
+    "price_paise": 175323,
+    "stock": 65,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0699",
+    "name": "Curtains Premium 497",
+    "price_paise": 120178,
+    "stock": 34,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "MUS-HOM-0700",
+    "name": "Table Ultra 800",
+    "price_paise": 150490,
+    "stock": 41,
+    "category": "home",
+    "merchant": "MusicMakers"
+  },
+  {
+    "sku": "FIT-FAS-0701",
+    "name": "Sunglasses Classic 166",
+    "price_paise": 194747,
+    "stock": 42,
+    "category": "fashion",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0702",
+    "name": "Keyboard Lite 931",
+    "price_paise": 151044,
+    "stock": 31,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-FAS-0703",
+    "name": "Shoes Lite 204",
+    "price_paise": 59465,
+    "stock": 68,
+    "category": "fashion",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-KIT-0704",
+    "name": "Kettle Vintage 935",
+    "price_paise": 23969,
+    "stock": 5,
+    "category": "kitchenware",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0705",
+    "name": "Laptop Max 998",
+    "price_paise": 4463139,
+    "stock": 24,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0706",
+    "name": "Mouse Lite 658",
+    "price_paise": 131934,
+    "stock": 22,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0707",
+    "name": "Mouse Ultra 967",
+    "price_paise": 182699,
+    "stock": 36,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-KIT-0708",
+    "name": "Blender Lite 927",
+    "price_paise": 50277,
+    "stock": 10,
+    "category": "kitchenware",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-KIT-0709",
+    "name": "Spatula Classic 878",
+    "price_paise": 195750,
+    "stock": 51,
+    "category": "kitchenware",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0710",
+    "name": "Monitor Pro 951",
+    "price_paise": 132278,
+    "stock": 82,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0711",
+    "name": "Headphones Vintage 442",
+    "price_paise": 63559,
+    "stock": 83,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0712",
+    "name": "Headphones Pro 691",
+    "price_paise": 167818,
+    "stock": 81,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0713",
+    "name": "Mouse Plus 693",
+    "price_paise": 113965,
+    "stock": 10,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0714",
+    "name": "Tablet Max 854",
+    "price_paise": 137863,
+    "stock": 67,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0715",
+    "name": "Mouse Vintage 679",
+    "price_paise": 172665,
+    "stock": 74,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0716",
+    "name": "Headphones Classic 335",
+    "price_paise": 84174,
+    "stock": 83,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-KIT-0717",
+    "name": "Mixer Max 841",
+    "price_paise": 64109,
+    "stock": 39,
+    "category": "kitchenware",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0718",
+    "name": "Laptop Classic 144",
+    "price_paise": 4284831,
+    "stock": 34,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0719",
+    "name": "Charger Max 674",
+    "price_paise": 184166,
+    "stock": 41,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0720",
+    "name": "Keyboard Vintage 226",
+    "price_paise": 185288,
+    "stock": 0,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0721",
+    "name": "Mouse Plus 684",
+    "price_paise": 153812,
+    "stock": 88,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0722",
+    "name": "Mouse Vintage 543",
+    "price_paise": 64977,
+    "stock": 5,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-FAS-0723",
+    "name": "Sunglasses Lite 620",
+    "price_paise": 27023,
+    "stock": 25,
+    "category": "fashion",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-KIT-0724",
+    "name": "Spatula Essential 955",
+    "price_paise": 92152,
+    "stock": 93,
+    "category": "kitchenware",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-KIT-0725",
+    "name": "Pan Classic 267",
+    "price_paise": 24064,
+    "stock": 14,
+    "category": "kitchenware",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0726",
+    "name": "Laptop Lite 507",
+    "price_paise": 4407739,
+    "stock": 30,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0727",
+    "name": "Smartphone Ultra 277",
+    "price_paise": 2860912,
+    "stock": 11,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0728",
+    "name": "Headphones Vintage 985",
+    "price_paise": 91684,
+    "stock": 84,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-GRO-0729",
+    "name": "Rice Vintage 542",
+    "price_paise": 29999,
+    "stock": 69,
+    "category": "grocery",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0730",
+    "name": "Headphones Plus 157",
+    "price_paise": 142618,
+    "stock": 93,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0731",
+    "name": "Laptop Premium 530",
+    "price_paise": 8155752,
+    "stock": 61,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0732",
+    "name": "Charger Essential 325",
+    "price_paise": 171723,
+    "stock": 64,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-HOM-0733",
+    "name": "Sofa Essential 819",
+    "price_paise": 61914,
+    "stock": 17,
+    "category": "home",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0734",
+    "name": "Laptop Ultra 753",
+    "price_paise": 4610694,
+    "stock": 94,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0735",
+    "name": "Mouse Vintage 764",
+    "price_paise": 191512,
+    "stock": 12,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0736",
+    "name": "Tablet Essential 331",
+    "price_paise": 196517,
+    "stock": 45,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0737",
+    "name": "Smartphone Classic 260",
+    "price_paise": 1634562,
+    "stock": 41,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0738",
+    "name": "Mouse Vintage 162",
+    "price_paise": 76349,
+    "stock": 42,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0739",
+    "name": "Headphones Ultra 656",
+    "price_paise": 196072,
+    "stock": 16,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0740",
+    "name": "Tablet Ultra 638",
+    "price_paise": 186710,
+    "stock": 14,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0741",
+    "name": "Smartwatch Ultra 413",
+    "price_paise": 111244,
+    "stock": 86,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0742",
+    "name": "Laptop Ultra 567",
+    "price_paise": 6841750,
+    "stock": 34,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-FAS-0743",
+    "name": "Shoes Max 328",
+    "price_paise": 164280,
+    "stock": 47,
+    "category": "fashion",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0744",
+    "name": "Tablet Modern 819",
+    "price_paise": 84116,
+    "stock": 53,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0745",
+    "name": "Charger Premium 195",
+    "price_paise": 185261,
+    "stock": 82,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0746",
+    "name": "Charger Vintage 473",
+    "price_paise": 149803,
+    "stock": 31,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0747",
+    "name": "Smartphone Classic 723",
+    "price_paise": 2557264,
+    "stock": 88,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-KIT-0748",
+    "name": "Pot Pro 107",
+    "price_paise": 83733,
+    "stock": 9,
+    "category": "kitchenware",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0749",
+    "name": "Charger Essential 426",
+    "price_paise": 92046,
+    "stock": 93,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "FIT-ELE-0750",
+    "name": "Earbuds Max 580",
+    "price_paise": 106495,
+    "stock": 93,
+    "category": "electronics",
+    "merchant": "FitnessFreaks"
+  },
+  {
+    "sku": "ART-FAS-0751",
+    "name": "Belt Pro 272",
+    "price_paise": 197330,
+    "stock": 68,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-GRO-0752",
+    "name": "Tomatoes Pro 891",
+    "price_paise": 2857,
+    "stock": 2,
+    "category": "grocery",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-HOM-0753",
+    "name": "Table Lite 567",
+    "price_paise": 41315,
+    "stock": 38,
+    "category": "home",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0754",
+    "name": "Scarf Ultra 511",
+    "price_paise": 57981,
+    "stock": 40,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0755",
+    "name": "T-Shirt Lite 122",
+    "price_paise": 172955,
+    "stock": 100,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0756",
+    "name": "Socks Essential 748",
+    "price_paise": 27151,
+    "stock": 76,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0757",
+    "name": "Hat Modern 329",
+    "price_paise": 55700,
+    "stock": 24,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0758",
+    "name": "Jeans Plus 454",
+    "price_paise": 127518,
+    "stock": 98,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0759",
+    "name": "Gloves Lite 556",
+    "price_paise": 81295,
+    "stock": 34,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-GRO-0760",
+    "name": "Cheese Max 173",
+    "price_paise": 15037,
+    "stock": 88,
+    "category": "grocery",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0761",
+    "name": "Belt Modern 899",
+    "price_paise": 78082,
+    "stock": 6,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0762",
+    "name": "Hat Lite 525",
+    "price_paise": 121978,
+    "stock": 52,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0763",
+    "name": "Gloves Modern 209",
+    "price_paise": 142104,
+    "stock": 6,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-GRO-0764",
+    "name": "Wheat Ultra 870",
+    "price_paise": 34767,
+    "stock": 14,
+    "category": "grocery",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0765",
+    "name": "Shoes Lite 974",
+    "price_paise": 57868,
+    "stock": 10,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-GRO-0766",
+    "name": "Apples Plus 365",
+    "price_paise": 41383,
+    "stock": 33,
+    "category": "grocery",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0767",
+    "name": "Jacket Plus 673",
+    "price_paise": 134525,
+    "stock": 29,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0768",
+    "name": "Belt Max 520",
+    "price_paise": 89800,
+    "stock": 33,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0769",
+    "name": "T-Shirt Premium 849",
+    "price_paise": 172925,
+    "stock": 61,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-GRO-0770",
+    "name": "Rice Max 428",
+    "price_paise": 9022,
+    "stock": 83,
+    "category": "grocery",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-HOM-0771",
+    "name": "Rug Classic 825",
+    "price_paise": 101765,
+    "stock": 98,
+    "category": "home",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0772",
+    "name": "T-Shirt Vintage 238",
+    "price_paise": 23400,
+    "stock": 82,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0773",
+    "name": "Shoes Premium 892",
+    "price_paise": 26289,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0774",
+    "name": "T-Shirt Max 493",
+    "price_paise": 178401,
+    "stock": 54,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-ELE-0775",
+    "name": "Laptop Plus 603",
+    "price_paise": 5438485,
+    "stock": 79,
+    "category": "electronics",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0776",
+    "name": "Jeans Plus 884",
+    "price_paise": 83588,
+    "stock": 48,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0777",
+    "name": "Jeans Plus 553",
+    "price_paise": 43419,
+    "stock": 13,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0778",
+    "name": "Gloves Ultra 724",
+    "price_paise": 70926,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0779",
+    "name": "Hat Premium 159",
+    "price_paise": 36046,
+    "stock": 89,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-GRO-0780",
+    "name": "Bread Ultra 271",
+    "price_paise": 44192,
+    "stock": 55,
+    "category": "grocery",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0781",
+    "name": "Hat Modern 101",
+    "price_paise": 144163,
+    "stock": 4,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0782",
+    "name": "Jacket Classic 369",
+    "price_paise": 18088,
+    "stock": 78,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0783",
+    "name": "Gloves Lite 590",
+    "price_paise": 134700,
+    "stock": 22,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0784",
+    "name": "Belt Ultra 784",
+    "price_paise": 76135,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0785",
+    "name": "Hat Lite 216",
+    "price_paise": 62409,
+    "stock": 17,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0786",
+    "name": "Shoes Max 330",
+    "price_paise": 152970,
+    "stock": 32,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-KIT-0787",
+    "name": "Mixer Ultra 571",
+    "price_paise": 188050,
+    "stock": 99,
+    "category": "kitchenware",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-ELE-0788",
+    "name": "Mouse Plus 522",
+    "price_paise": 194233,
+    "stock": 48,
+    "category": "electronics",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0789",
+    "name": "Belt Max 435",
+    "price_paise": 108278,
+    "stock": 0,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0790",
+    "name": "T-Shirt Ultra 567",
+    "price_paise": 180123,
+    "stock": 90,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0791",
+    "name": "Hat Classic 750",
+    "price_paise": 134007,
+    "stock": 62,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0792",
+    "name": "Socks Pro 583",
+    "price_paise": 109712,
+    "stock": 94,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0793",
+    "name": "Jeans Essential 182",
+    "price_paise": 109981,
+    "stock": 61,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-KIT-0794",
+    "name": "Microwave Plus 962",
+    "price_paise": 154816,
+    "stock": 97,
+    "category": "kitchenware",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-GRO-0795",
+    "name": "Bananas Essential 591",
+    "price_paise": 20705,
+    "stock": 32,
+    "category": "grocery",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0796",
+    "name": "Belt Vintage 926",
+    "price_paise": 119470,
+    "stock": 45,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0797",
+    "name": "Scarf Modern 528",
+    "price_paise": 40869,
+    "stock": 36,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0798",
+    "name": "Shoes Essential 867",
+    "price_paise": 126596,
+    "stock": 78,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0799",
+    "name": "Sunglasses Classic 194",
+    "price_paise": 84049,
+    "stock": 94,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "ART-FAS-0800",
+    "name": "Hat Lite 929",
+    "price_paise": 175906,
+    "stock": 93,
+    "category": "fashion",
+    "merchant": "ArtisanCrafts"
+  },
+  {
+    "sku": "GOU-FAS-0801",
+    "name": "T-Shirt Pro 852",
+    "price_paise": 73641,
+    "stock": 43,
+    "category": "fashion",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0802",
+    "name": "Smartwatch Ultra 861",
+    "price_paise": 68535,
+    "stock": 10,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0803",
+    "name": "Smartphone Vintage 743",
+    "price_paise": 1222306,
+    "stock": 74,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0804",
+    "name": "Smartphone Lite 453",
+    "price_paise": 2797902,
+    "stock": 76,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0805",
+    "name": "Tablet Max 871",
+    "price_paise": 168846,
+    "stock": 65,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0806",
+    "name": "Charger Plus 884",
+    "price_paise": 54316,
+    "stock": 65,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0807",
+    "name": "Monitor Vintage 827",
+    "price_paise": 139061,
+    "stock": 41,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0808",
+    "name": "Laptop Lite 682",
+    "price_paise": 7527604,
+    "stock": 80,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0809",
+    "name": "Tablet Plus 702",
+    "price_paise": 196234,
+    "stock": 92,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-GRO-0810",
+    "name": "Butter Lite 161",
+    "price_paise": 7550,
+    "stock": 69,
+    "category": "grocery",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0811",
+    "name": "Smartwatch Modern 655",
+    "price_paise": 113901,
+    "stock": 59,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0812",
+    "name": "Charger Premium 874",
+    "price_paise": 179947,
+    "stock": 79,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0813",
+    "name": "Earbuds Ultra 895",
+    "price_paise": 172300,
+    "stock": 7,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0814",
+    "name": "Smartphone Essential 306",
+    "price_paise": 2840703,
+    "stock": 5,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0815",
+    "name": "Smartwatch Plus 917",
+    "price_paise": 147592,
+    "stock": 30,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0816",
+    "name": "Mouse Vintage 418",
+    "price_paise": 175089,
+    "stock": 65,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0817",
+    "name": "Smartwatch Plus 553",
+    "price_paise": 100330,
+    "stock": 9,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0818",
+    "name": "Keyboard Max 605",
+    "price_paise": 69211,
+    "stock": 5,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0819",
+    "name": "Monitor Essential 987",
+    "price_paise": 62369,
+    "stock": 14,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0820",
+    "name": "Monitor Premium 926",
+    "price_paise": 116344,
+    "stock": 6,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0821",
+    "name": "Monitor Modern 162",
+    "price_paise": 64986,
+    "stock": 66,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-GRO-0822",
+    "name": "Milk Vintage 756",
+    "price_paise": 32130,
+    "stock": 9,
+    "category": "grocery",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-FAS-0823",
+    "name": "Sunglasses Classic 980",
+    "price_paise": 72271,
+    "stock": 40,
+    "category": "fashion",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0824",
+    "name": "Monitor Classic 536",
+    "price_paise": 72462,
+    "stock": 65,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0825",
+    "name": "Mouse Classic 496",
+    "price_paise": 182746,
+    "stock": 74,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-GRO-0826",
+    "name": "Eggs Classic 510",
+    "price_paise": 8221,
+    "stock": 26,
+    "category": "grocery",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-HOM-0827",
+    "name": "Sofa Pro 622",
+    "price_paise": 65658,
+    "stock": 68,
+    "category": "home",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0828",
+    "name": "Smartwatch Classic 494",
+    "price_paise": 132439,
+    "stock": 87,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0829",
+    "name": "Headphones Plus 502",
+    "price_paise": 80292,
+    "stock": 6,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0830",
+    "name": "Earbuds Modern 232",
+    "price_paise": 179451,
+    "stock": 96,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0831",
+    "name": "Keyboard Ultra 766",
+    "price_paise": 53783,
+    "stock": 93,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0832",
+    "name": "Mouse Vintage 153",
+    "price_paise": 107228,
+    "stock": 78,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0833",
+    "name": "Charger Pro 216",
+    "price_paise": 185094,
+    "stock": 43,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0834",
+    "name": "Headphones Plus 241",
+    "price_paise": 74939,
+    "stock": 48,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0835",
+    "name": "Smartwatch Plus 921",
+    "price_paise": 180154,
+    "stock": 86,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0836",
+    "name": "Tablet Classic 708",
+    "price_paise": 81551,
+    "stock": 40,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-KIT-0837",
+    "name": "Pot Vintage 920",
+    "price_paise": 110839,
+    "stock": 48,
+    "category": "kitchenware",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-GRO-0838",
+    "name": "Cheese Pro 497",
+    "price_paise": 4674,
+    "stock": 57,
+    "category": "grocery",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0839",
+    "name": "Keyboard Lite 822",
+    "price_paise": 190566,
+    "stock": 14,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0840",
+    "name": "Smartphone Plus 566",
+    "price_paise": 2521406,
+    "stock": 11,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0841",
+    "name": "Keyboard Classic 242",
+    "price_paise": 58052,
+    "stock": 93,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0842",
+    "name": "Mouse Max 549",
+    "price_paise": 78008,
+    "stock": 36,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-HOM-0843",
+    "name": "Mirror Premium 486",
+    "price_paise": 100668,
+    "stock": 37,
+    "category": "home",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0844",
+    "name": "Earbuds Max 502",
+    "price_paise": 73983,
+    "stock": 32,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0845",
+    "name": "Mouse Modern 131",
+    "price_paise": 179005,
+    "stock": 77,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-KIT-0846",
+    "name": "Microwave Ultra 725",
+    "price_paise": 176184,
+    "stock": 34,
+    "category": "kitchenware",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-FAS-0847",
+    "name": "T-Shirt Pro 608",
+    "price_paise": 153916,
+    "stock": 75,
+    "category": "fashion",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0848",
+    "name": "Monitor Premium 273",
+    "price_paise": 109618,
+    "stock": 41,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0849",
+    "name": "Keyboard Modern 335",
+    "price_paise": 171803,
+    "stock": 93,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "GOU-ELE-0850",
+    "name": "Headphones Ultra 559",
+    "price_paise": 161082,
+    "stock": 42,
+    "category": "electronics",
+    "merchant": "GourmetGrocer"
+  },
+  {
+    "sku": "HAR-HOM-0851",
+    "name": "Table Plus 515",
+    "price_paise": 105227,
+    "stock": 15,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-GRO-0852",
+    "name": "Butter Ultra 400",
+    "price_paise": 29809,
+    "stock": 71,
+    "category": "grocery",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0853",
+    "name": "Chair Pro 320",
+    "price_paise": 150420,
+    "stock": 1,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0854",
+    "name": "Mirror Lite 908",
+    "price_paise": 147622,
+    "stock": 0,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0855",
+    "name": "Chair Vintage 279",
+    "price_paise": 105637,
+    "stock": 65,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0856",
+    "name": "Lamp Vintage 602",
+    "price_paise": 20702,
+    "stock": 6,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0857",
+    "name": "Chair Modern 789",
+    "price_paise": 155997,
+    "stock": 52,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-FAS-0858",
+    "name": "Jacket Ultra 260",
+    "price_paise": 73927,
+    "stock": 79,
+    "category": "fashion",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0859",
+    "name": "Clock Essential 750",
+    "price_paise": 168673,
+    "stock": 21,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0860",
+    "name": "Cushion Ultra 630",
+    "price_paise": 41244,
+    "stock": 82,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0861",
+    "name": "Cushion Classic 280",
+    "price_paise": 129237,
+    "stock": 34,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0862",
+    "name": "Table Lite 809",
+    "price_paise": 96672,
+    "stock": 4,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0863",
+    "name": "Chair Premium 226",
+    "price_paise": 122363,
+    "stock": 38,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0864",
+    "name": "Clock Ultra 361",
+    "price_paise": 46316,
+    "stock": 48,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0865",
+    "name": "Chair Modern 987",
+    "price_paise": 154518,
+    "stock": 30,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0866",
+    "name": "Curtains Plus 177",
+    "price_paise": 86211,
+    "stock": 47,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-KIT-0867",
+    "name": "Kettle Plus 465",
+    "price_paise": 189001,
+    "stock": 82,
+    "category": "kitchenware",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-KIT-0868",
+    "name": "Pot Premium 566",
+    "price_paise": 129128,
+    "stock": 41,
+    "category": "kitchenware",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0869",
+    "name": "Sofa Classic 418",
+    "price_paise": 17974,
+    "stock": 94,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0870",
+    "name": "Rug Premium 886",
+    "price_paise": 122521,
+    "stock": 52,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0871",
+    "name": "Cushion Ultra 951",
+    "price_paise": 150093,
+    "stock": 12,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0872",
+    "name": "Curtains Vintage 250",
+    "price_paise": 167143,
+    "stock": 9,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0873",
+    "name": "Curtains Vintage 452",
+    "price_paise": 177200,
+    "stock": 58,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0874",
+    "name": "Table Modern 465",
+    "price_paise": 116738,
+    "stock": 63,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-ELE-0875",
+    "name": "Monitor Premium 617",
+    "price_paise": 86121,
+    "stock": 49,
+    "category": "electronics",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0876",
+    "name": "Bed Ultra 288",
+    "price_paise": 40469,
+    "stock": 19,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0877",
+    "name": "Bed Vintage 790",
+    "price_paise": 41692,
+    "stock": 52,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0878",
+    "name": "Cushion Essential 685",
+    "price_paise": 159483,
+    "stock": 33,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0879",
+    "name": "Table Premium 838",
+    "price_paise": 29889,
+    "stock": 96,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0880",
+    "name": "Clock Lite 993",
+    "price_paise": 139453,
+    "stock": 88,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0881",
+    "name": "Lamp Ultra 409",
+    "price_paise": 184407,
+    "stock": 36,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0882",
+    "name": "Sofa Lite 748",
+    "price_paise": 197470,
+    "stock": 10,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-GRO-0883",
+    "name": "Bread Lite 207",
+    "price_paise": 30154,
+    "stock": 29,
+    "category": "grocery",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-GRO-0884",
+    "name": "Wheat Ultra 278",
+    "price_paise": 7265,
+    "stock": 47,
+    "category": "grocery",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0885",
+    "name": "Table Plus 799",
+    "price_paise": 97765,
+    "stock": 25,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0886",
+    "name": "Cushion Plus 672",
+    "price_paise": 21425,
+    "stock": 72,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0887",
+    "name": "Rug Max 280",
+    "price_paise": 165930,
+    "stock": 39,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0888",
+    "name": "Curtains Modern 609",
+    "price_paise": 151673,
+    "stock": 46,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-KIT-0889",
+    "name": "Pot Lite 331",
+    "price_paise": 168846,
+    "stock": 17,
+    "category": "kitchenware",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0890",
+    "name": "Chair Modern 497",
+    "price_paise": 193514,
+    "stock": 61,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0891",
+    "name": "Sofa Modern 476",
+    "price_paise": 135702,
+    "stock": 35,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0892",
+    "name": "Rug Pro 568",
+    "price_paise": 71076,
+    "stock": 91,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-GRO-0893",
+    "name": "Butter Premium 468",
+    "price_paise": 20855,
+    "stock": 64,
+    "category": "grocery",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0894",
+    "name": "Clock Pro 405",
+    "price_paise": 55545,
+    "stock": 8,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-ELE-0895",
+    "name": "Earbuds Essential 742",
+    "price_paise": 103048,
+    "stock": 61,
+    "category": "electronics",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0896",
+    "name": "Chair Plus 389",
+    "price_paise": 128770,
+    "stock": 75,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-KIT-0897",
+    "name": "Kettle Classic 943",
+    "price_paise": 163470,
+    "stock": 22,
+    "category": "kitchenware",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-FAS-0898",
+    "name": "Jacket Max 438",
+    "price_paise": 153617,
+    "stock": 70,
+    "category": "fashion",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0899",
+    "name": "Sofa Lite 496",
+    "price_paise": 140198,
+    "stock": 78,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "HAR-HOM-0900",
+    "name": "Cushion Ultra 776",
+    "price_paise": 169433,
+    "stock": 64,
+    "category": "home",
+    "merchant": "HardwareHeroes"
+  },
+  {
+    "sku": "GAR-HOM-0901",
+    "name": "Clock Essential 376",
+    "price_paise": 30696,
+    "stock": 30,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0902",
+    "name": "Lamp Pro 337",
+    "price_paise": 56338,
+    "stock": 51,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0903",
+    "name": "Bed Modern 606",
+    "price_paise": 36947,
+    "stock": 18,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0904",
+    "name": "Curtains Classic 979",
+    "price_paise": 28769,
+    "stock": 91,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-ELE-0905",
+    "name": "Smartwatch Pro 246",
+    "price_paise": 175327,
+    "stock": 69,
+    "category": "electronics",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0906",
+    "name": "Cushion Classic 563",
+    "price_paise": 189848,
+    "stock": 52,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0907",
+    "name": "Rug Plus 367",
+    "price_paise": 91381,
+    "stock": 40,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-ELE-0908",
+    "name": "Smartphone Plus 453",
+    "price_paise": 3366620,
+    "stock": 97,
+    "category": "electronics",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-GRO-0909",
+    "name": "Tomatoes Modern 971",
+    "price_paise": 11351,
+    "stock": 28,
+    "category": "grocery",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0910",
+    "name": "Sofa Modern 598",
+    "price_paise": 25166,
+    "stock": 68,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0911",
+    "name": "Curtains Modern 213",
+    "price_paise": 153282,
+    "stock": 20,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0912",
+    "name": "Mirror Premium 922",
+    "price_paise": 72953,
+    "stock": 69,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-FAS-0913",
+    "name": "Sunglasses Lite 770",
+    "price_paise": 75427,
+    "stock": 41,
+    "category": "fashion",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-KIT-0914",
+    "name": "Oven Plus 569",
+    "price_paise": 111507,
+    "stock": 31,
+    "category": "kitchenware",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0915",
+    "name": "Bed Lite 502",
+    "price_paise": 166490,
+    "stock": 61,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-ELE-0916",
+    "name": "Smartwatch Ultra 797",
+    "price_paise": 92210,
+    "stock": 42,
+    "category": "electronics",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0917",
+    "name": "Lamp Vintage 871",
+    "price_paise": 40135,
+    "stock": 60,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0918",
+    "name": "Sofa Plus 868",
+    "price_paise": 18097,
+    "stock": 80,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0919",
+    "name": "Cushion Modern 616",
+    "price_paise": 55140,
+    "stock": 20,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-FAS-0920",
+    "name": "Jeans Premium 296",
+    "price_paise": 21962,
+    "stock": 23,
+    "category": "fashion",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-GRO-0921",
+    "name": "Wheat Classic 310",
+    "price_paise": 5041,
+    "stock": 12,
+    "category": "grocery",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0922",
+    "name": "Bed Plus 854",
+    "price_paise": 79814,
+    "stock": 97,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0923",
+    "name": "Cushion Classic 668",
+    "price_paise": 122851,
+    "stock": 14,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0924",
+    "name": "Clock Lite 903",
+    "price_paise": 113225,
+    "stock": 43,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-KIT-0925",
+    "name": "Kettle Pro 780",
+    "price_paise": 171790,
+    "stock": 97,
+    "category": "kitchenware",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0926",
+    "name": "Sofa Lite 442",
+    "price_paise": 66294,
+    "stock": 9,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0927",
+    "name": "Table Classic 826",
+    "price_paise": 123348,
+    "stock": 95,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0928",
+    "name": "Lamp Pro 122",
+    "price_paise": 57950,
+    "stock": 94,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0929",
+    "name": "Clock Essential 234",
+    "price_paise": 50061,
+    "stock": 88,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-ELE-0930",
+    "name": "Headphones Essential 508",
+    "price_paise": 118435,
+    "stock": 67,
+    "category": "electronics",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0931",
+    "name": "Lamp Vintage 582",
+    "price_paise": 166721,
+    "stock": 73,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0932",
+    "name": "Mirror Lite 136",
+    "price_paise": 112857,
+    "stock": 71,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-KIT-0933",
+    "name": "Spatula Pro 720",
+    "price_paise": 173405,
+    "stock": 67,
+    "category": "kitchenware",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0934",
+    "name": "Cushion Lite 998",
+    "price_paise": 175712,
+    "stock": 24,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0935",
+    "name": "Sofa Lite 712",
+    "price_paise": 162119,
+    "stock": 87,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0936",
+    "name": "Bed Pro 999",
+    "price_paise": 18924,
+    "stock": 8,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0937",
+    "name": "Rug Modern 982",
+    "price_paise": 196326,
+    "stock": 48,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0938",
+    "name": "Sofa Premium 883",
+    "price_paise": 65765,
+    "stock": 7,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0939",
+    "name": "Bed Premium 323",
+    "price_paise": 152658,
+    "stock": 94,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-FAS-0940",
+    "name": "Gloves Vintage 784",
+    "price_paise": 11126,
+    "stock": 21,
+    "category": "fashion",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0941",
+    "name": "Table Max 420",
+    "price_paise": 155113,
+    "stock": 34,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0942",
+    "name": "Bed Max 171",
+    "price_paise": 170083,
+    "stock": 87,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0943",
+    "name": "Sofa Ultra 353",
+    "price_paise": 22748,
+    "stock": 35,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0944",
+    "name": "Cushion Lite 886",
+    "price_paise": 76457,
+    "stock": 7,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-ELE-0945",
+    "name": "Headphones Max 371",
+    "price_paise": 148548,
+    "stock": 65,
+    "category": "electronics",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0946",
+    "name": "Chair Max 392",
+    "price_paise": 133816,
+    "stock": 79,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0947",
+    "name": "Rug Premium 761",
+    "price_paise": 168352,
+    "stock": 12,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-KIT-0948",
+    "name": "Pan Ultra 257",
+    "price_paise": 117895,
+    "stock": 73,
+    "category": "kitchenware",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0949",
+    "name": "Chair Max 499",
+    "price_paise": 131449,
+    "stock": 53,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "GAR-HOM-0950",
+    "name": "Lamp Classic 544",
+    "price_paise": 189548,
+    "stock": 22,
+    "category": "home",
+    "merchant": "GardenOasis"
+  },
+  {
+    "sku": "JEW-GRO-0951",
+    "name": "Tomatoes Essential 156",
+    "price_paise": 27920,
+    "stock": 53,
+    "category": "grocery",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-HOM-0952",
+    "name": "Curtains Essential 450",
+    "price_paise": 152062,
+    "stock": 48,
+    "category": "home",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0953",
+    "name": "Mixer Modern 128",
+    "price_paise": 181511,
+    "stock": 44,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0954",
+    "name": "Mixer Max 551",
+    "price_paise": 163137,
+    "stock": 75,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-HOM-0955",
+    "name": "Cushion Plus 630",
+    "price_paise": 194753,
+    "stock": 88,
+    "category": "home",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0956",
+    "name": "Toaster Max 525",
+    "price_paise": 151934,
+    "stock": 23,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0957",
+    "name": "Pan Plus 844",
+    "price_paise": 95823,
+    "stock": 63,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0958",
+    "name": "Blender Max 637",
+    "price_paise": 98256,
+    "stock": 45,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0959",
+    "name": "Pot Essential 582",
+    "price_paise": 126311,
+    "stock": 19,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0960",
+    "name": "Microwave Lite 756",
+    "price_paise": 191913,
+    "stock": 33,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0961",
+    "name": "Microwave Modern 580",
+    "price_paise": 43613,
+    "stock": 29,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-ELE-0962",
+    "name": "Tablet Pro 656",
+    "price_paise": 95695,
+    "stock": 16,
+    "category": "electronics",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-GRO-0963",
+    "name": "Bread Ultra 116",
+    "price_paise": 38759,
+    "stock": 96,
+    "category": "grocery",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0964",
+    "name": "Toaster Ultra 924",
+    "price_paise": 120545,
+    "stock": 63,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0965",
+    "name": "Pot Premium 475",
+    "price_paise": 130996,
+    "stock": 99,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0966",
+    "name": "Knife Pro 730",
+    "price_paise": 97885,
+    "stock": 9,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-ELE-0967",
+    "name": "Earbuds Essential 783",
+    "price_paise": 187732,
+    "stock": 75,
+    "category": "electronics",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0968",
+    "name": "Spatula Pro 838",
+    "price_paise": 135943,
+    "stock": 10,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0969",
+    "name": "Spatula Pro 720",
+    "price_paise": 122402,
+    "stock": 65,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-FAS-0970",
+    "name": "Scarf Modern 850",
+    "price_paise": 29725,
+    "stock": 98,
+    "category": "fashion",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0971",
+    "name": "Blender Max 343",
+    "price_paise": 190149,
+    "stock": 52,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0972",
+    "name": "Kettle Vintage 783",
+    "price_paise": 49024,
+    "stock": 75,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0973",
+    "name": "Toaster Vintage 129",
+    "price_paise": 152242,
+    "stock": 15,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-HOM-0974",
+    "name": "Lamp Vintage 244",
+    "price_paise": 78322,
+    "stock": 49,
+    "category": "home",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0975",
+    "name": "Toaster Ultra 246",
+    "price_paise": 190155,
+    "stock": 61,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0976",
+    "name": "Oven Premium 881",
+    "price_paise": 20693,
+    "stock": 17,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-HOM-0977",
+    "name": "Clock Vintage 545",
+    "price_paise": 198302,
+    "stock": 87,
+    "category": "home",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0978",
+    "name": "Pot Classic 998",
+    "price_paise": 56433,
+    "stock": 21,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0979",
+    "name": "Pot Modern 967",
+    "price_paise": 80742,
+    "stock": 37,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-GRO-0980",
+    "name": "Apples Vintage 313",
+    "price_paise": 39349,
+    "stock": 26,
+    "category": "grocery",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0981",
+    "name": "Pot Pro 146",
+    "price_paise": 107327,
+    "stock": 74,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0982",
+    "name": "Blender Pro 289",
+    "price_paise": 168963,
+    "stock": 43,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0983",
+    "name": "Microwave Classic 800",
+    "price_paise": 124971,
+    "stock": 34,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-FAS-0984",
+    "name": "T-Shirt Max 653",
+    "price_paise": 77211,
+    "stock": 92,
+    "category": "fashion",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0985",
+    "name": "Blender Max 463",
+    "price_paise": 104941,
+    "stock": 3,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0986",
+    "name": "Microwave Modern 939",
+    "price_paise": 186824,
+    "stock": 72,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0987",
+    "name": "Oven Essential 662",
+    "price_paise": 102489,
+    "stock": 75,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0988",
+    "name": "Knife Modern 546",
+    "price_paise": 193704,
+    "stock": 40,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0989",
+    "name": "Toaster Premium 598",
+    "price_paise": 39494,
+    "stock": 25,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-HOM-0990",
+    "name": "Table Lite 551",
+    "price_paise": 116825,
+    "stock": 63,
+    "category": "home",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-ELE-0991",
+    "name": "Charger Ultra 419",
+    "price_paise": 86097,
+    "stock": 3,
+    "category": "electronics",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0992",
+    "name": "Knife Max 254",
+    "price_paise": 25764,
+    "stock": 39,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0993",
+    "name": "Kettle Classic 123",
+    "price_paise": 138824,
+    "stock": 50,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0994",
+    "name": "Kettle Classic 415",
+    "price_paise": 94064,
+    "stock": 16,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0995",
+    "name": "Oven Essential 143",
+    "price_paise": 86179,
+    "stock": 49,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0996",
+    "name": "Microwave Plus 112",
+    "price_paise": 169060,
+    "stock": 65,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0997",
+    "name": "Pot Plus 989",
+    "price_paise": 87309,
+    "stock": 44,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0998",
+    "name": "Mixer Modern 530",
+    "price_paise": 108653,
+    "stock": 96,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-KIT-0999",
+    "name": "Knife Essential 918",
+    "price_paise": 25771,
+    "stock": 91,
+    "category": "kitchenware",
+    "merchant": "JewelryBox"
+  },
+  {
+    "sku": "JEW-FAS-1000",
+    "name": "Shoes Vintage 670",
+    "price_paise": 28994,
+    "stock": 16,
+    "category": "fashion",
+    "merchant": "JewelryBox"
+  }
+]
