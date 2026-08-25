@@ -2,8 +2,11 @@ import json
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
+import os
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db import init_db, get_db
 from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery, routes_console, routes_growth
@@ -338,7 +341,7 @@ def get_upsell_stats():
         """)
         total_accepted = cursor.fetchone()[0] or 0
 
-        # Verified incremental cross-sell revenue from growth_outcomes
+        # Verified incremental cross-sell revenue from growth_outcomes or settled upsell events
         cursor.execute("""
             SELECT COALESCE(SUM(g.incremental_paise), 0)
             FROM growth_outcomes g
@@ -352,7 +355,23 @@ def get_upsell_stats():
                     AND (COALESCE(pm.refund_status, 'NONE') = 'REFUNDED' OR COALESCE(cm.order_status, 'CREATED') = 'CANCELLED')
               )
         """)
-        total_lift_paise = cursor.fetchone()[0] or 0
+        growth_lift_paise = cursor.fetchone()[0] or 0
+
+        # Also calculate directly from settled upsell_events
+        cursor.execute("""
+            SELECT COALESCE(SUM(u.cart_total_after_paise - u.cart_total_before_paise), 0)
+            FROM upsell_events u
+            JOIN cart_mandates cm ON u.cart_id = cm.id
+            JOIN payment_mandates pm ON u.cart_id = pm.cart_id
+            WHERE u.accepted = 1 
+              AND pm.status = 'succeeded'
+              AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+              AND u.cart_total_after_paise > u.cart_total_before_paise
+        """)
+        events_lift_paise = cursor.fetchone()[0] or 0
+
+        total_lift_paise = max(growth_lift_paise, events_lift_paise)
 
         total_offered = max(total_offered_raw, total_accepted)
         total_revenue_lift_rupees = round(total_lift_paise / 100, 2)
@@ -588,6 +607,24 @@ def delete_chat_session(session_id: str):
         return {"status": "deleted", "id": session_id}
     finally:
         conn.close()
+
+
+# Serve static frontend assets & SPA fallback (for unified Docker container deployments)
+frontend_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
+if os.path.exists(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        index_file = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 if __name__ == "__main__":

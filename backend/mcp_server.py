@@ -700,4 +700,9 @@ def execute_growth_action(
 
 
 if __name__ == "__main__":
-    buyer_mcp.run()
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    port = int(os.getenv("PORT", "8000"))
+    if transport in ("sse", "http"):
+        buyer_mcp.run(transport=transport, host="0.0.0.0", port=port)
+    else:
+        buyer_mcp.run()

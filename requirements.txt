@@ -20,6 +20,15 @@ razorpay>=1.4.1
 httpx>=0.25.0
 requests>=2.31.0
 
+# Database & Enterprise Migration (PostgreSQL Flexible Server)
+psycopg2-binary>=2.9.9
+
+# Cloud Infrastructure & Azure SDKs
+azure-identity>=1.15.0
+azure-keyvault-secrets>=4.8.0
+azure-servicebus>=7.12.0
+azure-storage-blob>=12.19.0
+
 # Model Context Protocol (MCP) Server
 fastmcp>=0.1.0
 mcp>=1.0.0

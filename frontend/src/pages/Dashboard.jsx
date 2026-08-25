@@ -5,7 +5,9 @@ import {
   ArrowUpRight, Clock, PackageCheck, Layers, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-const BASE_URL = 'http://127.0.0.1:8000';
+const BASE_URL = (typeof window !== 'undefined' && window.location.origin.includes('5173'))
+  ? 'http://127.0.0.1:8000'
+  : '';
 
 /* ─── Formatters ─────────────────────────────────────────────────────── */
 function fmtTime(iso) {

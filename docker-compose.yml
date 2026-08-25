@@ -1,0 +1,26 @@
+services:
+  cartpilot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cartpilot-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    volumes:
+      # Persist SQLite database across container restarts
+      - cartpilot_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/catalog"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cartpilot_data:
+    name: cartpilot_data

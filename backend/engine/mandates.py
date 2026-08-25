@@ -169,6 +169,23 @@ def update_payment_mandate_status(razorpay_order_id: str = None, cart_id: str = 
                                VALUES (?, ?, 'paid', 0, ?, ?, 'recovery', ?)""",
                             (outcome_id, None, pm_check["amount_paise"], incremental_paise, updated_at)
                         )
+
+                # Check if there were accepted upsells on this cart and record settled cross-sell revenue
+                cursor.execute(
+                    "SELECT id, suggested_sku, cart_total_before_paise, cart_total_after_paise FROM upsell_events WHERE cart_id = ? AND accepted = 1",
+                    (associated_cart_id,)
+                )
+                upsell_records = cursor.fetchall()
+                for u_rec in upsell_records:
+                    inc_paise = max(0, (u_rec["cart_total_after_paise"] or 0) - (u_rec["cart_total_before_paise"] or 0))
+                    if inc_paise > 0:
+                        outcome_id = f"go_paid_{pay_id}"
+                        cursor.execute(
+                            """INSERT OR REPLACE INTO growth_outcomes
+                               (id, action_id, outcome_type, before_paise, after_paise, incremental_paise, revenue_type, created_at)
+                               VALUES (?, ?, 'paid', ?, ?, ?, 'cross_sell', ?)""",
+                            (outcome_id, pay_id, u_rec["cart_total_before_paise"], u_rec["cart_total_after_paise"], inc_paise, updated_at)
+                        )
             except Exception as e:
                 print(f"Error logging real order / growth outcome: {e}")
 
