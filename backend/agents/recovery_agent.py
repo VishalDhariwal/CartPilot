@@ -49,16 +49,25 @@ def detect_recoverable_carts(limit: int = 50) -> list[dict]:
         now = datetime.utcnow()
         recoverable = []
 
-        # Bucket 1: Approved carts with no successful payment AND no recovery link sent
+        # Bucket 1: Approved carts with non-empty items and total_paise > 0, no successful payment, non-cancelled AND no recovery link sent
         cursor.execute("""
             SELECT cm.id, cm.items, cm.total_paise, cm.created_at, cm.reason
             FROM cart_mandates cm
             WHERE cm.status = 'approved'
+            AND cm.total_paise > 0
+            AND cm.items IS NOT NULL
+            AND cm.items != '[]'
+            AND cm.items != ''
+            AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+            AND COALESCE(cm.cancellation_status, 'NONE') != 'CANCELLED'
             AND NOT EXISTS (
                 SELECT 1 FROM payment_mandates pm 
-                WHERE pm.cart_id = cm.id AND (pm.status = 'succeeded' OR pm.recovery_action = 'recovery_link_sent')
+                WHERE pm.cart_id = cm.id AND (
+                    pm.status = 'succeeded' 
+                    OR pm.recovery_action IN ('recovery_link_sent', 'refunded')
+                    OR COALESCE(pm.refund_status, 'NONE') IN ('REFUNDED', 'PARTIALLY_REFUNDED', 'REFUND_REQUESTED', 'REFUND_PROCESSING')
+                )
             )
-
             ORDER BY cm.created_at DESC
         """)
         rows = cursor.fetchall()
@@ -81,8 +90,13 @@ def detect_recoverable_carts(limit: int = 50) -> list[dict]:
             except Exception:
                 pass
 
+            if not items_list or total_paise <= 0:
+                continue
+
             item_names = [it.get("name") or it.get("sku", "Item") for it in items_list]
             item_skus = [it.get("sku") for it in items_list if "sku" in it]
+            if not item_skus:
+                continue
             items_summary = ", ".join(item_names[:3]) + (f" +{len(item_names)-3} more" if len(item_names) > 3 else "")
 
             # Check stock for items in cart

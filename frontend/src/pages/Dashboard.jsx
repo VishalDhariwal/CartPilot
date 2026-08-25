@@ -173,6 +173,59 @@ function OrderLedgerCard({ order, defaultExpanded = false }) {
       {/* Expanded Details Body */}
       {expanded && (
         <div className="ledger-card-body">
+          {/* Explainability & Intent Banner */}
+          <div style={{
+            padding: '0.85rem 1.25rem',
+            background: 'linear-gradient(180deg, #F9FAFB 0%, #F3F4F6 100%)',
+            borderBottom: '1px solid var(--hairline-dark)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '1rem'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>
+                🛒 Buyer Procurement Intent
+              </div>
+              <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--ink)' }}>
+                "{intent.raw_request || intent.goal}"
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--ink-secondary)', marginTop: '2px' }}>
+                Goal: <strong>{intent.goal || 'Direct checkout'}</strong> • Spend Cap: <strong>{fmtRupees(intent.spend_cap_paise)}</strong>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>
+                🛡️ Deterministic Guardrail Evaluation
+              </div>
+              <div style={{ fontSize: '0.84rem', fontWeight: 600, color: latestCart?.status === 'approved' ? 'var(--accent-teal-dark)' : 'var(--alert-brick)' }}>
+                {latestCart?.status === 'approved' ? '✓ Cart Mandate Approved' : '🚫 Cart Intercepted by Policy'}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--ink-secondary)', marginTop: '2px' }}>
+                {latestCart?.status === 'approved'
+                  ? `Cart total ${fmtRupees(latestCart.total_paise)} is safely within the ${fmtRupees(intent.spend_cap_paise)} spend cap.`
+                  : `Cart total ${fmtRupees(latestCart?.total_paise || 0)} exceeded the ${fmtRupees(intent.spend_cap_paise)} spend limit.`}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>
+                💳 Payment & Resolution Status
+              </div>
+              <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--ink)' }}>
+                {statusLabel}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--ink-secondary)', marginTop: '2px' }}>
+                {latestPayment?.razorpay_order_id ? (
+                  <>Order: <code>{latestPayment.razorpay_order_id}</code></>
+                ) : (
+                  'No gateway order initiated'
+                )}
+                {latestPayment?.recovery_action === 'refunded' && ' • Full reversal processed'}
+              </div>
+            </div>
+          </div>
+
           {/* Items Strip with Real Image Thumbnails */}
           {items.length > 0 && (
             <div className="ledger-items-strip">
@@ -222,26 +275,36 @@ function OrderLedgerCard({ order, defaultExpanded = false }) {
 
           {/* Audit Timeline */}
           <div className="ledger-timeline">
-            {logs.map((log) => {
-              const ec = classifyEvent(log.event);
-              return (
-                <div key={log.id} className="timeline-row">
-                  <div className={`timeline-dot ${ec}`}>
-                    <TimelineDotIcon eventClass={ec} />
-                  </div>
-                  <div className="timeline-body">
-                    <div className="timeline-event-name">
-                      <span>{log.event}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-muted)', fontWeight: 400 }}>
-                        ref: {log.ref_id.slice(-8)}
-                      </span>
+            <div style={{ fontSize: '0.74rem', fontFamily: 'var(--font-mono)', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+              Chronological Audit Event Stream ({logs.length})
+            </div>
+
+            {logs.length === 0 ? (
+              <div style={{ fontSize: '0.78rem', color: 'var(--ink-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                No historical micro-events recorded for this session.
+              </div>
+            ) : (
+              logs.map((log) => {
+                const ec = classifyEvent(log.event);
+                return (
+                  <div key={log.id} className="timeline-row">
+                    <div className={`timeline-dot ${ec}`}>
+                      <TimelineDotIcon eventClass={ec} />
                     </div>
-                    <div className="timeline-detail-text">{log.detail}</div>
-                    <div className="timeline-timestamp">{fmtTime(log.created_at)}</div>
+                    <div className="timeline-body">
+                      <div className="timeline-event-name">
+                        <span>{log.event}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-muted)', fontWeight: 400 }}>
+                          ref: {log.ref_id.slice(-8)}
+                        </span>
+                      </div>
+                      <div className="timeline-detail-text">{log.detail}</div>
+                      <div className="timeline-timestamp">{fmtTime(log.created_at)}</div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -308,23 +371,26 @@ export default function Dashboard() {
 
   // Aggregate stats
   const stats = useMemo(() => {
-    if (!orders.length) {
+    if (!orders.length && !data) {
       return { total: 0, totalPaise: 0, completed: 0, blocked: 0, failed: 0, refunded: 0 };
     }
     let completed = 0, blocked = 0, failed = 0, refunded = 0, totalPaise = 0;
     let mcpCount = 0, webCount = 0;
     orders.forEach(o => {
       const lp = o.payments[o.payments.length - 1];
-      const lc = o.carts[o.carts.length - 1];
+      const approvedCart = o.carts.find(c => c.status === 'approved') || o.carts[o.carts.length - 1];
       if (o.intent.channel === 'mcp_agent') {
         mcpCount++;
       } else {
         webCount++;
       }
-      if (lc?.status === 'approved') {
-        totalPaise += (lc.total_paise || 0);
+      if (approvedCart && approvedCart.status === 'approved') {
+        totalPaise += (approvedCart.total_paise || 0);
+      } else if (lp?.status === 'succeeded') {
+        totalPaise += (lp.amount_paise || 0);
       }
-      if (lp?.status === 'succeeded' && lp?.recovery_action === 'refunded') {
+
+      if (lp?.status === 'succeeded' && (lp?.recovery_action === 'refunded' || lp?.refund_status === 'REFUNDED')) {
         refunded++;
       } else if (lp?.status === 'succeeded') {
         completed++;
@@ -338,8 +404,15 @@ export default function Dashboard() {
         blocked++;
       }
     });
+
+    // Ensure total gross volume reflects all approved carts in the dataset
+    const allApprovedCartsSum = (data?.carts || [])
+      .filter(c => c.status === 'approved')
+      .reduce((sum, c) => sum + (c.total_paise || 0), 0);
+    totalPaise = Math.max(totalPaise, allApprovedCartsSum);
+
     return { total: orders.length, totalPaise, completed, blocked, failed, refunded, mcpCount, webCount };
-  }, [orders]);
+  }, [orders, data]);
 
   // Filtered orders
   const filteredOrders = useMemo(() => {

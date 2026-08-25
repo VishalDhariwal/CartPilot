@@ -373,25 +373,37 @@ def get_growth_rules(
         cursor.execute(sql, params + [limit, offset])
         rows = cursor.fetchall()
 
-        # Fetch per-target-SKU empirical metrics from upsell_events
+        # Fetch per-target-SKU empirical metrics from upsell_events (excluding refunded/cancelled orders)
         cursor.execute("""
             SELECT 
-                suggested_sku,
+                u.suggested_sku,
                 COUNT(*) AS times_offered,
-                SUM(CASE WHEN accepted = 1 THEN 1 ELSE 0 END) AS times_accepted,
-                SUM(CASE WHEN accepted = 1 THEN (cart_total_after_paise - cart_total_before_paise) ELSE 0 END) AS total_revenue_lift_paise
-            FROM upsell_events
-            GROUP BY suggested_sku
+                SUM(CASE WHEN u.accepted = 1 THEN 1 ELSE 0 END) AS times_accepted,
+                SUM(CASE WHEN u.accepted = 1 
+                         AND COALESCE(pm.status, '') = 'succeeded'
+                         AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+                         AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+                         THEN (u.cart_total_after_paise - u.cart_total_before_paise) ELSE 0 END) AS total_revenue_lift_paise
+            FROM upsell_events u
+            LEFT JOIN cart_mandates cm ON u.cart_id = cm.id
+            LEFT JOIN payment_mandates pm ON u.cart_id = pm.cart_id
+            GROUP BY u.suggested_sku
         """)
         events_by_sku = {r["suggested_sku"]: dict(r) for r in cursor.fetchall()}
 
-        # Global totals across all upsell events
+        # Global totals across all upsell events (excluding refunded/cancelled orders)
         cursor.execute("""
             SELECT 
                 COUNT(*) AS total_offered,
-                SUM(CASE WHEN accepted = 1 THEN 1 ELSE 0 END) AS total_accepted,
-                SUM(CASE WHEN accepted = 1 THEN (cart_total_after_paise - cart_total_before_paise) ELSE 0 END) AS total_revenue_lift_paise
-            FROM upsell_events
+                SUM(CASE WHEN u.accepted = 1 THEN 1 ELSE 0 END) AS total_accepted,
+                SUM(CASE WHEN u.accepted = 1 
+                         AND COALESCE(pm.status, '') = 'succeeded'
+                         AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+                         AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+                         THEN (u.cart_total_after_paise - u.cart_total_before_paise) ELSE 0 END) AS total_revenue_lift_paise
+            FROM upsell_events u
+            LEFT JOIN cart_mandates cm ON u.cart_id = cm.id
+            LEFT JOIN payment_mandates pm ON u.cart_id = pm.cart_id
         """)
         global_summary = cursor.fetchone()
         total_offered_all = global_summary["total_offered"] or 0

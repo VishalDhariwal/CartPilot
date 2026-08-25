@@ -589,6 +589,50 @@ def get_order_audit_trail(cart_id: str) -> Dict[str, Any]:
         conn.close()
 
 
+@buyer_mcp.tool()
+def orchestrate_buyer_journey(
+    query: str,
+    spend_cap_paise: int = 1000000,
+    session_id: Optional[str] = None,
+    auto_authorize: bool = False
+) -> Dict[str, Any]:
+    """
+    Autonomous multi-step AI Buyer journey orchestrated via LangGraph.
+    Executes intent understanding, catalog search, autonomous budget self-correction (max 3 revisions),
+    deterministic guardrails, 3-tier growth recommendations, buyer authorization gates, and checkout.
+    Returns complete structured state and explainable decision trace.
+    """
+    from backend.agents.buyer_graph import run_buyer_journey
+    state = run_buyer_journey(
+        query=query,
+        spend_cap_paise=spend_cap_paise,
+        session_id=session_id,
+        auto_authorize=auto_authorize
+    )
+
+    return {
+        "status": state.get("guardrail_status"),
+        "buyer_authorization_status": state.get("buyer_authorization_status"),
+        "cart_id": state.get("cart_id"),
+        "intent_id": state.get("intent_id"),
+        "goal": state.get("goal"),
+        "spend_cap_rupees": round(state.get("spend_cap_paise", 0) / 100, 2),
+        "total_paise": state.get("cart_total_paise", 0),
+        "total_rupees": round(state.get("cart_total_paise", 0) / 100, 2),
+        "items": state.get("proposed_items", []),
+        "oos_items": state.get("oos_items", []),
+        "revision_count": state.get("revision_count", 0),
+        "guardrail_reason": state.get("guardrail_reason"),
+        "recommendations": state.get("recommendations", []),
+        "checkout_status": state.get("checkout_status"),
+        "payment_status": state.get("payment_status"),
+        "razorpay_order_id": state.get("razorpay_order_id"),
+        "payment_link_url": state.get("payment_link_url"),
+        "recovery_state": state.get("recovery_state"),
+        "decision_trace": state.get("decision_trace", [])
+    }
+
+
 # ─── MERCHANT GROWTH TOOLS (REGISTERED ON MERCHANT_MCP WITH AUTH) ───────────
 
 @merchant_mcp.tool()

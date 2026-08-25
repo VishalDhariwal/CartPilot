@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Send, Sparkles, Shield, AlertTriangle, CheckCircle, RefreshCcw,
   ExternalLink, Trash2, Plus, Minus, ArrowRight, CornerDownLeft,
@@ -43,6 +44,92 @@ const loadSavedSessions = () => {
   const def = createDefaultSession();
   return [def];
 };
+
+const formatGuardrailNotice = (reason) => {
+  if (!reason) {
+    return `🔍 **No Matching Items Found**\nI couldn't find items matching your request in our catalog. Try searching for products like **MacBook Pro**, **iPhone**, **Dior Perfume**, or **Running Shoes**.`;
+  }
+  const low = reason.toLowerCase();
+  if (low.includes('exceeds spend cap') || low.includes('spend cap')) {
+    return `🛡️ **Budget Limit Notice**\n${reason}\n\n💡 *Tip: You can increase your spending limit by clicking **⚙️ Spend Cap** at the top right.*`;
+  }
+  if (low.includes('category') || low.includes('not allowed')) {
+    return `🛡️ **Merchant Policy Notice**\n${reason}`;
+  }
+  if (low.includes('empty') || low.includes('no valid items')) {
+    return `🔍 **No Matching Items Found**\nI couldn't find items in our catalog matching your request. Try browsing categories like **Laptops**, **Smartphones**, **Fragrances**, **Skincare**, or **Fashion**.`;
+  }
+  return `🛡️ **Shopping Policy Notice**\n${reason}`;
+};
+
+const NODE_LABELS = {
+  UNDERSTAND_INTENT: { label: 'Intent Analysis', icon: '🎯' },
+  SEARCH_CATALOG: { label: 'Catalog Search', icon: '🔍' },
+  BUILD_CART: { label: 'Cart Synthesis', icon: '🛒' },
+  VALIDATE_CART: { label: 'Guardrail & Budget Policy', icon: '🛡️' },
+  REVISE_CART: { label: 'Cart Optimization', icon: '⚡' },
+  GET_RECOMMENDATIONS: { label: 'RecSys Engine', icon: '✨' },
+  PRESENT_FOR_APPROVAL: { label: 'Authorization Gate', icon: '👤' },
+  EXECUTE_CHECKOUT: { label: 'Payment Initiation', icon: '💳' },
+  VERIFY_PAYMENT: { label: 'Mandate Verification', icon: '✅' },
+  HANDLE_RECOVERY: { label: 'Payment Recovery', icon: '🔄' },
+  NOTIFY_BUYER_BLOCKED: { label: 'Policy Resolution', icon: '🚫' },
+  FINALIZE_OUTCOME: { label: 'Audit Logging', icon: '📝' }
+};
+
+function LangGraphTraceViewer({ trace, revisionCount }) {
+  const [open, setOpen] = useState(false);
+  if (!trace || trace.length === 0) return null;
+
+  return (
+    <div className="trace-timeline-container">
+      <button
+        type="button"
+        className="trace-timeline-toggle"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="trace-badge-ai">LangGraph</span>
+        <span className="trace-steps-count">
+          Decision Execution Trace ({trace.length} steps{revisionCount ? ` · ${revisionCount} auto-revisions` : ''})
+        </span>
+        <span className="trace-arrow-icon">{open ? '▲ Hide' : '▼ Inspect'}</span>
+      </button>
+
+      {open && (
+        <div className="trace-step-flow">
+          {trace.map((step, idx) => {
+            const meta = NODE_LABELS[step.node] || { label: step.node, icon: '⚙️' };
+            const isBlocked = step.guardrail_status === 'blocked' || Boolean(step.error);
+            const isApproved = step.guardrail_status === 'approved';
+
+            return (
+              <div key={idx} className={`trace-row ${isBlocked ? 'is-blocked' : isApproved ? 'is-approved' : 'is-neutral'}`}>
+                <div className="trace-node-bullet">
+                  <span className="trace-bullet-dot" />
+                  {idx < trace.length - 1 && <span className="trace-connector-line" />}
+                </div>
+                <div className="trace-node-card">
+                  <div className="trace-node-header">
+                    <span className="trace-node-title">
+                      {meta.icon} {meta.label}
+                    </span>
+                    {step.tool && <span className="trace-pill-tool">{step.tool}</span>}
+                    {step.guardrail_status && (
+                      <span className={`trace-pill-status ${step.guardrail_status}`}>
+                        {step.guardrail_status}
+                      </span>
+                    )}
+                  </div>
+                  <div className="trace-node-summary">{step.result_summary || step.input_summary}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ─── Unified Dotted-Leader & Interactive Receipt Card Component ────── */
 function ReceiptCard({
@@ -97,6 +184,11 @@ function ReceiptCard({
                 <div style={{ minWidth: 0 }}>
                   <div className="receipt-item-label" title={item.name}>
                     {item.name || item.sku}
+                    {item.selected_size && (
+                      <span style={{ marginLeft: 6, fontSize: '0.72rem', padding: '2px 6px', borderRadius: 4, background: 'rgba(56, 178, 172, 0.15)', color: 'var(--accent-teal)', fontWeight: 600, display: 'inline-block' }}>
+                        {item.selected_size}
+                      </span>
+                    )}
                   </div>
                   {isInteractive && (
                     <div style={{ fontSize: '0.72rem', color: 'var(--ink-muted)' }}>
@@ -180,6 +272,10 @@ function ReceiptCard({
           <Shield size={13} />
           <span>Guardrail: {cartData.guardrail_reason} (Spend Cap: ₹{capRupees})</span>
         </div>
+      )}
+
+      {cartData.decision_trace && cartData.decision_trace.length > 0 && (
+        <LangGraphTraceViewer trace={cartData.decision_trace} revisionCount={cartData.revision_count} />
       )}
 
       {isInteractive && (
@@ -382,7 +478,7 @@ function CartEditReviewCard({ cartData, onUpdateQty, onRemoveItem, onProceedPaym
 }
 
 /* ─── Product Detail Modal Component ─────────────────────────────────── */
-function ProductDetailModal({ product, isOpen, onClose, onAddToCart, currentCartTotalPaise, spendCapPaise, isAdding }) {
+function ProductDetailModal({ product, isOpen, onClose, onAddToCart, currentCartTotalPaise, spendCapPaise, isAdding, isAlreadyInCart }) {
   if (!isOpen || !product) return null;
 
   return (
@@ -393,22 +489,25 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, currentCart
       currentCartTotalPaise={currentCartTotalPaise}
       spendCapPaise={spendCapPaise}
       isAdding={isAdding}
+      isAlreadyInCart={isAlreadyInCart}
     />
   );
 }
 
-function ProductDetailModalContent({ product, onClose, onAddToCart, currentCartTotalPaise, spendCapPaise, isAdding }) {
+function ProductDetailModalContent({ product, onClose, onAddToCart, currentCartTotalPaise, spendCapPaise, isAdding, isAlreadyInCart }) {
   const metadata = product.metadata || {};
-  const sizes = metadata.sizes || ['Standard'];
-  const [selectedSize, setSelectedSize] = useState(sizes[0]);
+  const options = metadata.sizes || metadata.options || ['Standard'];
+  const initialOption = product.selected_size || product.selected_option || product.selectedSize || (options.length > 0 ? options[0] : 'Standard');
+  const [selectedOption, setSelectedOption] = useState(initialOption);
+  const variantLabel = metadata.variantLabel || 'Option';
 
   const pricePaise = product.price_paise || 0;
   const priceRupees = (pricePaise / 100).toFixed(0);
   const remainingBudgetPaise = Math.max(0, spendCapPaise - currentCartTotalPaise);
-  const wouldExceed = pricePaise > remainingBudgetPaise;
+  const wouldExceed = !isAlreadyInCart && pricePaise > remainingBudgetPaise;
 
   const handleAdd = () => {
-    onAddToCart({ ...product, selectedSize });
+    onAddToCart({ ...product, selectedSize: selectedOption, selected_size: selectedOption });
     onClose();
   };
 
@@ -462,22 +561,22 @@ function ProductDetailModalContent({ product, onClose, onAddToCart, currentCartT
             </div>
           </div>
 
-          {/* Size / Variant Options */}
-          {sizes.length > 0 && (
+          {/* Variant / Option Selection */}
+          {options.length > 0 && (
             <div className="product-size-section">
               <div className="size-section-label">
-                <span>Select {metadata.variantLabel || 'Size / Variant'}:</span>
-                <span style={{ color: 'var(--accent-teal)', fontWeight: 600 }}>{selectedSize}</span>
+                <span>Select {variantLabel}:</span>
+                <span style={{ color: 'var(--accent-teal)', fontWeight: 600 }}>{selectedOption}</span>
               </div>
               <div className="size-chips-grid">
-                {sizes.map((s) => (
+                {options.map((opt) => (
                   <button
-                    key={s}
+                    key={opt}
                     type="button"
-                    className={`size-chip ${selectedSize === s ? 'active' : ''}`}
-                    onClick={() => setSelectedSize(s)}
+                    className={`size-chip ${selectedOption === opt ? 'active' : ''}`}
+                    onClick={() => setSelectedOption(opt)}
                   >
-                    {s}
+                    {opt}
                   </button>
                 ))}
               </div>
@@ -546,13 +645,13 @@ function ProductDetailModalContent({ product, onClose, onAddToCart, currentCartT
             onClick={handleAdd}
           >
             {isAdding ? (
-              <span className="flex-center gap-1"><RefreshCcw size={13} className="animate-spin" /> Adding…</span>
+              <span className="flex-center gap-1"><RefreshCcw size={13} className="animate-spin" /> {isAlreadyInCart ? 'Updating…' : 'Adding…'}</span>
             ) : wouldExceed ? (
               <span>Exceeds Spend Cap (₹{(spendCapPaise / 100).toFixed(0)})</span>
             ) : (
               <>
-                <Plus size={14} />
-                <span>Add to Order ({selectedSize})</span>
+                {isAlreadyInCart ? <CheckCircle size={14} /> : <Plus size={14} />}
+                <span>{isAlreadyInCart ? `Update to ${selectedOption}` : `Add to Order (${selectedOption})`}</span>
               </>
             )}
           </button>
@@ -822,28 +921,54 @@ function ChatHistorySidebar({
 
 /* ─── Authentic Welcome Hero Card Component ────────────────────────── */
 function WelcomeHeroCard({ onSelectPrompt }) {
-  const samplePrompts = [
+  const [prompts, setPrompts] = useState([
     {
       emoji: '💄',
       category: 'Beauty & Fragrances',
-      prompt: 'I want Essence Mascara and Dior Sauvage perfume within ₹3,500'
+      prompt: 'I want Essence Mascara and Dior Sauvage perfume within ₹3,500',
+      tag: 'Trending'
     },
     {
       emoji: '📱',
       category: 'Electronics & Style',
-      prompt: 'Buy me an iPhone charger and luxury sunglasses under ₹2,000'
+      prompt: 'Buy me an iPhone charger and luxury sunglasses under ₹2,000',
+      tag: 'High Demand'
     },
     {
-      emoji: '🥑',
-      category: 'Gourmet Groceries',
-      prompt: 'I need Arabica coffee beans, organic apples, and fresh milk'
+      emoji: '💻',
+      category: 'Tech & Laptops',
+      prompt: 'Show me a Lenovo Yoga 920 laptop or iPad Mini with fast delivery',
+      tag: 'Work & Play'
     },
     {
-      emoji: '🛋️',
-      category: 'Home & Living',
-      prompt: 'Find a modern bedside table lamp and scented candles under ₹4,000'
+      emoji: '👟',
+      category: 'Footwear & Fashion',
+      prompt: 'Find stylish running shoes and Calvin Klein perfume under ₹4,000',
+      tag: 'Lifestyle'
     }
-  ];
+  ]);
+  const [loadingPrompts, setLoadingPrompts] = useState(false);
+
+  const fetchTrendingPrompts = async (isRefresh = false) => {
+    setLoadingPrompts(true);
+    try {
+      const res = await fetch(`${BASE_URL}/checkout/trending-prompts${isRefresh ? '?refresh=true' : ''}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.prompts && data.prompts.length > 0) {
+          setPrompts(data.prompts);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load dynamic trending prompts:', err);
+    } finally {
+      setLoadingPrompts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTrendingPrompts(false);
+  }, []);
 
   return (
     <div className="welcome-hero-card">
@@ -869,13 +994,27 @@ function WelcomeHeroCard({ onSelectPrompt }) {
       </div>
 
       <div className="welcome-prompts-section">
-        <div className="welcome-prompts-title">
-          <Sparkles size={12} color="var(--accent-mustard)" />
-          <span>Try a curated shopping prompt:</span>
+        <div className="welcome-prompts-header-row">
+          <div className="welcome-prompts-title">
+            <Sparkles size={13} color="var(--accent-mustard)" />
+            <span>AI-Curated Trending Demands</span>
+            <span className="live-ai-badge">Live LLM</span>
+          </div>
+
+          <button
+            type="button"
+            className={`btn-refresh-prompts ${loadingPrompts ? 'loading' : ''}`}
+            onClick={() => fetchTrendingPrompts(true)}
+            disabled={loadingPrompts}
+            title="Generate fresh demand-driven suggestions using LLM"
+          >
+            <RefreshCcw size={11} className={loadingPrompts ? 'spin-icon' : ''} />
+            <span>{loadingPrompts ? 'Analyzing...' : 'Refresh Demands'}</span>
+          </button>
         </div>
 
         <div className="welcome-chips-grid">
-          {samplePrompts.map((item, idx) => (
+          {prompts.map((item, idx) => (
             <button
               key={idx}
               type="button"
@@ -883,9 +1022,12 @@ function WelcomeHeroCard({ onSelectPrompt }) {
               onClick={() => onSelectPrompt(item.prompt)}
               title={`Click to try: "${item.prompt}"`}
             >
-              <span className="welcome-chip-emoji">{item.emoji}</span>
+              <span className="welcome-chip-emoji">{item.emoji || '🛍️'}</span>
               <div className="welcome-chip-content">
-                <div className="welcome-chip-label">{item.category}</div>
+                <div className="welcome-chip-label-row">
+                  <span className="welcome-chip-label">{item.category}</span>
+                  {item.tag && <span className="welcome-chip-tag">{item.tag}</span>}
+                </div>
                 <div className="welcome-chip-text">{item.prompt}</div>
               </div>
               <ArrowRight size={13} color="var(--ink-muted)" style={{ marginTop: 2, flexShrink: 0 }} />
@@ -1242,7 +1384,11 @@ export default function Chat() {
 
       // Handle Guardrail Blocked
       if (data.status === 'blocked') {
-        appendMessage('agent', `🚫 **Guardrail Blocked**: ${data.reason}`, { isAlert: true });
+        const displayMsg = data.message || formatGuardrailNotice(data.reason);
+        appendMessage('agent', displayMsg, {
+          isAlert: true,
+          decisionTrace: data.decision_trace || []
+        });
         setPhase('idle');
         setLoading(false);
         return;
@@ -1255,9 +1401,9 @@ export default function Chat() {
       const cands = data.upsell ? (data.upsell.candidates || [data.upsell]) : [];
       setUpsellCandidates(cands);
 
-      const msgText = data.upsell
+      const msgText = data.message || (data.upsell
         ? `I itemized your cart below! Customers who purchased these items also frequently added:`
-        : `I itemized your cart below:`;
+        : `I itemized your cart below:`);
 
       appendMessage('agent', msgText, {
         cartData: data,
@@ -1317,7 +1463,11 @@ export default function Chat() {
 
       // Handle Guardrail Blocked
       if (data.status === 'blocked') {
-        appendMessage('agent', `🚫 **Guardrail Blocked**: ${data.reason}`, { isAlert: true });
+        const displayMsg = data.message || formatGuardrailNotice(data.reason);
+        appendMessage('agent', displayMsg, {
+          isAlert: true,
+          decisionTrace: data.decision_trace || []
+        });
         setPhase('idle');
         setLoading(false);
         return;
@@ -1330,9 +1480,9 @@ export default function Chat() {
       const cands = data.upsell ? (data.upsell.candidates || [data.upsell]) : [];
       setUpsellCandidates(cands);
 
-      const msgText = data.upsell
+      const msgText = data.message || (data.upsell
         ? `I itemized your cart below! Customers who purchased these items also frequently added:`
-        : `I itemized your cart below:`;
+        : `I itemized your cart below:`);
 
       appendMessage('agent', msgText, {
         cartData: data,
@@ -1405,14 +1555,25 @@ export default function Chat() {
         return;
       }
 
-      // ── SCENARIO 2: PRE-PURCHASE CART EXPANSION (During proposal phase) ──
+      // ── SCENARIO 2: PRE-PURCHASE CART EXPANSION / SIZING UPDATE (During proposal phase) ──
       const currentItems = activeCartData.proposed_items || [];
-      const exists = currentItems.find(i => i.sku === candidate.sku);
+      const chosenSize = candidate.selectedSize || candidate.selected_size;
+      const existsIndex = currentItems.findIndex(i => i.sku === candidate.sku);
       let updatedItems;
 
-      if (exists) {
-        updatedItems = currentItems.map(i => i.sku === candidate.sku ? { ...i, qty: i.qty + 1 } : i);
+      if (existsIndex !== -1) {
+        // Update size of the existing item in the cart without increasing quantity
+        updatedItems = currentItems.map((item, idx) => {
+          if (idx === existsIndex) {
+            return {
+              ...item,
+              selected_size: chosenSize || item.selected_size
+            };
+          }
+          return item;
+        });
       } else {
+        // Add fresh item with chosen size
         updatedItems = [...currentItems, {
           sku: candidate.sku,
           name: candidate.name,
@@ -1421,7 +1582,7 @@ export default function Chat() {
           category: candidate.category,
           image_url: candidate.image_url || '',
           metadata: candidate.metadata || {},
-          selected_size: candidate.selectedSize
+          selected_size: chosenSize
         }];
       }
 
@@ -1494,7 +1655,11 @@ export default function Chat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cart_id: activeCartData.cart_id,
-          items: items.map(i => ({ sku: i.sku, qty: i.qty }))
+          items: items.map(i => ({
+            sku: i.sku,
+            qty: i.qty,
+            selected_size: i.selected_size || i.selectedSize || null
+          }))
         })
       });
 
@@ -1649,7 +1814,7 @@ export default function Chat() {
       if (data.status === 'refunded') {
         setPaymentStatus('refunded');
         setPhase('refunded');
-        appendMessage('agent', `✅ **Refund Processed**: ${data.reason}\nRazorpay Refund ID: \`${data.refund_id}\``, {
+        appendMessage('agent', `✅ **Refund Processed**: ${data.reason}\n\n• **Order Status**: \`${data.order_status}\`\n• **Gateway Refund ID**: \`${data.refund_id}\`\n• **Refund Amount**: ₹${((data.amount_refunded_paise || 0) / 100).toFixed(2)}`, {
           isSuccess: true,
           isRefunded: true,
           refundId: data.refund_id,
@@ -1657,8 +1822,15 @@ export default function Chat() {
           paymentStatus: 'refunded',
           phase: 'refunded'
         });
+      } else if (data.status === 'cancelled') {
+        setPaymentStatus('cancelled');
+        appendMessage('agent', `🚫 **Order Cancelled**: ${data.reason}\n\n• **Order Status**: \`${data.order_status}\``, { isAlert: true });
+      } else if (data.status === 'review_required') {
+        appendMessage('agent', `📋 **Resolution Review Required**: ${data.reason}\n\n• **Return Status**: \`${data.return_status || 'REVIEW_REQUIRED'}\`\n• **Order Status**: \`${data.order_status}\``, { isAlert: true });
+      } else if (data.status === 'inform') {
+        appendMessage('agent', `ℹ️ **Policy Information**:\n\n${data.reason}`);
       } else {
-        appendMessage('agent', `⚠️ Resolution Decision: ${data.reason}`, { isAlert: true });
+        appendMessage('agent', `⚠️ **Resolution Decision**: ${data.reason}`, { isAlert: true });
       }
     } catch (err) {
       appendMessage('agent', `❌ ${err.message}`, { isAlert: true });
@@ -1750,7 +1922,13 @@ export default function Chat() {
                     <WelcomeHeroCard onSelectPrompt={handleQuickPrompt} />
                   ) : (
                     <div className={`agent-bubble ${msg.isAlert ? 'alert-bubble' : msg.isSuccess ? 'success-bubble' : ''}`}>
-                      <p style={{ whiteSpace: 'pre-line' }}>{msg.content}</p>
+                      <div className="agent-text-content">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+
+                      {msg.decisionTrace && msg.decisionTrace.length > 0 && !messageCartData && (
+                        <LangGraphTraceViewer trace={msg.decisionTrace} />
+                      )}
 
                       {messageCartData && (
                         <>
@@ -1890,6 +2068,7 @@ export default function Chat() {
         currentCartTotalPaise={activeCartData?.total_paise || 0}
         spendCapPaise={spendCapPaise}
         isAdding={addingSku === selectedProductForDetail?.sku}
+        isAlreadyInCart={activeCartData?.proposed_items?.some(i => i.sku === selectedProductForDetail?.sku)}
       />
     </div>
   );

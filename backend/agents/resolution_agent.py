@@ -1,43 +1,95 @@
-import os
+"""
+CartPilot AI Customer Intent & Resolution Classifier
+===================================================
+Uses LLM to understand and extract structured customer intent from natural language.
+Bounded role: Only parses and summarizes customer intent — never decides financial eligibility.
+"""
+
 import json
+from typing import Optional, Literal
 from pydantic import BaseModel
-from openai import OpenAI
+from backend.engine.llm import generate_structured
+
+
+class CustomerResolutionIntent(BaseModel):
+    intent: Literal[
+        "CANCEL_ORDER",
+        "REQUEST_REFUND",
+        "RETURN_ITEM",
+        "REPORT_DAMAGED_ITEM",
+        "ASK_REFUND_POLICY",
+        "CHECK_REFUND_STATUS",
+        "DISPUTE_CHARGE"
+    ]
+    reason: str
+    requested_amount_paise: Optional[int] = None
+    item_scope: Literal["full_order", "partial_item", "unknown"] = "full_order"
+    explanation: str
+
+CustomerResolutionIntent.model_rebuild()
+
 
 class ResolutionDecision(BaseModel):
     action: str
     reason: str
+    intent: Optional[str] = None
+    requested_amount_paise: Optional[int] = None
+
+ResolutionDecision.model_rebuild()
+
+
+def classify_customer_intent(natural_language_request: str, order_state: Optional[dict] = None) -> CustomerResolutionIntent:
+    """
+    Parses unstructured customer support inquiries into a structured intent representation.
+    The AI only understands customer intent — it NEVER decides financial or refund authorization.
+    """
+    system_instruction = """
+You are CartPilot's AI Customer Intent & Resolution Classifier.
+A customer is messaging regarding an existing shopping cart or order.
+Analyze the customer's natural language message and classify their core intent into one of the following:
+
+1. 'CANCEL_ORDER': Customer explicitly wants to cancel an in-progress or placed order before fulfillment.
+2. 'REQUEST_REFUND': Customer is seeking financial refund/reversal.
+3. 'RETURN_ITEM': Customer wants to return a physical item they received.
+4. 'REPORT_DAMAGED_ITEM': Customer is reporting broken, defective, or incorrect items.
+5. 'ASK_REFUND_POLICY': Customer is asking a general policy or informational question (e.g. "What is your refund policy?", "How many days for return?").
+6. 'CHECK_REFUND_STATUS': Customer is asking about the status of an existing refund or tracking progress.
+7. 'DISPUTE_CHARGE': Customer is escalating an unauthorized or disputed charge.
+
+Extract the specific reason, any requested partial refund amount in paise (1 INR = 100 paise), the item scope, and a polite 1-sentence customer explanation.
+Do NOT make financial approval decisions.
+"""
+    prompt_text = f"CUSTOMER MESSAGE:\n{natural_language_request}"
+    if order_state:
+        prompt_text += f"\n\nCONTEXTUAL ORDER METADATA:\n{json.dumps(order_state, indent=2)}"
+
+    data = generate_structured(
+        prompt=prompt_text,
+        schema=CustomerResolutionIntent,
+        system_prompt=system_instruction
+    )
+    return data
+
 
 def decide_resolution(natural_language_request: str, order_state: dict) -> dict:
     """
-    Determines what action to take (e.g. cancel, escalate) based on the user's request and order state using OpenAI or Gemini.
+    Backward-compatible wrapper:
+    1. Classifies intent via AI.
+    2. Returns legacy action dictionary with rich intent attributes.
     """
-    from backend.engine.llm import generate_structured
+    intent_obj = classify_customer_intent(natural_language_request, order_state)
     
-    system_instruction = f"""
-    You are the Autonomous AI Resolution & Refund Agent for CartPilot.
-    A customer is contacting you regarding an existing order.
-    
-    Here is the exact live order state from the database:
-    {json.dumps(order_state, indent=2)}
-    
-    Decision Rules:
-    1. 'cancel':
-       - Choose 'cancel' whenever the user wants to cancel the order, request a refund, or reverse their purchase (e.g. "I would like to cancel my order and request a refund", "cancel order", "please refund").
-       - If `cart.reversible` is 1 (or true) AND `payment.status` is 'succeeded' AND `payment.recovery_action` is not 'refunded', this order is 100% ELIGIBLE for instant cancellation and automated refund. You MUST select 'cancel'.
-    
-    2. 'escalate':
-       - Choose 'escalate' ONLY if the order is no longer reversible (`cart.reversible` is 0), already refunded, or involves an unresolvable fraud/technical dispute.
-    
-    3. 'inform':
-       - Choose 'inform' ONLY if the user is asking a general question (e.g. "what is your refund policy?") without requesting an actual order cancellation or refund.
-    
-    4. Reason:
-       - Provide a concise 1-sentence confirmation (e.g. "Your cancellation request has been verified against merchant policy and approved for immediate Razorpay refund.").
-    """
-    
-    data = generate_structured(
-        prompt=natural_language_request,
-        schema=ResolutionDecision,
-        system_prompt=system_instruction
-    )
-    return data.model_dump()
+    if intent_obj.intent in ["CANCEL_ORDER", "REQUEST_REFUND"]:
+        action = "cancel"
+    elif intent_obj.intent in ["ASK_REFUND_POLICY", "CHECK_REFUND_STATUS"]:
+        action = "inform"
+    else:
+        action = "escalate"
+
+    return {
+        "action": action,
+        "reason": intent_obj.explanation or intent_obj.reason,
+        "intent": intent_obj.intent,
+        "requested_amount_paise": intent_obj.requested_amount_paise,
+        "item_scope": intent_obj.item_scope
+    }

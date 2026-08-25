@@ -124,12 +124,14 @@ def calculate_inventory_velocity_metrics(cursor) -> dict[str, Any]:
     """
     now = datetime.utcnow()
 
-    # 1. Fetch settled orders with cart item arrays
+    # 1. Fetch settled orders with cart item arrays (excluding cancelled and refunded orders)
     cursor.execute("""
         SELECT pm.id, pm.cart_id, pm.created_at, cm.items
         FROM payment_mandates pm
         JOIN cart_mandates cm ON pm.cart_id = cm.id
         WHERE pm.status = 'succeeded'
+          AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+          AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
     """)
     succeeded_orders = cursor.fetchall()
 
@@ -814,12 +816,15 @@ def evaluate_active_promotion_experiments(cursor) -> list[dict[str, Any]]:
 
         elapsed_days = max(1, (now - start_dt).days)
 
-        # 1. Query treatment orders completed since experiment started
+        # 1. Query treatment orders completed since experiment started (excluding cancelled/refunded)
         cursor.execute("""
             SELECT pm.id, pm.created_at, cm.items
             FROM payment_mandates pm
             JOIN cart_mandates cm ON pm.cart_id = cm.id
-            WHERE pm.status = 'succeeded' AND pm.created_at >= ?
+            WHERE pm.status = 'succeeded' 
+              AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+              AND pm.created_at >= ?
         """, (started_at_str,))
         recent_orders = cursor.fetchall()
 
@@ -2024,18 +2029,37 @@ def get_growth_metrics() -> dict:
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # 1. Total realized store revenue from succeeded payments
-        cursor.execute("SELECT COUNT(*), SUM(amount_paise) FROM payment_mandates WHERE status = 'succeeded'")
+        # 1. Total realized store revenue from succeeded payments (excluding refunded/cancelled, net of partial refunds)
+        cursor.execute("""
+            SELECT COUNT(*), 
+                   SUM(CASE 
+                       WHEN COALESCE(pm.refund_status, 'NONE') = 'REFUNDED' OR COALESCE(cm.order_status, 'CREATED') = 'CANCELLED' THEN 0
+                       WHEN COALESCE(pm.refund_status, 'NONE') = 'PARTIALLY_REFUNDED' THEN MAX(0, pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0))
+                       ELSE pm.amount_paise 
+                   END)
+            FROM payment_mandates pm
+            JOIN cart_mandates cm ON pm.cart_id = cm.id
+            WHERE pm.status = 'succeeded'
+              AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+        """)
         pay_count, total_rev_paise = cursor.fetchone()
         total_rev_paise = total_rev_paise or 0
         pay_count = pay_count or 0
 
-        # 2. Observed AI revenue by type from growth_outcomes (strictly paid/settled transactions)
+        # 2. Observed AI revenue by type from growth_outcomes (strictly paid/settled transactions on active non-refunded/non-cancelled orders)
         cursor.execute("""
-            SELECT revenue_type, SUM(incremental_paise), COUNT(*)
-            FROM growth_outcomes
-            WHERE outcome_type = 'paid'
-            GROUP BY revenue_type
+            SELECT g.revenue_type, SUM(g.incremental_paise), COUNT(*)
+            FROM growth_outcomes g
+            WHERE g.outcome_type = 'paid'
+              AND g.incremental_paise > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM payment_mandates pm
+                  JOIN cart_mandates cm ON pm.cart_id = cm.id
+                  WHERE (g.id = 'go_paid_' || pm.id OR g.id = 'go_recov_' || pm.id OR g.action_id = pm.id OR (g.id LIKE 'go_xs_%' AND g.action_id = cm.id))
+                    AND (COALESCE(pm.refund_status, 'NONE') = 'REFUNDED' OR COALESCE(cm.order_status, 'CREATED') = 'CANCELLED')
+              )
+            GROUP BY g.revenue_type
         """)
         outcomes_by_type = {row["revenue_type"]: {"paise": row[1] or 0, "count": row[2]} for row in cursor.fetchall()}
 
@@ -2075,8 +2099,19 @@ def get_growth_metrics() -> dict:
         spend_cap_paise = pol_row["spend_cap_paise"] if pol_row else 1000000
         autonomy_thresh_paise = pol_row["autonomy_threshold_paise"] if pol_row else 250000
 
-        # 9. Gross recovered cash (100% face value of settled recovery orders)
-        cursor.execute("SELECT SUM(amount_paise) FROM payment_mandates WHERE status = 'succeeded' AND recovery_action = 'recovery_link_sent'")
+        # 9. Gross recovered cash (face value of settled recovery orders, excluding refunded/cancelled)
+        cursor.execute("""
+            SELECT SUM(CASE 
+                       WHEN COALESCE(pm.refund_status, 'NONE') = 'PARTIALLY_REFUNDED' THEN MAX(0, pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0))
+                       ELSE pm.amount_paise 
+                   END)
+            FROM payment_mandates pm
+            JOIN cart_mandates cm ON pm.cart_id = cm.id
+            WHERE pm.status = 'succeeded' 
+              AND pm.recovery_action = 'recovery_link_sent'
+              AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+        """)
         gross_recov_paise = cursor.fetchone()[0] or 0
 
         opps = detect_all_opportunities()
@@ -2155,9 +2190,15 @@ def get_agent_performance_stats() -> dict:
         xs_accepted = row_xs["accepted_offers"] or 0
 
         cursor.execute("""
-            SELECT SUM(incremental_paise)
-            FROM growth_outcomes
-            WHERE outcome_type = 'paid' AND revenue_type = 'cross_sell'
+            SELECT SUM(g.incremental_paise)
+            FROM growth_outcomes g
+            WHERE g.outcome_type = 'paid' AND g.revenue_type = 'cross_sell' AND g.incremental_paise > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM payment_mandates pm
+                  JOIN cart_mandates cm ON pm.cart_id = cm.id
+                  WHERE (g.id = 'go_paid_' || pm.id OR g.action_id = pm.id OR (g.id LIKE 'go_xs_%' AND g.action_id = cm.id))
+                    AND (COALESCE(pm.refund_status, 'NONE') = 'REFUNDED' OR COALESCE(cm.order_status, 'CREATED') = 'CANCELLED')
+              )
         """)
         xs_inc_paise = cursor.fetchone()[0] or 0
         xs_rate = round(xs_accepted / xs_offers, 3) if xs_offers > 0 else 0.0
@@ -2165,13 +2206,14 @@ def get_agent_performance_stats() -> dict:
         cursor.execute("SELECT COUNT(*) FROM basket_pairs WHERE source = 'data_verified' AND (retired IS NULL OR retired = 0)")
         active_rules_count = cursor.fetchone()[0] or 0
 
-        # Recovery empirical stats
+        # Recovery empirical stats (excluding refunded and cancelled orders)
         cursor.execute("""
             SELECT COUNT(*) as attempts,
-                   SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) as recovered,
-                   SUM(CASE WHEN status = 'succeeded' THEN amount_paise ELSE 0 END) as recov_paise
-            FROM payment_mandates
-            WHERE recovery_action = 'recovery_link_sent'
+                   SUM(CASE WHEN pm.status = 'succeeded' AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED' AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED' THEN 1 ELSE 0 END) as recovered,
+                   SUM(CASE WHEN pm.status = 'succeeded' AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED' AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED' THEN pm.amount_paise ELSE 0 END) as recov_paise
+            FROM payment_mandates pm
+            JOIN cart_mandates cm ON pm.cart_id = cm.id
+            WHERE pm.recovery_action = 'recovery_link_sent'
         """)
         row_rec = cursor.fetchone()
         rec_attempts = row_rec["attempts"] or 0
@@ -2180,9 +2222,15 @@ def get_agent_performance_stats() -> dict:
         rec_rate = round(rec_recovered / rec_attempts, 3) if rec_attempts > 0 else None
 
         cursor.execute("""
-            SELECT SUM(incremental_paise)
-            FROM growth_outcomes
-            WHERE outcome_type = 'paid' AND revenue_type = 'recovery'
+            SELECT SUM(g.incremental_paise)
+            FROM growth_outcomes g
+            WHERE g.outcome_type = 'paid' AND g.revenue_type = 'recovery' AND g.incremental_paise > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM payment_mandates pm
+                  JOIN cart_mandates cm ON pm.cart_id = cm.id
+                  WHERE (g.id = 'go_recov_' || pm.id OR g.action_id = pm.id)
+                    AND (COALESCE(pm.refund_status, 'NONE') = 'REFUNDED' OR COALESCE(cm.order_status, 'CREATED') = 'CANCELLED')
+              )
         """)
         rec_inc_paise = cursor.fetchone()[0] or 0
 

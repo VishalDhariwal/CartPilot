@@ -1,6 +1,53 @@
 import json
 from backend.db import get_db
 
+def is_category_allowed(category: str, allowed_categories: list) -> bool:
+    """
+    Checks if a product category is permitted under the active policy.
+    Supports normalized string matching (e.g. 'skin-care' == 'skincare'),
+    prefix/hierarchical matching ('clothing' covers 'mens-shirts', 'womens-dresses'),
+    and wildcards.
+    """
+    if not category:
+        return False
+    if category == "restricted_items":
+        return False
+    if "*" in allowed_categories or "all" in allowed_categories:
+        return True
+    if category in allowed_categories:
+        return True
+
+    def normalize(c: str) -> str:
+        return c.lower().replace("-", "").replace("_", "").replace(" ", "")
+
+    norm_cat = normalize(category)
+    norm_allowed = [normalize(a) for a in allowed_categories]
+
+    if norm_cat in norm_allowed:
+        return True
+
+    # Substring / hierarchical containment
+    for a, na in zip(allowed_categories, norm_allowed):
+        if na in norm_cat or norm_cat in na:
+            return True
+
+    # Semantic category hierarchy
+    category_synonyms = {
+        "skincare": ["skincare", "skin-care", "beauty", "cosmetics"],
+        "clothing": ["clothing", "mens-shirts", "womens-dresses", "tops", "mens-shoes", "womens-shoes", "shoes"],
+        "home": ["home", "home-decoration", "kitchen-accessories", "furniture"],
+        "sports": ["sports", "sports-accessories"],
+        "accessories": ["accessories", "mobile-accessories", "sports-accessories", "sunglasses", "womens-jewellery", "womens-bags", "mens-watches", "womens-watches"],
+        "electronics": ["electronics", "laptops", "smartphones", "tablets", "mobile-accessories"],
+    }
+    for parent, children in category_synonyms.items():
+        if normalize(parent) in norm_allowed:
+            if any(normalize(ch) == norm_cat for ch in children):
+                return True
+
+    return False
+
+
 def validate_cart(intent_id: str, items: list, total_paise: int) -> dict:
     """
     Validates the proposed cart against the global policy configuration.
@@ -49,12 +96,13 @@ def validate_cart(intent_id: str, items: list, total_paise: int) -> dict:
                     "reason": f"SKU {item['sku']} not found in catalog.",
                     "reversible": True
                 }
-            if cat_row["category"] not in allowed_categories:
+            if not is_category_allowed(cat_row["category"], allowed_categories):
                 return {
                     "status": "blocked",
                     "reason": f"SKU {item['sku']} is in category '{cat_row['category']}' which is not allowed by active merchant policy.",
                     "reversible": True
                 }
+
                 
         # 3. Check Autonomy Threshold (Reserve Pay Spending-Limit Pattern)
         if total_paise >= autonomy_threshold_paise:
