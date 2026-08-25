@@ -2,8 +2,12 @@ from fastapi import APIRouter, Request, HTTPException
 import razorpay
 from backend.integrations.razorpay_client import verify_webhook_signature
 from backend.engine.mandates import update_payment_mandate_status
+from backend.shared.queue.service_bus import publish_event
 
 router = APIRouter()
+
+# In-memory deduplication set for fast idempotency check
+_processed_event_ids = set()
 
 @router.post("/razorpay")
 async def razorpay_webhook(request: Request):
@@ -24,6 +28,23 @@ async def razorpay_webhook(request: Request):
 
     payload = await request.json()
     event = payload.get("event")
+    event_id = payload.get("account_id", "") + "_" + str(payload.get("created_at", "")) + "_" + str(event)
+
+    # Provider Event Idempotency Check
+    if event_id in _processed_event_ids:
+        print(f"ℹ️ Duplicate webhook event ignored: {event_id}")
+        return {"status": "ok", "detail": "idempotent_duplicate"}
+
+    _processed_event_ids.add(event_id)
+    if len(_processed_event_ids) > 10000:
+        _processed_event_ids.clear()
+
+    # Durable Service Bus Event Enqueue
+    publish_event("webhook-events", {
+        "event_type": event,
+        "event_id": event_id,
+        "payload": payload
+    })
 
     if event in ["payment.captured", "payment.failed", "payment_link.paid", "order.paid"]:
         payment_entity = payload.get('payload', {}).get('payment', {}).get('entity', {})
@@ -39,6 +60,13 @@ async def razorpay_webhook(request: Request):
 
         if event in ["payment.captured", "payment_link.paid", "order.paid"]:
             print(f"✅ Webhook Event: {event} for order {target_order_id} / cart {cart_id}")
+            publish_event("order-paid", {
+                "event_type": "order.paid",
+                "order_id": target_order_id,
+                "cart_id": cart_id,
+                "payment_id": payment_id,
+                "amount_paise": payment_entity.get("amount", 0)
+            })
             update_payment_mandate_status(
                 razorpay_order_id=target_order_id,
                 cart_id=cart_id,
