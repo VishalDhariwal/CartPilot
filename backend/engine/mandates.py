@@ -202,11 +202,15 @@ def get_cart_state(cart_id: str) -> dict:
 
         cursor.execute("SELECT * FROM payment_mandates WHERE cart_id = ?", (cart_id,))
         payment = cursor.fetchone()
+
+        cursor.execute("SELECT * FROM refunds WHERE cart_id = ? ORDER BY created_at ASC", (cart_id,))
+        refunds = [dict(r) for r in cursor.fetchall()]
         
         return {
             "intent": dict(intent) if intent else None,
             "cart": dict(cart),
-            "payment": dict(payment) if payment else None
+            "payment": dict(payment) if payment else None,
+            "refunds": refunds
         }
     finally:
         conn.close()
@@ -232,55 +236,22 @@ def append_audit_log(ref_type: str, ref_id: str, event_name: str, detail: str):
     finally:
         conn.close()
 
-def execute_refund(cart_id: str) -> dict:
+def execute_refund(cart_id: str, requested_amount_paise: int = None, reason: str = "Customer request") -> dict:
     """
-    Validates state and executes the Razorpay refund, then updates DB.
+    Authoritatively delegates cancellation & refund execution to the deterministic Resolution Engine.
     """
-    from backend.integrations.razorpay_client import refund_payment
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        # Get current state
-        state = get_cart_state(cart_id)
-        if not state or not state["payment"]:
-            raise ValueError("Cart or Payment Mandate not found")
-            
-        cart = state["cart"]
-        payment = state["payment"]
-        
-        if not cart["reversible"]:
-            raise ValueError("Cart is no longer reversible")
-            
-        if payment["status"] != "succeeded" or not payment["razorpay_payment_id"]:
-            raise ValueError("Payment is not in a refundable state (must be succeeded with a payment ID)")
-            
-        if payment["recovery_action"] == "refunded":
-            raise ValueError("Payment is already refunded")
-            
-        # Call Razorpay
-        refund_response = refund_payment(payment["razorpay_payment_id"], payment["amount_paise"])
-        
-        # Update Database
-        updated_at = datetime.utcnow().isoformat() + "Z"
-        
-        # 1. Update Payment Mandate
-        cursor.execute(
-            "UPDATE payment_mandates SET recovery_action = ?, updated_at = ? WHERE id = ?",
-            ("refunded", updated_at, payment["id"])
-        )
-        
-        # 2. Update Cart Mandate
-        cursor.execute(
-            "UPDATE cart_mandates SET reversible = 0 WHERE id = ?",
-            (cart["id"],)
-        )
-        
-        # 3. Log it
-        create_audit_log(cursor, "payment", payment["id"], "Payment Refunded", f"Refund ID: {refund_response.get('id')} for {payment['amount_paise']} paise")
-        create_audit_log(cursor, "cart", cart["id"], "Cart Cancelled", "Reversible flipped to false due to refund")
-        
-        conn.commit()
-        return refund_response
-    finally:
-        conn.close()
+    from backend.engine.resolution_engine import create_and_execute_refund
+    result = create_and_execute_refund(cart_id, requested_amount_paise, reason)
+    if result.get("status") in ["denied", "failed"]:
+        raise ValueError(result.get("reason", "Refund operation not authorized or failed."))
+    return {
+        "id": result.get("refund_id"),
+        "status": result.get("refund_status") or result.get("status"),
+        "order_status": result.get("order_status"),
+        "cancellation_status": result.get("cancellation_status"),
+        "fulfillment_status": result.get("fulfillment_status"),
+        "return_status": result.get("return_status"),
+        "refund_status": result.get("refund_status"),
+        "amount": result.get("amount_refunded_paise"),
+        "reason": result.get("reason")
+    }

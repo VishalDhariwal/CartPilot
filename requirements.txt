@@ -23,3 +23,7 @@ requests>=2.31.0
 # Model Context Protocol (MCP) Server
 fastmcp>=0.1.0
 mcp>=1.0.0
+
+# Agent Orchestration (Stateful Multi-Turn Buyer Graph)
+langgraph>=0.2.0
+langchain-core>=0.3.0

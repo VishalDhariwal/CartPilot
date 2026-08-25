@@ -303,7 +303,7 @@ def get_cart_status(cart_id: str):
 def get_upsell_stats():
     """
     Upsell conversion metrics for the Growth Metrics card.
-    Reads from upsell_events table and audit_log for comprehensive measurement.
+    Calculates verified incremental lift from growth_outcomes and active upsell events.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -311,33 +311,52 @@ def get_upsell_stats():
         cursor.execute("SELECT COUNT(*) FROM intent_mandates")
         total_orders = cursor.fetchone()[0] or 1
 
-        cursor.execute("SELECT COUNT(DISTINCT cart_id) FROM upsell_events WHERE accepted = 1")
+        cursor.execute("""
+            SELECT COUNT(DISTINCT u.cart_id) 
+            FROM upsell_events u
+            JOIN cart_mandates cm ON u.cart_id = cm.id
+            JOIN payment_mandates pm ON u.cart_id = pm.cart_id
+            WHERE u.accepted = 1 
+              AND pm.status = 'succeeded'
+              AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+        """)
         orders_with_upsell = cursor.fetchone()[0] or 0
 
         cursor.execute("SELECT COUNT(*) FROM upsell_events")
-        total_offered_raw = cursor.fetchone()[0]
+        total_offered_raw = cursor.fetchone()[0] or 0
 
-        cursor.execute("SELECT COUNT(*) FROM upsell_events WHERE accepted = 1")
-        total_accepted_raw = cursor.fetchone()[0]
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM upsell_events u
+            JOIN cart_mandates cm ON u.cart_id = cm.id
+            JOIN payment_mandates pm ON u.cart_id = pm.cart_id
+            WHERE u.accepted = 1 
+              AND pm.status = 'succeeded'
+              AND COALESCE(pm.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(cm.order_status, 'CREATED') != 'CANCELLED'
+        """)
+        total_accepted = cursor.fetchone()[0] or 0
 
-        cursor.execute("SELECT SUM(cart_total_after_paise - cart_total_before_paise) FROM upsell_events WHERE accepted = 1")
-        sum_lift_row = cursor.fetchone()[0]
-        total_lift_paise = sum_lift_row if sum_lift_row else 0
+        # Verified incremental cross-sell revenue from growth_outcomes
+        cursor.execute("""
+            SELECT COALESCE(SUM(g.incremental_paise), 0)
+            FROM growth_outcomes g
+            WHERE g.outcome_type = 'paid' 
+              AND g.revenue_type = 'cross_sell' 
+              AND g.incremental_paise > 0
+              AND NOT EXISTS (
+                  SELECT 1 FROM payment_mandates pm
+                  JOIN cart_mandates cm ON pm.cart_id = cm.id
+                  WHERE (g.id = 'go_paid_' || pm.id OR g.action_id = pm.id OR (g.id LIKE 'go_xs_%' AND g.action_id = cm.id))
+                    AND (COALESCE(pm.refund_status, 'NONE') = 'REFUNDED' OR COALESCE(cm.order_status, 'CREATED') = 'CANCELLED')
+              )
+        """)
+        total_lift_paise = cursor.fetchone()[0] or 0
 
-        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE event IN ('Upsell Accepted', 'Post-Purchase Add-on Created', 'Substitute Accepted')")
-        audit_accepted_count = cursor.fetchone()[0]
-
-        total_accepted = max(total_accepted_raw, audit_accepted_count)
-
-        cursor.execute("SELECT COUNT(*) FROM audit_log WHERE event = 'Upsell Offered'")
-        audit_offered_count = cursor.fetchone()[0]
-        total_offered = max(total_offered_raw, audit_offered_count, total_accepted)
-
-        if total_lift_paise == 0 and total_accepted > 0:
-            total_lift_paise = total_accepted * 22500
-
+        total_offered = max(total_offered_raw, total_accepted)
         total_revenue_lift_rupees = round(total_lift_paise / 100, 2)
-        conversion_rate = round((total_accepted / total_orders * 100), 1)
+        conversion_rate = round((total_accepted / total_orders * 100), 1) if total_orders > 0 else 0.0
         avg_uplift_rupees = round((total_lift_paise / total_accepted) / 100, 2) if total_accepted > 0 else 0.0
 
         return {

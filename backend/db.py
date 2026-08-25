@@ -60,7 +60,11 @@ def init_db():
       total_paise INTEGER NOT NULL,
       status TEXT NOT NULL,
       reason TEXT NOT NULL,
-      reversible INTEGER NOT NULL,
+      reversible INTEGER NOT NULL DEFAULT 1,
+      order_status TEXT NOT NULL DEFAULT 'CREATED',
+      cancellation_status TEXT NOT NULL DEFAULT 'NONE',
+      fulfillment_status TEXT NOT NULL DEFAULT 'UNFULFILLED',
+      return_status TEXT NOT NULL DEFAULT 'NONE',
       created_at TEXT NOT NULL
     );
 
@@ -73,8 +77,25 @@ def init_db():
       status TEXT NOT NULL,
       failure_reason TEXT,
       recovery_action TEXT,
+      refund_status TEXT NOT NULL DEFAULT 'NONE',
+      refund_amount_paise INTEGER NOT NULL DEFAULT 0,
+      refunded_amount_paise INTEGER NOT NULL DEFAULT 0,
+      razorpay_refund_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS refunds (
+      id TEXT PRIMARY KEY,
+      payment_id TEXT NOT NULL REFERENCES payment_mandates(id),
+      cart_id TEXT NOT NULL REFERENCES cart_mandates(id),
+      requested_amount_paise INTEGER NOT NULL,
+      processed_amount_paise INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'REFUND_REQUESTED',
+      razorpay_refund_id TEXT,
+      reason TEXT,
+      created_at TEXT NOT NULL,
+      processed_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS audit_log (
@@ -268,6 +289,14 @@ def init_db():
         ("promotion_experiments", "early_killed", "INTEGER DEFAULT 0"),
         ("promotion_experiments", "early_kill_reason", "TEXT"),
         ("promotion_experiments", "merchant_decision", "TEXT DEFAULT 'PENDING'"),
+        ("cart_mandates", "order_status", "TEXT NOT NULL DEFAULT 'CREATED'"),
+        ("cart_mandates", "cancellation_status", "TEXT NOT NULL DEFAULT 'NONE'"),
+        ("cart_mandates", "fulfillment_status", "TEXT NOT NULL DEFAULT 'UNFULFILLED'"),
+        ("cart_mandates", "return_status", "TEXT NOT NULL DEFAULT 'NONE'"),
+        ("payment_mandates", "refund_status", "TEXT NOT NULL DEFAULT 'NONE'"),
+        ("payment_mandates", "refund_amount_paise", "INTEGER NOT NULL DEFAULT 0"),
+        ("payment_mandates", "refunded_amount_paise", "INTEGER NOT NULL DEFAULT 0"),
+        ("payment_mandates", "razorpay_refund_id", "TEXT"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
@@ -290,7 +319,9 @@ def init_db():
             JOIN cart_mandates c ON p.cart_id = c.id
             JOIN upsell_events u ON p.cart_id = u.cart_id AND u.accepted = 1
             WHERE p.status = 'succeeded' 
-              AND (p.recovery_action IS NULL OR p.recovery_action != 'recovery_link_sent')
+              AND COALESCE(p.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(c.order_status, 'CREATED') != 'CANCELLED'
+              AND (p.recovery_action IS NULL OR p.recovery_action NOT IN ('recovery_link_sent', 'refunded'))
             GROUP BY p.id, p.cart_id, p.amount_paise, c.total_paise, p.created_at
         """)
         for row in cursor.fetchall():
@@ -300,7 +331,7 @@ def init_db():
                 VALUES (?, ?, 'paid', ?, ?, ?, 'cross_sell', ?)
             """, (f"go_paid_{row['pay_id']}", None, row["base_cart_paise"], row["paid_paise"], incremental, row["created_at"]))
 
-        # Also sync settled recovery orders with 60% attribution factor on idle carts
+        # Also sync settled recovery orders with 60% attribution factor on idle carts (excluding refunded/cancelled)
         cursor.execute("SELECT recovery_attribution_percent, recovery_idle_threshold_minutes FROM policy_config WHERE id = 1")
         pol_row = cursor.fetchone()
         rec_factor = (pol_row["recovery_attribution_percent"] if pol_row and pol_row["recovery_attribution_percent"] is not None else 60) / 100.0
@@ -310,7 +341,10 @@ def init_db():
             SELECT p.id as pay_id, p.amount_paise, p.created_at, p.updated_at, c.created_at as cart_created_at
             FROM payment_mandates p
             JOIN cart_mandates c ON p.cart_id = c.id
-            WHERE p.status = 'succeeded' AND p.recovery_action = 'recovery_link_sent'
+            WHERE p.status = 'succeeded' 
+              AND p.recovery_action = 'recovery_link_sent'
+              AND COALESCE(p.refund_status, 'NONE') != 'REFUNDED'
+              AND COALESCE(c.order_status, 'CREATED') != 'CANCELLED'
         """)
         for rrow in cursor.fetchall():
             # Check idle eligibility
@@ -414,8 +448,8 @@ def init_db():
         "FIT-ELE-0711",   # Headphones Vintage  — electronics, ₹636
         "HOM-FAS-0181",   # Belt Essential 615  — fashion, ₹224
     ]
-    for sku in boosted_skus:
-        cursor.execute("UPDATE catalog SET boosted = 1 WHERE sku = ?", (sku,))
+    placeholders = ",".join("?" for _ in boosted_skus)
+    cursor.execute(f"UPDATE catalog SET boosted = 1 WHERE sku IN ({placeholders})", boosted_skus)
 
     conn.commit()
     conn.close()

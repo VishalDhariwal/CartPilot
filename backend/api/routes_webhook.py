@@ -63,4 +63,16 @@ async def razorpay_webhook(request: Request):
                 recovery_action=recommendation
             )
 
+    elif event in ["refund.processed", "refund.created", "refund.failed", "refund.speed_changed"]:
+        refund_entity = payload.get('payload', {}).get('refund', {}).get('entity', {})
+        refund_id = refund_entity.get('id')
+        print(f"🔄 Webhook Event: {event} for refund {refund_id}")
+        
+        from backend.engine.resolution_engine import settle_refund_webhook
+        settle_refund_webhook(
+            razorpay_refund_id=refund_id,
+            event_type=event,
+            refund_entity=refund_entity
+        )
+
     return {"status": "ok"}

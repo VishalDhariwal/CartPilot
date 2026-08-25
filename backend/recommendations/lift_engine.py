@@ -22,10 +22,10 @@ class CategoryPriorsResponse(BaseModel):
 # Complementary category affinity map to ensure rich, cross-category candidate pools
 COMPLEMENTARY_CATEGORY_MAP = {
     "motorcycle": ["sunglasses", "mobile-accessories", "sports-accessories", "mens-watches", "mens-shoes"],
-    "smartphones": ["mobile-accessories", "laptops", "tablets", "sports-accessories"],
+    "smartphones": ["mobile-accessories", "laptops", "tablets"],
     "laptops": ["mobile-accessories", "tablets", "smartphones"],
     "tablets": ["mobile-accessories", "laptops", "smartphones"],
-    "mobile-accessories": ["smartphones", "laptops", "tablets", "sports-accessories"],
+    "mobile-accessories": ["smartphones", "laptops", "tablets"],
     "beauty": ["skin-care", "fragrances", "sunglasses", "womens-jewellery"],
     "skin-care": ["beauty", "fragrances", "sunglasses"],
     "fragrances": ["beauty", "skin-care", "mens-watches", "womens-jewellery"],
@@ -42,8 +42,8 @@ COMPLEMENTARY_CATEGORY_MAP = {
     "kitchen-accessories": ["groceries", "home-decoration", "furniture"],
     "furniture": ["home-decoration", "kitchen-accessories"],
     "home-decoration": ["furniture", "kitchen-accessories", "groceries"],
-    "sports-accessories": ["smartphones", "mobile-accessories", "sunglasses", "mens-shoes"],
-    "vehicle": ["mobile-accessories", "sunglasses", "sports-accessories"],
+    "sports-accessories": ["sunglasses", "mens-shoes"],
+    "vehicle": ["mobile-accessories", "sunglasses"],
 }
 
 
@@ -510,6 +510,19 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
     except Exception as e:
         print(f"⚠️ Live category candidate lookup skipped: {e}")
 
+    # Fetch active policy allowed_categories to guarantee recommended candidates never violate guardrails
+    allowed_categories = []
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT allowed_categories FROM policy_config WHERE id = 1")
+        p_row = cursor.fetchone()
+        if p_row and p_row["allowed_categories"]:
+            allowed_categories = json.loads(p_row["allowed_categories"])
+        conn.close()
+    except Exception:
+        pass
+
     # Sort candidates by tier priority first (3 -> 2 -> 1), then by final_score (boosted items rise)
     sorted_candidates = sorted(
         candidates_by_sku.values(),
@@ -517,8 +530,17 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
         reverse=True
     )
 
+    # Filter strictly by active merchant policy categories
+    if allowed_categories:
+        from backend.engine.guardrail import is_category_allowed
+        sorted_candidates = [
+            cand for cand in sorted_candidates
+            if is_category_allowed(cand.get("category", ""), allowed_categories)
+        ]
+
     # Clean up internal sorting helper before returning
     for cand in sorted_candidates:
         cand.pop("_tier_priority", None)
 
     return sorted_candidates[:top_k]
+

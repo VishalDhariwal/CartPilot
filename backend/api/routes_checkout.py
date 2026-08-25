@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import json
+import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -53,6 +54,7 @@ class AcceptSubstituteRequest(BaseModel):
 class CartItemInput(BaseModel):
     sku: str
     qty: int
+    selected_size: Optional[str] = None
 
 class UpdateCartRequest(BaseModel):
     cart_id: str
@@ -94,141 +96,76 @@ def _record_upsell_event(cart_id: str, suggested_sku: str, accepted: bool,
 @router.post("/agent-checkout")
 def agent_checkout(req: AgentCheckoutRequest):
     """
-    Full agent checkout pipeline:
-      1. Buyer Agent parses NL request with conversation history & active cart → structured cart
-      2. OOS detection → Substitution Agent (if needed) — returned before guardrail
-      3. Guardrail Engine validates cart
-      4. Growth Agent cross-sell (post-guardrail, pre-Razorpay)
+    Full LangGraph-powered agent checkout pipeline:
+      1. LangGraph AI Buyer Orchestrator executes intent understanding, catalog search,
+         budget self-correction (up to 3 revisions), guardrail validation, and 4-tier recommendations.
+      2. Returns structured cart, intent, recommendations, and execution decision trace.
     """
     try:
-        # ── Step 1: Buyer Agent with Memory ──────────────────────────────
+        from backend.agents.buyer_graph import run_buyer_journey
         history_dicts = [m.model_dump() for m in req.conversation_history] if req.conversation_history else None
-        agent_output = generate_cart_proposal(
-            natural_language_request=req.query,
-            custom_spend_cap_paise=req.spend_cap_paise,
+
+        # Execute LangGraph Buyer Journey
+        state = run_buyer_journey(
+            query=req.query,
+            spend_cap_paise=req.spend_cap_paise,
             conversation_history=history_dicts,
-            current_cart=req.current_cart
+            auto_authorize=False
         )
 
+        intent_obj = {
+            "id": state.get("intent_id") or "intent_unknown",
+            "goal": state.get("goal") or req.query,
+            "spend_cap_paise": state.get("spend_cap_paise") or 1000000
+        }
 
-        # ── Step 2: Create Intent Mandate ────────────────────────────────
-        intent = create_intent_mandate(
-            raw_request=req.query,
-            goal=agent_output["goal"],
-            spend_cap_paise=agent_output["spend_cap_paise"]
-        )
-
-
-        proposed_items = agent_output["proposed_items"]
-        oos_items = agent_output.get("oos_items", [])
-        total_paise = sum(item["price_paise"] * item["qty"] for item in proposed_items)
-
-        # ── Step 3: OOS / Substitution check ────────────────────────────
-        # If any items are OOS, pause and offer a substitute before guardrail.
-        if oos_items:
-            oos_item = oos_items[0]  # Handle one at a time
-            budget_remaining = agent_output["spend_cap_paise"] - total_paise
-            substitute = find_substitute(oos_item, budget_remaining)
-
-            if substitute:
-                append_audit_log(
-                    "substitution", intent["id"], "Substitution Offered",
-                    f"OOS: {oos_item['sku']} — Substitute: {substitute['sku']} ({substitute['name']}) "
-                    f"at ₹{substitute['price_paise']/100:.0f}. Reason: {substitute['reason']}"
-                )
-                return {
-                    "status": "substitute_offered",
-                    "intent_id": intent["id"],
-                    "intent": {"id": intent["id"], "goal": intent["goal"],
-                               "spend_cap_paise": intent["spend_cap_paise"]},
-                    "oos_item": {
-                        "sku": oos_item["sku"],
-                        "name": oos_item.get("name", oos_item["sku"])
-                    },
-                    "substitute": substitute,
-                    "remaining_items": proposed_items,          # items excluding the OOS one
-                    "total_paise_without_oos": total_paise,
-                }
-            else:
-                # No substitute found — drop OOS item and proceed
-                append_audit_log(
-                    "intent", intent["id"], "OOS Item Dropped",
-                    f"SKU {oos_item['sku']} is OOS and no substitute was found. Proceeding without it."
-                )
-
-        # ── Step 4: Guardrail Check ──────────────────────────────────────
-        if not proposed_items:
+        # Handle Guardrail Blocked
+        if state.get("guardrail_status") == "blocked" or not state.get("proposed_items"):
             return {
                 "status": "blocked",
-                "reason": "No valid items found for your request. Please try a different query.",
-                "cart_id": None,
-                "intent": {"id": intent["id"], "goal": intent["goal"],
-                           "spend_cap_paise": intent["spend_cap_paise"]},
-                "proposed_items": [],
-                "total_paise": 0
+                "reason": state.get("guardrail_reason") or "No valid items found matching active merchant policy.",
+                "message": state.get("assistant_message") or state.get("guardrail_reason"),
+                "cart_id": state.get("cart_id"),
+                "intent": intent_obj,
+                "proposed_items": state.get("proposed_items", []),
+                "total_paise": state.get("cart_total_paise", 0),
+                "revision_count": state.get("revision_count", 0),
+                "decision_trace": state.get("decision_trace", [])
             }
 
-        validation_result = validate_cart(intent["id"], proposed_items, total_paise)
-
-        # ── Step 5: Create Cart Mandate ──────────────────────────────────
-        cart = create_cart_mandate(
-            intent_id=intent["id"],
-            items=proposed_items,
-            total_paise=total_paise,
-            status=validation_result["status"],
-            reason=validation_result["reason"],
-            reversible=validation_result["reversible"]
-        )
-
-        if cart["status"] == "blocked":
-            return {
-                "status": "blocked",
-                "reason": cart["reason"],
-                "cart_id": cart["id"],
-                "intent": {"id": intent["id"], "goal": intent["goal"],
-                           "spend_cap_paise": intent["spend_cap_paise"]},
-                "proposed_items": proposed_items,
-                "total_paise": total_paise
+        # Build Upsell / Growth Recommendations
+        recs = state.get("recommendations", [])
+        upsell = None
+        if recs:
+            upsell = {
+                "sku": recs[0]["sku"],
+                "name": recs[0]["name"],
+                "price_paise": recs[0]["price_paise"],
+                "category": recs[0]["category"],
+                "image_url": recs[0].get("image_url", ""),
+                "description": recs[0].get("description", ""),
+                "metadata": recs[0].get("metadata", {}),
+                "reason": recs[0].get("reason", "Frequently purchased together."),
+                "candidates": recs
             }
-
-        # ── Step 6: Growth Agent cross-sell ─────────────────────────────
-        upsell = generate_upsell(proposed_items)
-        if upsell:
-            # Verify the suggested SKU exists and get its name (double-check)
-            conn = get_db()
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT sku, name, price_paise, category FROM catalog WHERE sku = ?",
-                (upsell["sku"],)
-            )
-            row = cursor.fetchone()
-            conn.close()
-
-            if row:
-                upsell["name"] = row["name"]
-                upsell["price_paise"] = row["price_paise"]
-                upsell["category"] = row["category"]
-                append_audit_log(
-                    "upsell", cart["id"], "Upsell Offered",
-                    f"SKU: {upsell['sku']} ({upsell['name']}) — ₹{upsell['price_paise']/100:.0f}. "
-                    f"Reason: {upsell['reason']}"
-                )
-            else:
-                upsell = None
 
         return {
-            "status": "upsell_offered",
-            "cart_id": cart["id"],
-            "intent": {"id": intent["id"], "goal": intent["goal"],
-                       "spend_cap_paise": intent["spend_cap_paise"]},
-            "proposed_items": proposed_items,
-            "total_paise": total_paise,
-            "guardrail_reason": validation_result["reason"],
-            "upsell": upsell
+            "status": "upsell_offered" if upsell else "approved",
+            "cart_id": state.get("cart_id"),
+            "intent": intent_obj,
+            "message": state.get("assistant_message"),
+            "proposed_items": state.get("proposed_items", []),
+            "total_paise": state.get("cart_total_paise", 0),
+            "guardrail_reason": state.get("guardrail_reason"),
+            "upsell": upsell,
+            "revision_count": state.get("revision_count", 0),
+            "buyer_authorization_status": state.get("buyer_authorization_status"),
+            "decision_trace": state.get("decision_trace", [])
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.post("/update-cart")
@@ -273,9 +210,11 @@ def update_cart(req: UpdateCartRequest):
                 "price_paise": row["price_paise"],
                 "qty": item.qty,
                 "category": row["category"],
+                "stock": row["stock"],
                 "image_url": row["image_url"] or "",
                 "description": row["description"] or "",
-                "metadata": meta_obj
+                "metadata": meta_obj,
+                "selected_size": item.selected_size
             })
         conn.close()
 
@@ -790,4 +729,154 @@ def post_purchase_add(req: PostPurchaseAddRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class OrchestratedCheckoutRequest(BaseModel):
+    query: str
+    spend_cap_paise: Optional[int] = None
+    session_id: Optional[str] = None
+    auto_authorize: bool = False
+    conversation_history: Optional[list[ChatHistoryMessage]] = None
+
+
+@router.post("/orchestrated-checkout")
+def orchestrated_checkout(req: OrchestratedCheckoutRequest):
+    """
+    Executes the LangGraph AI Buyer Orchestrator pipeline.
+    Combines multi-step intent understanding, budget self-correction, guardrails,
+    4-tier recommendations, buyer authorization gates, and Razorpay checkout.
+    """
+    try:
+        from backend.agents.buyer_graph import run_buyer_journey
+        history_dicts = [m.model_dump() for m in req.conversation_history] if req.conversation_history else None
+        
+        final_state = run_buyer_journey(
+            query=req.query,
+            spend_cap_paise=req.spend_cap_paise,
+            session_id=req.session_id,
+            auto_authorize=req.auto_authorize,
+            conversation_history=history_dicts
+        )
+        
+        return {
+            "status": final_state.get("guardrail_status"),
+            "buyer_authorization_status": final_state.get("buyer_authorization_status"),
+            "cart_id": final_state.get("cart_id"),
+            "intent_id": final_state.get("intent_id"),
+            "goal": final_state.get("goal"),
+            "spend_cap_paise": final_state.get("spend_cap_paise"),
+            "total_paise": final_state.get("cart_total_paise"),
+            "proposed_items": final_state.get("proposed_items"),
+            "oos_items": final_state.get("oos_items"),
+            "revision_count": final_state.get("revision_count"),
+            "guardrail_reason": final_state.get("guardrail_reason"),
+            "recommendations": final_state.get("recommendations"),
+            "checkout_status": final_state.get("checkout_status"),
+            "payment_status": final_state.get("payment_status"),
+            "razorpay_order_id": final_state.get("razorpay_order_id"),
+            "payment_link_url": final_state.get("payment_link_url"),
+            "payment_url": final_state.get("payment_link_url"),
+            "recovery_state": final_state.get("recovery_state"),
+            "decision_trace": final_state.get("decision_trace")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Dynamic LLM Demand-Driven Starter Prompts ──────────────────────────────
+_TRENDING_PROMPTS_CACHE = {
+    "timestamp": 0,
+    "data": []
+}
+
+class TrendingPromptItem(BaseModel):
+    emoji: str
+    category: str
+    prompt: str
+    tag: Optional[str] = None
+
+class TrendingPromptsResponse(BaseModel):
+    prompts: List[TrendingPromptItem]
+
+TrendingPromptsResponse.model_rebuild()
+
+
+@router.get("/trending-prompts")
+def get_trending_prompts(refresh: bool = False):
+    """
+    Synthesizes real-time, high-demand starter shopping prompts using the LLM
+    grounded in live in-stock catalog inventory.
+    """
+    global _TRENDING_PROMPTS_CACHE
+    import time
+    now = time.time()
+
+    # Cache for 15 minutes unless forced refresh
+    if not refresh and _TRENDING_PROMPTS_CACHE["data"] and (now - _TRENDING_PROMPTS_CACHE["timestamp"] < 900):
+        return {"prompts": _TRENDING_PROMPTS_CACHE["data"]}
+
+    try:
+        from backend.db import get_db
+        from backend.engine.llm import generate_structured
+        import json
+
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT category, name, price_paise, stock FROM catalog WHERE stock > 0 ORDER BY RANDOM() LIMIT 25"
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+
+        catalog_sample = json.dumps(rows[:18], indent=2)
+
+        sys_prompt = (
+            "You are CartPilot's AI Trend & Merchandising Engine.\n"
+            "Analyze the live catalog inventory and shopper trends to generate 4 high-demand, diverse, realistic starter shopping prompts.\n"
+            "Each prompt should represent natural shopper demand combining 1-2 complementary items or realistic budget targets.\n"
+            "Ensure the products mentioned are actually in the catalog sample.\n"
+            "Return JSON matching the schema."
+        )
+
+        user_prompt = f"LIVE CATALOG INVENTORY SAMPLE:\n{catalog_sample}\n\nGenerate 4 fresh, trending starter shopping prompts."
+
+        res = generate_structured(
+            prompt=user_prompt,
+            schema=TrendingPromptsResponse,
+            system_prompt=sys_prompt
+        )
+        prompts = [p.model_dump() for p in res.prompts]
+        _TRENDING_PROMPTS_CACHE["timestamp"] = now
+        _TRENDING_PROMPTS_CACHE["data"] = prompts
+        return {"prompts": prompts}
+    except Exception as e:
+        print(f"⚠️ Error generating trending prompts with LLM: {e}")
+        fallback = [
+            {
+                "emoji": "💄",
+                "category": "Beauty & Fragrances",
+                "prompt": "I want Essence Mascara and Dior Sauvage perfume within ₹3,500",
+                "tag": "Trending"
+            },
+            {
+                "emoji": "💻",
+                "category": "Laptops & Tech",
+                "prompt": "Show me a Lenovo Yoga or MacBook Pro laptop under ₹15,000",
+                "tag": "High Demand"
+            },
+            {
+                "emoji": "👟",
+                "category": "Footwear & Fashion",
+                "prompt": "Looking for Nike running shoes and a stylish watch under ₹5,000",
+                "tag": "Style Pick"
+            },
+            {
+                "emoji": "📱",
+                "category": "Mobile & Accessories",
+                "prompt": "Buy an iPhone and fast charger bundle within my budget",
+                "tag": "Essential"
+            }
+        ]
+        return {"prompts": _TRENDING_PROMPTS_CACHE["data"] or fallback}
+
 
