@@ -125,7 +125,9 @@ def get_db():
     # SQLite fallback with WAL and timeout
     conn = sqlite3.connect(DB_PATH, timeout=60.0)
     conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA busy_timeout=60000;")
+    conn.execute("PRAGMA busy_timeout=30000;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA cache_size=-64000;")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -155,6 +157,9 @@ def init_db():
           category TEXT NOT NULL,
           merchant TEXT NOT NULL,
           boosted INTEGER NOT NULL DEFAULT 0,
+          boost_weight REAL NOT NULL DEFAULT 1.0,
+          boost_reason TEXT,
+          boost_source TEXT NOT NULL DEFAULT 'system',
           image_url TEXT,
           description TEXT,
           tags TEXT,
@@ -190,12 +195,15 @@ def init_db():
           cancellation_status TEXT NOT NULL DEFAULT 'NONE',
           fulfillment_status TEXT NOT NULL DEFAULT 'UNFULFILLED',
           return_status TEXT NOT NULL DEFAULT 'NONE',
+          expires_at TEXT,
+          consumed_at TEXT,
+          consumed_by_payment_id TEXT,
           created_at TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS payment_mandates (
           id TEXT PRIMARY KEY,
-          cart_id TEXT NOT NULL REFERENCES cart_mandates(id),
+          cart_id TEXT NOT NULL UNIQUE REFERENCES cart_mandates(id),
           razorpay_order_id TEXT,
           razorpay_payment_id TEXT,
           amount_paise INTEGER NOT NULL,
@@ -209,6 +217,9 @@ def init_db():
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
+        -- Deduplicate payment_mandates if legacy rows exist
+        DELETE FROM payment_mandates WHERE rowid NOT IN (SELECT min(rowid) FROM payment_mandates GROUP BY cart_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_mandates_cart_id ON payment_mandates(cart_id);
 
         CREATE TABLE IF NOT EXISTS refunds (
           id TEXT PRIMARY KEY,
@@ -229,6 +240,8 @@ def init_db():
           ref_id TEXT NOT NULL,
           event TEXT NOT NULL,
           detail TEXT NOT NULL,
+          prev_hash TEXT NOT NULL DEFAULT 'GENESIS_00000000000000000000000000000000',
+          hash TEXT NOT NULL DEFAULT '',
           created_at TEXT NOT NULL
         );
 
@@ -363,6 +376,9 @@ def init_db():
     # ── Safe Column Alterations for Existing Databases ───────────────────
     for table_name, col_name, col_type in [
         ("catalog", "boosted", "INTEGER NOT NULL DEFAULT 0"),
+        ("catalog", "boost_weight", "REAL NOT NULL DEFAULT 1.0"),
+        ("catalog", "boost_reason", "TEXT"),
+        ("catalog", "boost_source", "TEXT NOT NULL DEFAULT 'system'"),
         ("catalog", "image_url", "TEXT"),
         ("catalog", "description", "TEXT"),
         ("catalog", "tags", "TEXT"),
@@ -387,6 +403,11 @@ def init_db():
         ("cart_mandates", "cancellation_status", "TEXT NOT NULL DEFAULT 'NONE'"),
         ("cart_mandates", "fulfillment_status", "TEXT NOT NULL DEFAULT 'UNFULFILLED'"),
         ("cart_mandates", "return_status", "TEXT NOT NULL DEFAULT 'NONE'"),
+        ("cart_mandates", "expires_at", "TEXT"),
+        ("cart_mandates", "consumed_at", "TEXT"),
+        ("cart_mandates", "consumed_by_payment_id", "TEXT"),
+        ("audit_log", "prev_hash", "TEXT NOT NULL DEFAULT 'GENESIS_00000000000000000000000000000000'"),
+        ("audit_log", "hash", "TEXT NOT NULL DEFAULT ''"),
         ("payment_mandates", "refund_status", "TEXT NOT NULL DEFAULT 'NONE'"),
         ("payment_mandates", "refund_amount_paise", "INTEGER NOT NULL DEFAULT 0"),
         ("payment_mandates", "refunded_amount_paise", "INTEGER NOT NULL DEFAULT 0"),

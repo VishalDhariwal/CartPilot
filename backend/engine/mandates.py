@@ -1,12 +1,29 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from backend.db import get_db
+from backend.engine.audit_hash import compute_audit_hash, GENESIS_PREV_HASH
 
 def create_audit_log(cursor, ref_type: str, ref_id: str, event: str, detail: str):
+    cursor.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1")
+    last_row = cursor.fetchone()
+    if last_row:
+        prev_hash = (last_row["hash"] if isinstance(last_row, dict) else last_row[0]) or GENESIS_PREV_HASH
+    else:
+        prev_hash = GENESIS_PREV_HASH
+
+    created_at = datetime.utcnow().isoformat() + "Z"
+    entry_hash = compute_audit_hash(
+        ref_type=ref_type,
+        ref_id=ref_id,
+        event=event,
+        detail=detail,
+        created_at=created_at,
+        prev_hash=prev_hash
+    )
     cursor.execute(
-        "INSERT INTO audit_log (ref_type, ref_id, event, detail, created_at) VALUES (?, ?, ?, ?, ?)",
-        (ref_type, ref_id, event, detail, datetime.utcnow().isoformat() + "Z")
+        "INSERT INTO audit_log (ref_type, ref_id, event, detail, prev_hash, hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (ref_type, ref_id, event, detail, prev_hash, entry_hash, created_at)
     )
 
 def create_intent_mandate(raw_request: str, goal: str, spend_cap_paise: int, channel: str = "web_chat") -> dict:
@@ -34,16 +51,18 @@ def create_intent_mandate(raw_request: str, goal: str, spend_cap_paise: int, cha
     finally:
         conn.close()
 
-def create_cart_mandate(intent_id: str, items: list, total_paise: int, status: str, reason: str, reversible: bool) -> dict:
+def create_cart_mandate(intent_id: str, items: list, total_paise: int, status: str, reason: str, reversible: bool, ttl_minutes: int = 15) -> dict:
     conn = get_db()
     cursor = conn.cursor()
     try:
         cart_id = f"cart_{uuid.uuid4().hex}"
-        created_at = datetime.utcnow().isoformat() + "Z"
+        now_dt = datetime.utcnow()
+        created_at = now_dt.isoformat() + "Z"
+        expires_at = (now_dt + timedelta(minutes=ttl_minutes)).isoformat() + "Z"
         
         cursor.execute(
-            "INSERT INTO cart_mandates (id, intent_id, items, total_paise, status, reason, reversible, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (cart_id, intent_id, json.dumps(items), total_paise, status, reason, 1 if reversible else 0, created_at)
+            "INSERT INTO cart_mandates (id, intent_id, items, total_paise, status, reason, reversible, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (cart_id, intent_id, json.dumps(items), total_paise, status, reason, 1 if reversible else 0, expires_at, created_at)
         )
         
         event_name = "Cart Approved" if status == "approved" else "Cart Blocked"
@@ -58,6 +77,7 @@ def create_cart_mandate(intent_id: str, items: list, total_paise: int, status: s
             "status": status,
             "reason": reason,
             "reversible": reversible,
+            "expires_at": expires_at,
             "created_at": created_at
         }
     finally:

@@ -41,7 +41,7 @@ from backend.engine.mandates import (
 )
 from backend.engine.guardrail import validate_cart
 from backend.recommendations.lift_engine import find_cross_sell
-from backend.integrations.razorpay_client import create_order, create_payment_link
+from backend.engine.payment_engine import execute_payment_mandate
 from backend.agents.resolution_agent import decide_resolution
 
 
@@ -439,38 +439,18 @@ def checkout(cart_id: str) -> Dict[str, Any]:
     if cart["status"] not in ["approved", "pending_confirmation"]:
         return {"error": f"Cannot checkout cart with status '{cart['status']}'. Reason: {cart['reason']}"}
 
-    total_paise = cart["total_paise"]
-
-    # Create real Razorpay order
-    order = create_order(
-        amount_paise=total_paise,
-        receipt_id=cart["id"],
-        notes={"cart_id": cart["id"], "channel": "mcp_agent"}
-    )
-
-    # Create Razorpay payment link
-    payment_link = create_payment_link(
-        amount_paise=total_paise,
-        order_id=order["id"],
-        cart_id=cart["id"],
-        description=f"CartPilot Order: {cart['id']}"
-    )
-
-    # Record Payment Mandate
-    payment_mandate = create_payment_mandate(
-        cart_id=cart["id"],
-        razorpay_order_id=order["id"],
-        amount_paise=total_paise
-    )
-
-    conn = get_db()
-    cursor = conn.cursor()
-    create_audit_log(
-        cursor, "payment", payment_mandate["id"], "Payment Link Created via MCP Agent",
-        f"Razorpay Order {order['id']} created for ₹{total_paise/100:.2f}. Link: {payment_link['short_url']}"
-    )
-    conn.commit()
-    conn.close()
+    try:
+        pay_res = execute_payment_mandate(
+            cart_id=cart["id"],
+            description=f"CartPilot Order: {cart['id']}",
+            notes={"cart_id": cart["id"], "channel": "mcp_agent"}
+        )
+        payment_mandate_id = pay_res["payment_mandate_id"]
+        razorpay_order_id = pay_res["razorpay_order_id"]
+        payment_link_url = pay_res["payment_link_url"]
+        total_paise = pay_res["amount_paise"]
+    except Exception as e:
+        return {"error": f"Payment execution failed: {str(e)}"}
 
     # Compute post-checkout add-ons (identical to web chat)
     cart_items = json.loads(cart["items"]) if isinstance(cart["items"], str) else cart["items"]

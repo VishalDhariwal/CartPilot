@@ -13,7 +13,7 @@ from backend.engine.mandates import (
     append_audit_log, get_cart_state
 )
 from backend.engine.guardrail import validate_cart
-from backend.integrations.razorpay_client import create_order, create_payment_link
+from backend.engine.payment_engine import execute_payment_mandate
 from backend.agents.buyer_agent import generate_cart_proposal
 from backend.agents.growth_agent import generate_upsell
 from backend.agents.substitution_agent import find_substitute
@@ -571,35 +571,21 @@ def finalize_checkout(req: FinalizeRequest):
             final_cart_id = new_cart["id"]
             final_total_paise = new_cart["total_paise"]
 
-        # Create Razorpay Order
-        order = create_order(
-            amount_paise=final_total_paise,
-            receipt_id=final_cart_id,
-            notes={"cart_id": final_cart_id}
-        )
-
-        # Create Payment Link
-        payment_link = create_payment_link(
-            amount_paise=final_total_paise,
-            order_id=order["id"],
-            description="CartPilot Order"
-        )
-
-        # Create Payment Mandate
-        payment_mandate = create_payment_mandate(
+        # Execute Payment through Authoritative PaymentEngine Choke Point
+        pay_res = execute_payment_mandate(
             cart_id=final_cart_id,
-            razorpay_order_id=order["id"],
-            amount_paise=final_total_paise
+            description="CartPilot Order",
+            notes={"cart_id": final_cart_id}
         )
 
         return {
             "status": "approved",
-            "payment_url": payment_link["short_url"],
-            "payment_link": payment_link["short_url"],
+            "payment_url": pay_res["payment_link_url"],
+            "payment_link": pay_res["payment_link_url"],
             "cart_id": final_cart_id,
-            "payment_mandate_id": payment_mandate["id"],
-            "razorpay_order_id": order["id"],
-            "amount_paise": final_total_paise
+            "payment_mandate_id": pay_res["payment_mandate_id"],
+            "razorpay_order_id": pay_res["razorpay_order_id"],
+            "amount_paise": pay_res["amount_paise"]
         }
 
 
@@ -679,25 +665,11 @@ def post_purchase_add(req: PostPurchaseAddRequest):
             reversible=True
         )
 
-        # Create Razorpay Order for add-on
-        order = create_order(
-            amount_paise=item_total_paise,
-            receipt_id=addon_cart["id"],
-            notes={"parent_cart_id": req.parent_cart_id, "type": "post_purchase_addon"}
-        )
-
-        # Create Payment Link
-        payment_link = create_payment_link(
-            amount_paise=item_total_paise,
-            order_id=order["id"],
-            description=f"Add-on: {row['name']}"
-        )
-
-        # Create Payment Mandate
-        payment_mandate = create_payment_mandate(
+        # Execute Payment through Authoritative PaymentEngine Choke Point
+        pay_res = execute_payment_mandate(
             cart_id=addon_cart["id"],
-            razorpay_order_id=order["id"],
-            amount_paise=item_total_paise
+            description=f"Add-on: {row['name']}",
+            notes={"parent_cart_id": req.parent_cart_id, "type": "post_purchase_addon"}
         )
 
         append_audit_log(

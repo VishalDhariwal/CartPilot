@@ -980,6 +980,84 @@ def evaluate_active_promotion_experiments(cursor) -> list[dict[str, Any]]:
     return evaluated
 
 
+def apply_seasonal_boosts(context: Optional[dict] = None) -> dict:
+    """
+    Autonomous AI Merchandiser:
+    Evaluates real-time seasonal, meteorological, and festival signals from context_agent
+    and writes dynamic boost weights and clear human-readable explanations to the catalog.
+    
+    PROTECTION RULE:
+    If a SKU has boost_source == 'manual', its merchant-assigned boost is STRICTLY PROTECTED
+    and will not be overwritten by autonomous seasonal adjustments.
+    """
+    from backend.agents.context_agent import get_context
+    if context is None:
+        context = get_context()
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    category_boosts = context.get("category_boosts", {})
+    
+    cursor.execute("SELECT sku, category, boosted, boost_weight, boost_source, boost_reason FROM catalog")
+    rows = cursor.fetchall()
+
+    updated_count = 0
+    manual_protected_count = 0
+    elevated_count = 0
+    penalized_count = 0
+
+    for row in rows:
+        sku = row["sku"]
+        cat = row["category"]
+        source = row["boost_source"] if "boost_source" in row.keys() and row["boost_source"] else "system"
+
+        # Explicit User Directive: Protect manual merchant boosts
+        if source == "manual":
+            manual_protected_count += 1
+            continue
+
+        if cat in category_boosts:
+            c_info = category_boosts[cat]
+            target_weight = float(c_info.get("multiplier", 1.0))
+            target_reason = str(c_info.get("reason", "Dynamic seasonal recommendation"))
+        else:
+            target_weight = 1.0
+            target_reason = "Neutral baseline: standard seasonal demand"
+
+        is_boosted = 1 if target_weight > 1.05 else 0
+
+        cursor.execute(
+            """
+            UPDATE catalog 
+            SET boost_weight = ?, boost_reason = ?, boost_source = 'agent', boosted = ?
+            WHERE sku = ?
+            """,
+            (target_weight, target_reason, is_boosted, sku)
+        )
+        updated_count += 1
+        if target_weight > 1.05:
+            elevated_count += 1
+        elif target_weight < 0.95:
+            penalized_count += 1
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "status": "applied",
+        "season": context.get("season"),
+        "season_label": context.get("season_label"),
+        "weather": context.get("weather", {}),
+        "total_skus_evaluated": len(rows),
+        "updated_skus": updated_count,
+        "manual_protected_skus": manual_protected_count,
+        "elevated_skus": elevated_count,
+        "penalized_skus": penalized_count,
+        "upcoming_festivals_count": len(context.get("upcoming_festivals", []))
+    }
+
+
 def detect_all_opportunities() -> list[dict]:
     """
     OBSERVE & DETECT: Scans real merchant data across SQLite tables to detect live revenue growth opportunities.
@@ -1002,13 +1080,29 @@ def detect_all_opportunities() -> list[dict]:
         rec_attr_pct = pol_row["recovery_attribution_percent"] if pol_row and pol_row["recovery_attribution_percent"] is not None else 60
         rec_idle_min = pol_row["recovery_idle_threshold_minutes"] if pol_row and pol_row["recovery_idle_threshold_minutes"] is not None else 120
 
-        # Get all dismissed opportunity IDs
-        cursor.execute("SELECT id FROM growth_actions WHERE status = 'dismissed'")
-        dismissed_ids = {r[0] for r in cursor.fetchall()}
+        # Get all dismissed and executed opportunity IDs & targets
+        cursor.execute("SELECT id, execution_ref, affected_ref FROM growth_actions WHERE status IN ('dismissed', 'completed')")
+        growth_action_rows = cursor.fetchall()
+        dismissed_ids = {r[0] for r in growth_action_rows}
+        executed_targets = set()
+        for r in growth_action_rows:
+            if r["execution_ref"]:
+                executed_targets.add(r["execution_ref"])
+            if r["affected_ref"]:
+                try:
+                    aff = json.loads(r["affected_ref"]) if isinstance(r["affected_ref"], str) else r["affected_ref"]
+                    if isinstance(aff, dict):
+                        if "target_sku" in aff:
+                            executed_targets.add(aff["target_sku"])
+                        if "sku" in aff:
+                            executed_targets.add(aff["sku"])
+                except Exception:
+                    pass
 
-        # Get all executed cross-sell target IDs
-        cursor.execute("SELECT execution_ref FROM growth_actions WHERE action_type = 'CROSS_SELL' AND status = 'completed'")
-        executed_xsell_targets = {r[0] for r in cursor.fetchall()}
+        # Also get active promotion experiments to exclude active boosted SKUs
+        cursor.execute("SELECT sku FROM promotion_experiments WHERE status = 'ACTIVE'")
+        active_experiment_skus = {r[0] for r in cursor.fetchall()}
+        executed_targets.update(active_experiment_skus)
 
         # ── 1. Abandoned Carts Recovery Opportunities (RECOVER_CART) ─────
         recoverable_carts = detect_recoverable_carts(limit=10)
@@ -1109,7 +1203,7 @@ def detect_all_opportunities() -> list[dict]:
 
         for r in strong_rules:
             opp_id = f"opp_xsell_{r['sku_a']}_{r['sku_b']}"
-            if opp_id in dismissed_ids or r["sku_b"] in executed_xsell_targets:
+            if opp_id in dismissed_ids or r["sku_b"] in executed_targets or opp_id in executed_targets:
                 continue
 
             est_incremental = r["price_b"]
@@ -1582,7 +1676,7 @@ def detect_all_opportunities() -> list[dict]:
 
         # ── 3c. Explicit NO_ACTION Decision for Healthy Inventory ───────────
         healthy_candidates = [c for c in stage1_candidates if c["product_state"] == "HEALTHY"]
-        if healthy_candidates and len(opportunities) < 6:
+        if healthy_candidates:
             healthy = healthy_candidates[0]
             opp_id = f"opp_healthy_{healthy['sku']}"
             if opp_id not in dismissed_ids:

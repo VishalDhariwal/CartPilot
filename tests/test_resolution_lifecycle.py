@@ -52,6 +52,7 @@ TEST_DB_PATH = "/tmp/test_resolution_lifecycle.db"
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
+    orig_db = os.environ.get("CARTPILOT_DB")
     if os.path.exists(TEST_DB_PATH):
         try:
             os.remove(TEST_DB_PATH)
@@ -67,6 +68,11 @@ def setup_test_db():
             os.remove(TEST_DB_PATH)
         except Exception:
             pass
+    if orig_db is not None:
+        os.environ["CARTPILOT_DB"] = orig_db
+    else:
+        os.environ.pop("CARTPILOT_DB", None)
+    backend.db.DB_PATH = os.environ.get("CARTPILOT_DB") or os.path.join(backend.db.BASE_DIR, "cartpilot.db")
 
 
 def _create_test_order(

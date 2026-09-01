@@ -39,7 +39,7 @@ from backend.engine.guardrail import validate_cart
 from backend.recommendations.lift_engine import find_cross_sell
 from backend.agents.substitution_agent import find_substitute
 from backend.agents.recovery_agent import analyze_failure
-from backend.integrations.razorpay_client import create_order, create_payment_link
+from backend.engine.payment_engine import execute_payment_mandate
 
 
 # ─── 1. STRONGLY TYPED GRAPH STATE ──────────────────────────────────────────
@@ -600,6 +600,16 @@ def node_notify_buyer_blocked(state: BuyerGraphState) -> Dict[str, Any]:
     node_name = "NOTIFY_BUYER_BLOCKED"
     reason = state.get("guardrail_reason", "Cart could not be reconciled with active merchant policy.")
 
+    recommendations = state.get("recommendations", [])
+    if not recommendations:
+        try:
+            candidates = state.get("candidate_products", [])
+            if candidates:
+                recs = find_cross_sell(candidates[:2], top_k=3)
+                recommendations = recs
+        except Exception:
+            pass
+
     msg = generate_conversational_response(
         query=state["user_request"],
         spend_cap_paise=state["spend_cap_paise"],
@@ -607,7 +617,7 @@ def node_notify_buyer_blocked(state: BuyerGraphState) -> Dict[str, Any]:
         candidate_products=state.get("candidate_products", []),
         guardrail_status="blocked",
         guardrail_reason=reason,
-        recommendations=state.get("recommendations", [])
+        recommendations=recommendations
     )
 
     trace = _add_trace(
@@ -628,6 +638,7 @@ def node_notify_buyer_blocked(state: BuyerGraphState) -> Dict[str, Any]:
         "buyer_authorization_status": "DECLINED",
         "checkout_status": "failed",
         "error_state": reason,
+        "recommendations": recommendations,
         "decision_trace": state["decision_trace"] + [trace]
     }
 
@@ -751,34 +762,19 @@ def node_execute_checkout(state: BuyerGraphState) -> Dict[str, Any]:
         }
 
     try:
-        # 1. Create real/mock Razorpay order
-        order = create_order(
-            amount_paise=total_paise,
-            receipt_id=cart_id or f"cart_lg_{uuid.uuid4().hex[:8]}",
-            notes={"cart_id": cart_id, "channel": state.get("channel", "langgraph_agent")}
-        )
-
-        # 2. Create Razorpay payment link
-        plink = create_payment_link(
-            amount_paise=total_paise,
-            order_id=order["id"],
+        # Execute checkout strictly through Authoritative PaymentEngine Choke Point
+        pay_res = execute_payment_mandate(
             cart_id=cart_id,
-            description=f"CartPilot Order: {cart_id}"
-        )
-
-        # 3. Create Payment Mandate in SQLite
-        pm = create_payment_mandate(
-            cart_id=cart_id or "cart_unknown",
-            razorpay_order_id=order["id"],
-            amount_paise=total_paise
+            description=f"CartPilot Order: {cart_id}",
+            notes={"cart_id": cart_id, "channel": state.get("channel", "langgraph_agent")}
         )
 
         trace = _add_trace(
             state=state,
             node=node_name,
-            tool="create_order + create_payment_link",
+            tool="execute_payment_mandate",
             input_summary=f"Cart: {cart_id}, Total: ₹{total_paise/100:.2f}",
-            result_summary=f"Razorpay Order {order['id']} created. Link: {plink['short_url']}",
+            result_summary=f"Razorpay Order {pay_res['razorpay_order_id']} created. Link: {pay_res['payment_link_url']}",
             state_transition="EXECUTE_CHECKOUT -> VERIFY_PAYMENT",
             outcome="Payment Link Generated"
         )
@@ -786,11 +782,11 @@ def node_execute_checkout(state: BuyerGraphState) -> Dict[str, Any]:
         return {
             "current_node": node_name,
             "checkout_status": "link_created",
-            "razorpay_order_id": order["id"],
-            "payment_mandate_id": pm["id"],
-            "payment_link_url": plink["short_url"],
+            "razorpay_order_id": pay_res["razorpay_order_id"],
+            "payment_mandate_id": pay_res["payment_mandate_id"],
+            "payment_link_url": pay_res["payment_link_url"],
             "payment_status": "created",
-            "last_tool": "create_payment_link",
+            "last_tool": "execute_payment_mandate",
             "decision_trace": state["decision_trace"] + [trace]
         }
 

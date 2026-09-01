@@ -8,7 +8,8 @@ from backend.agents.growth_agent import (
     detect_all_opportunities,
     score_next_best_actions,
     execute_growth_action,
-    evaluate_active_promotion_experiments
+    evaluate_active_promotion_experiments,
+    apply_seasonal_boosts
 )
 
 logger = logging.getLogger("cartpilot.growth_worker")
@@ -225,6 +226,12 @@ def execute_autonomous_cycle(max_actions_per_cycle: int = 2) -> Dict[str, Any]:
         # Step 1b: Evaluate active promotion experiments and record telemetry
         evaluate_active_promotion_experiments(cursor)
         conn.commit()
+
+        # Step 1c: Synchronize seasonal, weather & festival merchandise weights
+        try:
+            apply_seasonal_boosts()
+        except Exception as e:
+            logger.warning(f"Seasonal boost synchronization skipped: {e}")
 
         # Step 2: Only execute if growth_mode == 'autonomous'
         if growth_mode != "autonomous":

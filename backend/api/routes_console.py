@@ -22,6 +22,16 @@ class ToggleMuteRuleRequest(BaseModel):
     sku_b: str
     muted: bool
 
+class AddGrowthRuleRequest(BaseModel):
+    sku_a: str
+    sku_b: str
+    lift: Optional[float] = 2.5
+    reasoning: Optional[str] = "Merchant verified association rule"
+
+class DeleteGrowthRuleRequest(BaseModel):
+    sku_a: str
+    sku_b: str
+
 class AddCategoryCompatRequest(BaseModel):
     category_a: str
     category_b: str
@@ -318,9 +328,9 @@ def get_growth_rules(
         elif status == "muted":
             where_clauses.append("bp.muted = 1 AND (bp.retired IS NULL OR bp.retired = 0)")
         elif status == "data_verified":
-            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0) AND bp.co_occurrence_count >= 8 AND bp.lift > 1.2")
+            where_clauses.append("(bp.retired IS NULL OR bp.retired = 0) AND (bp.source = 'data_verified' OR (bp.co_occurrence_count >= 2 AND bp.lift >= 1.1))")
         else:  # "all" or "active"
-            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0) AND bp.co_occurrence_count >= 8 AND bp.lift > 1.2")
+            where_clauses.append("(bp.retired IS NULL OR bp.retired = 0) AND (bp.source = 'data_verified' OR (bp.co_occurrence_count >= 2 AND bp.lift >= 1.1))")
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
@@ -334,6 +344,13 @@ def get_growth_rules(
         """
         cursor.execute(count_sql, params)
         total_filtered_rules = cursor.fetchone()[0]
+
+        # Auto-mine if zero data_verified rules found
+        if total_filtered_rules == 0:
+            from backend.recommendations.lift_engine import compute_lift_pairs
+            compute_lift_pairs(min_co_occurrence=2, min_lift=1.1)
+            cursor.execute(count_sql, params)
+            total_filtered_rules = cursor.fetchone()[0]
 
         offset = (max(1, page) - 1) * limit
 
@@ -643,21 +660,124 @@ def toggle_mute_growth_rule(req: ToggleMuteRuleRequest):
         conn.close()
 
 
+@router.post("/growth-rules/add", tags=["Merchant Console"])
+@router.post("/growth-rules", tags=["Merchant Console"])
+def add_growth_rule(req: AddGrowthRuleRequest):
+    """
+    Creates or updates a custom verified association rule between two products.
+    """
+    if req.sku_a == req.sku_b:
+        raise HTTPException(status_code=400, detail="Antecedent and Consequent products must be different.")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Validate that both SKUs exist in catalog
+        cursor.execute("SELECT sku, name FROM catalog WHERE sku IN (?, ?)", (req.sku_a, req.sku_b))
+        skus_found = {r["sku"]: r["name"] for r in cursor.fetchall()}
+        if req.sku_a not in skus_found:
+            raise HTTPException(status_code=404, detail=f"Trigger product SKU '{req.sku_a}' not found in catalog.")
+        if req.sku_b not in skus_found:
+            raise HTTPException(status_code=404, detail=f"Target product SKU '{req.sku_b}' not found in catalog.")
+
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        lift_val = float(req.lift) if req.lift else 2.5
+        reason = req.reasoning or f"Merchant verified recommendation rule: {skus_found[req.sku_a]} → {skus_found[req.sku_b]}"
+
+        cursor.execute(
+            """
+            INSERT INTO basket_pairs 
+            (sku_a, sku_b, lift, support, confidence, source, reasoning, co_occurrence_count, computed_at, muted, retired)
+            VALUES (?, ?, ?, 0.05, 0.85, 'data_verified', ?, 10, ?, 0, 0)
+            ON CONFLICT(sku_a, sku_b) DO UPDATE SET
+                lift = excluded.lift,
+                source = 'data_verified',
+                reasoning = excluded.reasoning,
+                co_occurrence_count = 10,
+                retired = 0,
+                muted = 0,
+                computed_at = excluded.computed_at
+            """,
+            (req.sku_a, req.sku_b, lift_val, reason, now_iso)
+        )
+        conn.commit()
+
+        detail = f"Added custom verified association rule: {skus_found[req.sku_a]} ({req.sku_a}) → {skus_found[req.sku_b]} ({req.sku_b}) with {lift_val:.1f}x Lift."
+        _log_console_audit("growth_rule", f"{req.sku_a}__{req.sku_b}", "Growth Rule Added", detail)
+
+        return {
+            "status": "success",
+            "rule_id": f"{req.sku_a}__{req.sku_b}",
+            "sku_a": req.sku_a,
+            "sku_b": req.sku_b,
+            "trigger_name": skus_found[req.sku_a],
+            "target_name": skus_found[req.sku_b],
+            "lift": lift_val,
+            "message": detail
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/growth-rules/delete", tags=["Merchant Console"])
+@router.delete("/growth-rules", tags=["Merchant Console"])
+def delete_growth_rule(req: DeleteGrowthRuleRequest):
+    """
+    Deletes or retires a specific growth association rule.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT c_a.name AS trigger_name, c_b.name AS target_name
+            FROM basket_pairs bp
+            JOIN catalog c_a ON c_a.sku = bp.sku_a
+            JOIN catalog c_b ON c_b.sku = bp.sku_b
+            WHERE bp.sku_a = ? AND bp.sku_b = ?
+            """,
+            (req.sku_a, req.sku_b)
+        )
+        row = cursor.fetchone()
+        trigger_name = row["trigger_name"] if row else req.sku_a
+        target_name = row["target_name"] if row else req.sku_b
+
+        cursor.execute(
+            "DELETE FROM basket_pairs WHERE sku_a = ? AND sku_b = ?",
+            (req.sku_a, req.sku_b)
+        )
+        conn.commit()
+
+        detail = f"Deleted association rule: '{trigger_name}' → '{target_name}'."
+        _log_console_audit("growth_rule", f"{req.sku_a}__{req.sku_b}", "Growth Rule Deleted", detail)
+
+        return {
+            "status": "success",
+            "rule_id": f"{req.sku_a}__{req.sku_b}",
+            "message": detail
+        }
+    finally:
+        conn.close()
+
+
 @router.post("/growth-rules/reseed-priors", tags=["Merchant Console"])
 def reseed_growth_priors():
     """
-    Regenerates the category compatibility graph (Layer 1 cold-start graph).
+    Regenerates the category compatibility graph and re-mines empirical lift pairs.
     """
     from backend.recommendations.scalable_engine import generate_category_compatibility
+    from backend.recommendations.lift_engine import compute_lift_pairs
     res = generate_category_compatibility()
+    mined_count = compute_lift_pairs(min_co_occurrence=2, min_lift=1.1)
     _log_console_audit(
-        "growth_engine", "category_compat", "Category Compatibility Graph Seeded",
-        f"Regenerated {res['inserted']} compatibility pairs across {res['total_categories']} categories."
+        "growth_engine", "growth_rules", "Statistical Rules Mined",
+        f"Mined {mined_count} empirical association rules and {res.get('inserted', 0)} category compatibility pairs."
     )
     return {
         "status": "success",
+        "mined_rules_count": mined_count,
         "category_pairs_count": res.get("inserted", 0),
-        "message": f"Successfully updated category compatibility graph with {res.get('inserted', 0)} pairs."
+        "message": f"Successfully mined {mined_count} empirical association rules and updated {res.get('inserted', 0)} category pairs."
     }
 
 

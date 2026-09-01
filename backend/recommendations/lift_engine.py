@@ -462,6 +462,8 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
             "description": row["candidate_description"] or "",
             "metadata": meta_obj,
             "source": source,
+            "tier": "tier_1_lift",
+            "tier_label": "Tier 1: Data-Verified Association Rule (Lift Analysis)",
             "lift": lift_val,
             "support": support_val,
             "confidence": confidence_val,
@@ -487,6 +489,8 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
             top_k=top_k
         )
         for cand in copurchase_candidates:
+            cand["tier"] = "tier_2_item2vec"
+            cand["tier_label"] = "Tier 2: Co-Purchase Neural Embedding (Item2Vec)"
             cand["_tier_priority"] = 2  # Tier 2 priority
             sku = cand["sku"]
             if sku not in candidates_by_sku or cand["_tier_priority"] > candidates_by_sku[sku]["_tier_priority"]:
@@ -503,6 +507,8 @@ def find_cross_sell(cart_items: list, top_k: int = 3) -> list[dict]:
             top_k=top_k
         )
         for cand in live_cat_candidates:
+            cand["tier"] = "tier_3_category_semantic"
+            cand["tier_label"] = "Tier 3: Live Category Graph & Semantic Matching"
             cand["_tier_priority"] = 1  # Tier 3 live cold-start priority
             sku = cand["sku"]
             if sku not in candidates_by_sku or cand["_tier_priority"] > candidates_by_sku[sku]["_tier_priority"]:

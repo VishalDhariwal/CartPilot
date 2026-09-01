@@ -375,7 +375,7 @@ def find_co_purchase_neighbors(
     exc_placeholders = ",".join(["?"] * len(excluded)) if excluded else "NULL"
     cursor.execute(
         f"""
-        SELECT sku, name, price_paise, category, boosted, image_url, description, metadata, co_purchase_embedding
+        SELECT sku, name, price_paise, category, boosted, boost_weight, boost_source, boost_reason, image_url, description, metadata, co_purchase_embedding
         FROM catalog
         WHERE stock > 0
           AND co_purchase_embedding IS NOT NULL
@@ -418,7 +418,15 @@ def find_co_purchase_neighbors(
         row = cand_meta[i]
         sim = float(similarities[i])
         boosted = bool(row["boosted"])
-        boost_mul = 1.35 if boosted else 1.0
+        boost_weight = float(row["boost_weight"]) if ("boost_weight" in row.keys() and row["boost_weight"] is not None) else 1.0
+        boost_source = str(row["boost_source"]) if ("boost_source" in row.keys() and row["boost_source"]) else "system"
+        boost_reason = str(row["boost_reason"]) if ("boost_reason" in row.keys() and row["boost_reason"]) else ""
+
+        if boost_source == "manual" and boosted:
+            boost_mul = 1.35
+        else:
+            boost_mul = boost_weight if boost_weight != 1.0 else (1.35 if boosted else 1.0)
+
         final_score = round(sim * boost_mul, 6)
 
         meta_obj = {}
@@ -429,7 +437,9 @@ def find_co_purchase_neighbors(
                 pass
 
         reason = f"Learned from {real_order_count} real orders' co-purchase patterns."
-        if boosted:
+        if boost_reason:
+            reason += f" Seasonal merchandising: {boost_reason}."
+        elif boosted:
             reason += " Featured partner recommendation."
 
         results.append({
@@ -448,6 +458,9 @@ def find_co_purchase_neighbors(
             "co_occurrence_count": real_order_count,
             "final_score": final_score,
             "boosted": boosted,
+            "boost_weight": boost_weight,
+            "boost_source": boost_source,
+            "boost_reason": boost_reason,
             "trigger_sku": cart_skus[0] if cart_skus else "",
             "trigger_name": "your cart",
             "reason": reason,
@@ -527,24 +540,34 @@ def find_live_category_candidates(
         SELECT category_b AS compat_cat, category_a AS trigger_cat, reasoning
         FROM category_compatibility
         WHERE category_a IN ({cat_placeholders})
-          AND category_b NOT IN ({cat_placeholders})
         UNION
         SELECT category_a AS compat_cat, category_b AS trigger_cat, reasoning
         FROM category_compatibility
         WHERE category_b IN ({cat_placeholders})
-          AND category_a NOT IN ({cat_placeholders})
         """,
-        cart_categories + cart_categories + cart_categories + cart_categories
+        cart_categories + cart_categories
     )
     compat_rows = cursor.fetchall()
 
-    if not compat_rows:
+    # Target categories include cart's own categories (intra-category complements) + compatible partner categories
+    target_category_set = set(cart_categories)
+    compat_reasoning = {}
+    compat_triggers = {}
+
+    for cat in cart_categories:
+        clean_name = cat.replace('-', ' ')
+        compat_reasoning[cat] = f"Complementary {clean_name} selection to complete your cart."
+        compat_triggers[cat] = cat
+
+    for r in compat_rows:
+        target_category_set.add(r["compat_cat"])
+        compat_reasoning[r["compat_cat"]] = r["reasoning"]
+        compat_triggers[r["compat_cat"]] = r["trigger_cat"]
+
+    compat_categories = list(target_category_set)
+    if not compat_categories:
         conn.close()
         return []
-
-    compat_categories = list({r["compat_cat"] for r in compat_rows})
-    compat_reasoning = {r["compat_cat"]: r["reasoning"] for r in compat_rows}
-    compat_triggers = {r["compat_cat"]: r["trigger_cat"] for r in compat_rows}
 
     # Extract cart embedding representation (average normalized 384-d dense vector)
     cart_vecs = []
@@ -574,7 +597,7 @@ def find_live_category_candidates(
 
     cursor.execute(
         f"""
-        SELECT sku, name, price_paise, category, boosted, image_url, description, metadata, embedding
+        SELECT sku, name, price_paise, category, boosted, boost_weight, boost_source, boost_reason, image_url, description, metadata, embedding
         FROM catalog
         WHERE stock > 0
           AND category IN ({cat_in})
@@ -588,7 +611,7 @@ def find_live_category_candidates(
     if not candidate_rows:
         return []
 
-    # Score candidates using cosine similarity, price tier proximity, and merchant boost
+    # Score candidates using cosine similarity, price tier proximity, and merchant/seasonal boost
     scored = []
     for row in candidate_rows:
         cat = row["category"]
@@ -609,15 +632,24 @@ def find_live_category_candidates(
         price_diff_ratio = abs(cand_price - avg_cart_price) / max(1.0, avg_cart_price)
         price_factor = 1.0 / (1.0 + 0.15 * min(price_diff_ratio, 10.0))
 
-        # Promotion boost lever (1.35x)
+        # Promotion & Seasonal boost multiplier
         boosted = bool(row["boosted"])
-        boost_mul = 1.35 if boosted else 1.0
+        boost_weight = float(row["boost_weight"]) if ("boost_weight" in row.keys() and row["boost_weight"] is not None) else 1.0
+        boost_source = str(row["boost_source"]) if ("boost_source" in row.keys() and row["boost_source"]) else "system"
+        boost_reason = str(row["boost_reason"]) if ("boost_reason" in row.keys() and row["boost_reason"]) else ""
+
+        if boost_source == "manual" and boosted:
+            boost_mul = 1.35
+        else:
+            boost_mul = boost_weight if boost_weight != 1.0 else (1.35 if boosted else 1.0)
 
         final_score = round(raw_sim * price_factor * boost_mul, 4)
 
         cat_reason = compat_reasoning.get(cat, f"Complementary {cat} selection for your cart.")
         reason = f"Category match: {cat_reason}"
-        if boosted:
+        if boost_reason:
+            reason += f" Seasonal merchandising: {boost_reason}."
+        elif boosted:
             reason += " Featured partner recommendation."
 
         meta_obj = {}
@@ -646,6 +678,9 @@ def find_live_category_candidates(
             "co_occurrence_count": 0,
             "final_score": final_score,
             "boosted": boosted,
+            "boost_weight": boost_weight,
+            "boost_source": boost_source,
+            "boost_reason": boost_reason,
             "trigger_sku": trigger_sku,
             "trigger_name": trigger_name,
             "reason": reason,
