@@ -370,6 +370,42 @@ def init_db():
           updated_at TEXT NOT NULL,
           FOREIGN KEY (sku) REFERENCES catalog(sku)
         );
+
+        CREATE TABLE IF NOT EXISTS cart_recovery_offers (
+          id TEXT PRIMARY KEY,
+          cart_id TEXT NOT NULL,
+          coupon_code TEXT NOT NULL UNIQUE,
+          discount_pct INTEGER NOT NULL,
+          discount_paise INTEGER NOT NULL,
+          original_total_paise INTEGER NOT NULL,
+          discounted_total_paise INTEGER NOT NULL,
+          session_id TEXT,
+          items_summary TEXT,
+          reason TEXT,
+          ai_nudge_message TEXT,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          redeemed_at TEXT,
+          redeemed_by_payment_id TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_cro_cart_id ON cart_recovery_offers(cart_id);
+        CREATE INDEX IF NOT EXISTS idx_cro_status_exp ON cart_recovery_offers(status, expires_at);
+
+        CREATE TABLE IF NOT EXISTS festival_calendar (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          month INTEGER NOT NULL,
+          day INTEGER NOT NULL,
+          duration_days INTEGER NOT NULL DEFAULT 7,
+          themes TEXT NOT NULL,
+          custom_categories TEXT,
+          lift_multiplier REAL NOT NULL DEFAULT 1.35,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_fest_active_month ON festival_calendar(is_active, month);
         ''')
         conn.commit()
 
@@ -454,6 +490,35 @@ def init_db():
                          item["category"], item.get("merchant", "DefaultMerchant"))
                     )
             conn.commit()
+
+    # ── Seed Festival Calendar ───────────────────────────────────────────
+    cursor.execute("SELECT COUNT(*) FROM festival_calendar")
+    res = cursor.fetchone()
+    fest_count = list(res.values())[0] if isinstance(res, dict) else (res[0] if res else 0)
+    if fest_count == 0:
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        default_festivals = [
+            ("Republic Day Mega Sale", 1, 26, 5, '["electronics", "smartphones", "laptops", "apparel", "furniture", "national_sale"]', 1.30),
+            ("Holi Festive Shopping", 3, 15, 7, '["skincare", "beauty", "apparel", "sweets", "groceries", "colors_festive"]', 1.35),
+            ("Eid al-Fitr Celebrations", 4, 10, 7, '["fragrances", "luxury", "beauty", "apparel", "watches", "groceries", "feast_gifting"]', 1.35),
+            ("Back-to-School & College Rush", 6, 25, 20, '["tech", "laptops", "tablets", "stationery", "backpacks", "accessories", "student_gear"]', 1.25),
+            ("Independence Day Freedom Sale", 8, 15, 6, '["electronics", "home_decor", "appliances", "fashion", "mega_sale"]', 1.30),
+            ("Raksha Bandhan Gifting", 8, 28, 7, '["gifting", "fragrances", "chocolates", "watches", "jewellery", "skincare", "sibling_gifts"]', 1.35),
+            ("Onam Festive Season", 9, 5, 10, '["feast_cooking", "traditional_attire", "festive_gifting", "home_decor", "groceries", "kitchenware", "harvest_celebration"]', 1.35),
+            ("Navratri & Durga Puja", 10, 10, 10, '["festive_fashion", "traditional_attire", "beauty", "fragrances", "home_decor", "skincare", "ethnic_styling"]', 1.40),
+            ("Diwali & Dhanteras Festive Window", 11, 1, 12, '["home_decor", "kitchenware", "appliances", "electronics", "smartphones", "fragrances", "jewellery", "gifting", "sweets"]', 1.45),
+            ("Winter Wedding Season", 11, 25, 25, '["luxury", "beauty", "fragrances", "formal_wear", "watches", "jewellery", "skincare", "wedding_styling"]', 1.35),
+            ("Christmas & Year-End Clearance", 12, 25, 8, '["gifting", "fragrances", "party_wear", "winter_care", "electronics", "home_decor", "year_end_deals"]', 1.30),
+        ]
+        for name, month, day, duration, themes, lift in default_festivals:
+            cursor.execute(
+                """
+                INSERT INTO festival_calendar (name, month, day, duration_days, themes, lift_multiplier, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+                """,
+                (name, month, day, duration, themes, lift, now_iso, now_iso)
+            )
+        conn.commit()
 
     conn.close()
 

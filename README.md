@@ -67,17 +67,16 @@ CartPilot/
 │       ├── scalable_engine.py      # 4-Tier RecSys & Item2Vec neural training engine
 │       └── lift_engine.py          # Cross-sell scoring & rank-boost calculator
 │
-├── frontend/
-│   ├── index.html                  # HTML entrypoint
-│   ├── src/
-│   │   ├── App.jsx                 # Routing & Global Layout
-│   │   ├── index.css               # Design system, tokens, and shaded theme
-│   │   └── pages/
-│   │       ├── Chat.jsx            # Interactive AI Buyer Shopping Chat
-│   │       ├── Dashboard.jsx       # Merchant Ledger & Collapsible Audit Trail
-│   │       └── MerchantConsole.jsx # Merchant Growth & Autonomy Console
+├── cartpilot-merchant/             # Unified React + TypeScript + Vite SPA
+│   ├── client/
+│   │   └── src/
+│   │       ├── pages/
+│   │       │   ├── buyer/BuyerApp.tsx   # Interactive AI Buyer Shopping Chat & Cart
+│   │       │   ├── merchant/            # Merchant Growth Console & Rules Engine
+│   │       │   ├── Home.tsx             # Merchant Command Center & Audit Ledger
+│   │       │   └── Auth.tsx             # Role Switcher (Merchant / Buyer)
 │   ├── package.json
-│   └── vite.config.js
+│   └── vite.config.ts
 │
 ├── requirements.txt                # Python backend dependencies
 ├── .env.example                    # Environment variable template
@@ -149,11 +148,11 @@ cd CartPilot
 
 ---
 
-### 4. Frontend Setup
+### 4. Unified Frontend Setup
 
-1. In a new terminal window, navigate to the `frontend/` directory:
+1. In a new terminal window, navigate to the `cartpilot-merchant/` directory:
    ```bash
-   cd frontend
+   cd cartpilot-merchant
    npm install
    ```
 
@@ -161,7 +160,7 @@ cd CartPilot
    ```bash
    npm run dev
    ```
-   The frontend will be live at `http://localhost:5173`.
+   The unified frontend will be live at `http://localhost:5000` (or the port Vite provides). You can seamlessly toggle between the **Buyer Storefront** and **Merchant Console** via `/auth`, `/buyer`, or `/merchant`.
 
 ---
 

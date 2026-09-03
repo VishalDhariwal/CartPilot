@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (role: UserRole, profile: Partial<UserProfile>) => {
     const newUser: UserProfile = {
       role,
-      name: profile.name || (role === 'merchant' ? 'Store Manager' : 'Shopper'),
+      name: profile.name || (role === 'merchant' ? 'Store Owner' : 'Shopper'),
       email: profile.email || `${role}@cartpilot.io`,
       storeName: profile.storeName || 'Northstar Supply',
       spendCapPaise: profile.spendCapPaise || 1000000,

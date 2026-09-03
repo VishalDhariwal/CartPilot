@@ -336,7 +336,7 @@ def find_co_purchase_neighbors(
     cursor.execute("SELECT COUNT(*) FROM historical_orders WHERE is_synthetic = 0")
     real_order_count = cursor.fetchone()[0]
 
-    # Load cart item embeddings
+    # Load cart item metadata & embeddings
     cart_skus = [i["sku"] for i in cart_items if "sku" in i]
     if not cart_skus:
         conn.close()
@@ -344,17 +344,26 @@ def find_co_purchase_neighbors(
 
     placeholders = ",".join(["?"] * len(cart_skus))
     cursor.execute(
-        f"SELECT sku, co_purchase_embedding FROM catalog WHERE sku IN ({placeholders})",
+        f"SELECT sku, name, category, price_paise, co_purchase_embedding FROM catalog WHERE sku IN ({placeholders})",
         cart_skus
     )
     cart_rows = cursor.fetchall()
 
     cart_vecs = []
+    cart_cats = set()
+    cart_prices = []
+
     for row in cart_rows:
+        if row["category"]:
+            cart_cats.add(row["category"])
+        if row["price_paise"]:
+            cart_prices.append(row["price_paise"])
         if row["co_purchase_embedding"]:
             try:
                 vec = np.array(json.loads(row["co_purchase_embedding"]), dtype=np.float32)
-                cart_vecs.append(vec)
+                norm = np.linalg.norm(vec)
+                if norm > 0:
+                    cart_vecs.append(vec / norm)
             except Exception:
                 pass
 
@@ -362,7 +371,22 @@ def find_co_purchase_neighbors(
         conn.close()
         return []
 
-    # Average cart vector
+    # Verify if these cart SKUs actually participated in real co-purchase orders.
+    # If a cart SKU has < 2 real orders, its vector is untrained random noise.
+    # Falling back cleanly to Tier 3 (Category Graph + Dense MiniLM Semantic Embeddings)
+    # guarantees relevant, high-quality recommendations.
+    order_placeholders = " OR ".join(["items LIKE ?" for _ in cart_skus])
+    order_params = [f"%{sku}%" for sku in cart_skus]
+    cursor.execute(
+        f"SELECT COUNT(*) FROM historical_orders WHERE is_synthetic = 0 AND ({order_placeholders})",
+        order_params
+    )
+    matching_orders = cursor.fetchone()[0]
+    if matching_orders < 2:
+        conn.close()
+        return []
+
+    # Average normalized cart vector
     query_vec = np.mean(cart_vecs, axis=0)
     query_norm = np.linalg.norm(query_vec)
     if query_norm == 0:
@@ -370,19 +394,45 @@ def find_co_purchase_neighbors(
         return []
     query_vec = query_vec / query_norm
 
-    # Load all in-stock catalog embeddings (excluding cart & already-seen SKUs)
+    # Determine compatible categories for the cart items
+    target_categories = set(cart_cats)
+    if cart_cats:
+        cat_placeholders = ",".join(["?"] * len(cart_cats))
+        cursor.execute(
+            f"""
+            SELECT category_b FROM category_compatibility WHERE category_a IN ({cat_placeholders})
+            UNION
+            SELECT category_a FROM category_compatibility WHERE category_b IN ({cat_placeholders})
+            """,
+            list(cart_cats) + list(cart_cats)
+        )
+        for r in cursor.fetchall():
+            if r[0]:
+                target_categories.add(r[0])
+
+    if not target_categories:
+        target_categories = set(cart_cats)
+
+    # Price plausibility: prevent exorbitant upsells (e.g. ₹25,000 car for a ₹20 slipper)
+    max_cart_price = max(cart_prices) if cart_prices else 200000
+    price_cap = max(max_cart_price * 4, 250000)
+
+    # Load in-stock catalog candidates within compatible categories and price limits
     excluded = list(exclude_skus | set(cart_skus))
     exc_placeholders = ",".join(["?"] * len(excluded)) if excluded else "NULL"
-    cursor.execute(
-        f"""
+    compat_placeholders = ",".join(["?"] * len(target_categories))
+
+    sql = f"""
         SELECT sku, name, price_paise, category, boosted, boost_weight, boost_source, boost_reason, image_url, description, metadata, co_purchase_embedding
         FROM catalog
         WHERE stock > 0
           AND co_purchase_embedding IS NOT NULL
+          AND price_paise <= ?
+          AND category IN ({compat_placeholders})
           {"AND sku NOT IN (" + exc_placeholders + ")" if excluded else ""}
-        """,
-        excluded if excluded else []
-    )
+    """
+    params = [price_cap] + list(target_categories) + (excluded if excluded else [])
+    cursor.execute(sql, params)
     cand_rows = cursor.fetchall()
     conn.close()
 
@@ -411,7 +461,12 @@ def find_co_purchase_neighbors(
     cand_matrix = np.stack(cand_vecs, axis=0)  # (N, D)
     similarities = cand_matrix @ query_vec       # (N,)
 
-    top_indices = np.argsort(-similarities)[:top_k]
+    # Only accept candidates with high affinity (>= 0.65) to reject uncorrelated noise
+    qual_indices = [i for i in range(len(similarities)) if similarities[i] >= 0.65]
+    if not qual_indices:
+        return []
+
+    top_indices = sorted(qual_indices, key=lambda i: similarities[i], reverse=True)[:top_k]
 
     results = []
     for i in top_indices:
@@ -454,9 +509,10 @@ def find_co_purchase_neighbors(
             "lift": None,
             "support": None,
             "confidence": None,
-            "reasoning": None,
-            "co_occurrence_count": real_order_count,
+            "reasoning": f"Co-purchase vector similarity: {sim:.2f}",
+            "co_occurrence_count": matching_orders,
             "final_score": final_score,
+            "similarity_score": round(sim, 4),
             "boosted": boosted,
             "boost_weight": boost_weight,
             "boost_source": boost_source,

@@ -19,8 +19,8 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 T = TypeVar("T", bound=BaseModel)
 
-# Preferred Gemini models in priority order
-GEMINI_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash"]
+# Preferred Gemini models in priority order (fast lite model first to prevent quota delays)
+GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.6-flash"]
 OPENAI_MODEL = "gpt-4o-mini"
 MAX_STRUCTURED_RETRIES = 2
 

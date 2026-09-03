@@ -20,7 +20,7 @@ export default function Auth() {
 
     if (selectedRole === 'merchant') {
       login('merchant', {
-        name: name || 'Store Manager',
+        name: name || 'Store Owner',
         email: email || 'merchant@cartpilot.io',
         storeName: storeName || 'Northstar Supply',
       });
@@ -71,7 +71,6 @@ export default function Auth() {
 
       <div className="w-full max-w-[520px] bg-white border border-[#ebeaf0] rounded-2xl shadow-xl p-8 sm:p-10">
         <div className="text-center mb-8">
-          <div className="eyebrow text-violet mb-2">Role-Based Access Control</div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-ink">
             Sign in to CartPilot
           </h1>

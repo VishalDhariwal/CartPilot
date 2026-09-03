@@ -201,32 +201,22 @@ export default function AuditTrail() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="eyebrow text-violet mb-1.5">Cryptographic Accountability Ledger</div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Order Audit Trail</h1>
-          <p className="text-xs text-muted mt-1">
-            Complete immutable ledger of orders, products, quantities, spend cap validations, and SHA-256 hashes.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchAuditData}
-            title="Refresh Audit Data"
-            className="p-2.5 bg-white border border-[#ebeaf0] rounded-xl text-muted hover:text-ink hover:bg-[#faf9fd] transition-all shadow-sm"
-          >
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          </button>
-          <button
-            onClick={() => setShowDownloadModal(true)}
-            className="px-4 py-2.5 bg-violet text-white text-xs font-bold rounded-xl shadow-md hover:bg-[#6849d8] flex items-center gap-2 transition-all"
-          >
-            <Download size={15} />
-            <span>Download Audit CSV</span>
-          </button>
-        </div>
+      {/* Action Header */}
+      <div className="flex justify-end items-center gap-2">
+        <button
+          onClick={fetchAuditData}
+          title="Refresh Audit Data"
+          className="p-2.5 bg-white border border-[#ebeaf0] rounded-xl text-muted hover:text-ink hover:bg-[#faf9fd] transition-all shadow-sm"
+        >
+          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+        </button>
+        <button
+          onClick={() => setShowDownloadModal(true)}
+          className="px-4 py-2.5 bg-violet text-white text-xs font-bold rounded-xl shadow-md hover:bg-[#6849d8] flex items-center gap-2 transition-all"
+        >
+          <Download size={15} />
+          <span>Download Audit CSV</span>
+        </button>
       </div>
 
       {/* Date Range Download Modal */}

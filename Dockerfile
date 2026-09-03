@@ -1,13 +1,13 @@
 # ==========================================
-# Stage 1: Build the React Frontend
+# Stage 1: Build the Unified Frontend
 # ==========================================
 FROM node:20-alpine AS frontend-builder
-WORKDIR /app/frontend
+WORKDIR /app/cartpilot-merchant
 
-COPY frontend/package*.json ./
+COPY cartpilot-merchant/package*.json ./
 RUN npm install
 
-COPY frontend/ ./
+COPY cartpilot-merchant/ ./
 RUN npm run build
 
 # ==========================================
@@ -49,8 +49,8 @@ COPY backend/ ./backend/
 COPY seed_catalog.json .
 COPY docs/ ./docs/
 
-# Copy built frontend assets from Stage 1 into /app/frontend/dist
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+# Copy built frontend assets from Stage 1 into /app/cartpilot-merchant/dist
+COPY --from=frontend-builder /app/cartpilot-merchant/dist ./cartpilot-merchant/dist
 
 # Expose backend/frontend unified port
 EXPOSE 8000

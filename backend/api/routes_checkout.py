@@ -789,40 +789,49 @@ def get_trending_prompts(refresh: bool = False):
 
     try:
         from backend.db import get_db
-        from backend.engine.llm import generate_structured
-        import json
-
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT category, name, price_paise, stock FROM catalog WHERE stock > 0 ORDER BY RANDOM() LIMIT 25"
+            "SELECT category, name, price_paise FROM catalog WHERE stock > 0 ORDER BY RANDOM() LIMIT 20"
         )
         rows = [dict(r) for r in cursor.fetchall()]
         conn.close()
 
-        catalog_sample = json.dumps(rows[:18], indent=2)
+        CAT_CONFIG = {
+            "beauty": ("💄", "Beauty & Fragrances", "Trending"),
+            "fragrances": ("💄", "Beauty & Fragrances", "Trending"),
+            "skin-care": ("💄", "Beauty & Personal Care", "Trending"),
+            "laptops": ("💻", "Laptops & Tech", "High Demand"),
+            "smartphones": ("📱", "Mobile & Tech", "High Demand"),
+            "mobile-accessories": ("📱", "Mobile Accessories", "Essential"),
+            "mens-shirts": ("👕", "Fashion & Apparel", "Style Pick"),
+            "mens-watches": ("⌚", "Watches & Accessories", "Style Pick"),
+            "groceries": ("🥑", "Daily Essentials", "Popular"),
+            "kitchen-accessories": ("🍳", "Home & Living", "Fresh"),
+            "sports-accessories": ("⚽", "Fitness & Sports", "Trending"),
+        }
 
-        sys_prompt = (
-            "You are CartPilot's AI Trend & Merchandising Engine.\n"
-            "Analyze the live catalog inventory and shopper trends to generate 4 high-demand, diverse, realistic starter shopping prompts.\n"
-            "Each prompt should represent natural shopper demand combining 1-2 complementary items or realistic budget targets.\n"
-            "Ensure the products mentioned are actually in the catalog sample.\n"
-            "Return JSON matching the schema."
-        )
+        prompts = []
+        used_cats = set()
+        for r in rows:
+            cat = r.get("category", "")
+            if cat in CAT_CONFIG and cat not in used_cats and len(prompts) < 4:
+                emoji, cat_label, tag = CAT_CONFIG[cat]
+                price = round((r.get("price_paise", 3000) / 100) * 1.25)
+                prompts.append({
+                    "emoji": emoji,
+                    "category": cat_label,
+                    "prompt": f"I want {r['name']} and companion items within ₹{price:,}",
+                    "tag": tag
+                })
+                used_cats.add(cat)
 
-        user_prompt = f"LIVE CATALOG INVENTORY SAMPLE:\n{catalog_sample}\n\nGenerate 4 fresh, trending starter shopping prompts."
-
-        res = generate_structured(
-            prompt=user_prompt,
-            schema=TrendingPromptsResponse,
-            system_prompt=sys_prompt
-        )
-        prompts = [p.model_dump() for p in res.prompts]
-        _TRENDING_PROMPTS_CACHE["timestamp"] = now
-        _TRENDING_PROMPTS_CACHE["data"] = prompts
-        return {"prompts": prompts}
+        if len(prompts) >= 3:
+            _TRENDING_PROMPTS_CACHE["timestamp"] = now
+            _TRENDING_PROMPTS_CACHE["data"] = prompts
+            return {"prompts": prompts}
     except Exception as e:
-        print(f"⚠️ Error generating trending prompts with LLM: {e}")
+        print(f"⚠️ Error building dynamic catalog prompts: {e}")
         fallback = [
             {
                 "emoji": "💄",

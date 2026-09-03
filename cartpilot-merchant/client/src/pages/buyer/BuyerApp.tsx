@@ -706,7 +706,7 @@ export default function BuyerApp() {
     {
       role: 'agent',
       isWelcome: true,
-      content: 'Hello! I am your CartPilot personal shopping agent. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will curate your cart with live receipts, spend cap verification, and smart recommendations.',
+      content: 'Hello! I am your CartPilot personal shopping assistant. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will find the right items, verify your budget, and curate your cart with live receipts and smart recommendations.',
       timestamp: Date.now()
     }
   ]);
@@ -858,7 +858,7 @@ export default function BuyerApp() {
       {
         role: 'agent',
         isWelcome: true,
-        content: 'Hello! I am your CartPilot personal shopping agent. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will curate your cart with live receipts, spend cap verification, and smart recommendations.',
+        content: 'Hello! I am your CartPilot personal shopping assistant. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will find the right items, verify your budget, and curate your cart with live receipts and smart recommendations.',
         timestamp: Date.now()
       }
     ]);
@@ -935,7 +935,14 @@ export default function BuyerApp() {
       };
       setMessages((prev) => [...prev, agentReply]);
 
-      if (data.cart) {
+      if (data.status === 'blocked' || !data.cart || data.cart.guardrail_status === 'blocked') {
+        if (!activeCart || activeCart.items.length === 0) {
+          setActiveCart(null);
+        }
+        if (data.cart?.guardrail_reason) {
+          toast.warning(`Policy notice: ${data.cart.guardrail_reason}`);
+        }
+      } else if (data.cart && data.cart.items && data.cart.items.length > 0) {
         setActiveCart({
           items: data.cart.items || [],
           total_paise: data.cart.total_paise || 0,
@@ -1218,10 +1225,10 @@ export default function BuyerApp() {
                 </button>
 
                 <div>
-                  <h2 className="text-sm font-bold text-ink">CartPilot Shopping Agent</h2>
+                  <h2 className="text-sm font-bold text-ink">CartPilot Shopping Assistant</h2>
                   <div className="text-[11px] text-emerald flex items-center gap-1.5 font-medium">
                     <span className="w-2 h-2 rounded-full bg-[#2a9a71] animate-pulse"></span>
-                    LangGraph Autonomous State Machine Ready
+                    Online • Ready to Assist
                   </div>
                 </div>
               </div>
@@ -1263,56 +1270,75 @@ export default function BuyerApp() {
             )}
 
             {/* Chat Messages */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-4">
-              {messages.map((m, idx) => (
-                <div
-                  key={idx}
-                  className={`flex flex-col ${m.role === 'buyer' ? 'items-end' : 'items-start'}`}
-                >
-                  <div
-                    className={`max-w-[95%] sm:max-w-[88%] rounded-2xl p-4 text-sm leading-relaxed ${
-                      m.role === 'buyer'
-                        ? 'bg-violet text-white rounded-br-none shadow-md'
-                        : 'bg-[#f4f3f8] text-ink rounded-bl-none border border-[#ebeaf0]'
-                    }`}
-                  >
-                    <div>{m.content}</div>
+            <div className="flex-1 p-6 overflow-y-auto space-y-4 flex flex-col">
+              {(() => {
+                const visibleMessages = messages.filter((m) => !m.isWelcome);
 
-                    {/* In-Chat Payment Link Action Button */}
-                    {m.paymentLink && (
-                      <div className="mt-3 pt-2.5 border-t border-[#ebeaf0] flex items-center gap-2">
-                        <a
-                          href={m.paymentLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2a9a71] text-white text-xs font-bold shadow-md hover:bg-[#23805e] transition-all"
-                        >
-                          <CreditCard size={14} />
-                          <span>Complete Payment on Razorpay</span>
-                          <ExternalLink size={13} />
-                        </a>
+                if (visibleMessages.length === 0) {
+                  return (
+                    <div className="flex-1 flex items-center justify-center p-6 text-center my-auto">
+                      <div className="max-w-lg bg-white border border-[#ebeaf0] rounded-2xl p-8 shadow-xs space-y-4 animate-in fade-in">
+                        <div className="w-12 h-12 rounded-2xl bg-[#efeaff] text-violet flex items-center justify-center mx-auto shadow-xs">
+                          <Sparkles size={22} />
+                        </div>
+                        <p className="text-sm text-ink leading-relaxed font-medium">
+                          Hello! I am your CartPilot personal shopping assistant. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will find the right items, verify your budget, and curate your cart with live receipts and smart recommendations.
+                        </p>
                       </div>
-                    )}
+                    </div>
+                  );
+                }
 
-                    {/* In-Chat Interactive Recommendation Cards / Carousel */}
-                    {m.recommendations && m.recommendations.length > 0 && (
-                      <InChatRecommendations
-                        recommendations={m.recommendations}
-                        onSelectDetail={(rec) => setInspectingProduct(rec)}
-                        onAddWithVariant={(rec, variant) => handleAddCrossSellWithVariant(rec, variant)}
-                        selectedVariants={selectedVariants}
-                        onSelectVariant={(sku, v) => setSelectedVariants((prev) => ({ ...prev, [sku]: v }))}
-                        spendCapPaise={spendCapPaise}
-                        currentCartTotalPaise={activeCart?.total_paise || 0}
-                        cartSkus={new Set(activeCart?.items?.map((i) => i.sku) || [])}
-                      />
-                    )}
+                return visibleMessages.map((m, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex flex-col ${m.role === 'buyer' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div
+                      className={`max-w-[95%] sm:max-w-[88%] rounded-2xl p-4 text-sm leading-relaxed ${
+                        m.role === 'buyer'
+                          ? 'bg-violet text-white rounded-br-none shadow-md'
+                          : 'bg-[#f4f3f8] text-ink rounded-bl-none border border-[#ebeaf0]'
+                      }`}
+                    >
+                      <div>{m.content}</div>
+
+                      {/* In-Chat Payment Link Action Button */}
+                      {m.paymentLink && (
+                        <div className="mt-3 pt-2.5 border-t border-[#ebeaf0] flex items-center gap-2">
+                          <a
+                            href={m.paymentLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2a9a71] text-white text-xs font-bold shadow-md hover:bg-[#23805e] transition-all"
+                          >
+                            <CreditCard size={14} />
+                            <span>Complete Payment on Razorpay</span>
+                            <ExternalLink size={13} />
+                          </a>
+                        </div>
+                      )}
+
+                      {/* In-Chat Interactive Recommendation Cards / Carousel */}
+                      {m.recommendations && m.recommendations.length > 0 && (
+                        <InChatRecommendations
+                          recommendations={m.recommendations}
+                          onSelectDetail={(rec) => setInspectingProduct(rec)}
+                          onAddWithVariant={(rec, variant) => handleAddCrossSellWithVariant(rec, variant)}
+                          selectedVariants={selectedVariants}
+                          onSelectVariant={(sku, v) => setSelectedVariants((prev) => ({ ...prev, [sku]: v }))}
+                          spendCapPaise={spendCapPaise}
+                          currentCartTotalPaise={activeCart?.total_paise || 0}
+                          cartSkus={new Set(activeCart?.items?.map((i) => i.sku) || [])}
+                        />
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted mt-1 px-1">
+                      {m.role === 'buyer' ? 'You' : 'CartPilot Agent'}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-muted mt-1 px-1">
-                    {m.role === 'buyer' ? 'You' : 'CartPilot Agent'}
-                  </span>
-                </div>
-              ))}
+                ));
+              })()}
 
               {loading && (
                 <div className="flex items-center gap-2 p-3 bg-[#f4f3f8] rounded-2xl rounded-bl-none max-w-[200px] border border-[#ebeaf0]">

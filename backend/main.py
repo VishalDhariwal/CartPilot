@@ -1,4 +1,6 @@
 import json
+import re
+import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
@@ -57,6 +59,13 @@ def startup_event():
             if cc_count == 0:
                 from backend.recommendations.scalable_engine import generate_category_compatibility
                 generate_category_compatibility()
+
+        # Pre-warm embedding model in memory
+        try:
+            from backend.recommendations.embedding_engine import get_model
+            get_model()
+        except Exception as e:
+            print(f"⚠️ Error warming embedding model: {e}")
 
     except Exception as e:
         print(f"⚠️ Error during startup sync: {e}")
@@ -203,6 +212,81 @@ def get_catalog():
         conn.close()
 
 
+class CreateCatalogProductRequest(BaseModel):
+    name: str
+    price_rupees: Optional[float] = None
+    price_paise: Optional[int] = None
+    stock: int = 10
+    category: str = "general"
+    sku: Optional[str] = None
+    description: Optional[str] = ""
+    image_url: Optional[str] = ""
+    merchant: Optional[str] = "Store Direct"
+
+
+@app.post("/api/catalog/products", tags=["Catalog"])
+@app.post("/catalog/products", tags=["Catalog"])
+def create_catalog_product(req: CreateCatalogProductRequest):
+    """
+    Adds a new item to the store catalog with stock quantity, price per unit, and category.
+    """
+    if not req.name or not req.name.strip():
+        raise HTTPException(status_code=400, detail="Product name is required.")
+    if req.stock < 0:
+        raise HTTPException(status_code=400, detail="Stock quantity cannot be negative.")
+    
+    # Calculate price_paise
+    price_paise = req.price_paise
+    if price_paise is None:
+        if req.price_rupees is None or req.price_rupees <= 0:
+            raise HTTPException(status_code=400, detail="Valid price per unit is required.")
+        price_paise = int(round(req.price_rupees * 100))
+    elif price_paise <= 0:
+        raise HTTPException(status_code=400, detail="Price must be greater than zero.")
+    
+    category = req.category.strip().lower() if req.category else "general"
+    
+    # Generate clean SKU if not supplied
+    sku = req.sku.strip() if req.sku and req.sku.strip() else ""
+    if not sku:
+        cat_prefix = re.sub(r'[^A-Z0-9]', '', category.upper())[:3] or "PRD"
+        name_prefix = re.sub(r'[^A-Z0-9]', '', req.name.upper())[:3] or "ITM"
+        sku = f"{cat_prefix}-{name_prefix}-{uuid.uuid4().hex[:4].upper()}"
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT sku FROM catalog WHERE sku = ?", (sku,))
+        if cursor.fetchone():
+            raise HTTPException(status_code=400, detail=f"Product with SKU '{sku}' already exists.")
+        
+        cursor.execute(
+            """
+            INSERT INTO catalog (sku, name, price_paise, stock, category, merchant, boosted, boost_weight, boost_source, boost_reason, image_url, description, tags)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 1.0, 'manual', '', ?, ?, '[]')
+            """,
+            (sku, req.name.strip(), price_paise, req.stock, category, req.merchant or "Store Direct", req.image_url or "", req.description or "")
+        )
+        conn.commit()
+        return {
+            "status": "success",
+            "message": f"Product '{req.name.strip()}' added successfully to catalog.",
+            "product": {
+                "sku": sku,
+                "name": req.name.strip(),
+                "price_paise": price_paise,
+                "price_rupees": round(price_paise / 100, 2),
+                "stock": req.stock,
+                "category": category,
+                "merchant": req.merchant or "Store Direct",
+                "image_url": req.image_url or "",
+                "description": req.description or ""
+            }
+        }
+    finally:
+        conn.close()
+
+
 @app.get("/api/catalog/seasonal-context", tags=["Merchandising"])
 @app.get("/catalog/seasonal-context", tags=["Merchandising"])
 def get_seasonal_context():
@@ -225,12 +309,22 @@ def get_seasonal_context():
         cursor.execute("SELECT sku, name, category, price_paise, boosted, boost_weight, boost_source, boost_reason FROM catalog WHERE boost_source = 'manual'")
         manual_rows = [dict(r) for r in cursor.fetchall()]
 
+        # Calculate active average category boost weight
+        avg_boost = 1.15
+        if context.get("category_boosts"):
+            elev_muls = [v["multiplier"] for v in context["category_boosts"].values() if v.get("multiplier", 1.0) > 1.0]
+            if elev_muls:
+                avg_boost = round(sum(elev_muls) / len(elev_muls), 2)
+
         return {
             "timestamp": context["timestamp"],
+            "formatted_date": context.get("formatted_date", datetime.utcnow().strftime("%A, %b %d, %Y")),
+            "formatted_time": context.get("formatted_time", datetime.utcnow().strftime("%I:%M %p")),
             "season": context["season"],
             "season_label": context["season_label"],
             "commercial_week": context["commercial_week"],
             "weather": context["weather"],
+            "boost_weight": avg_boost,
             "upcoming_festivals": context["upcoming_festivals"],
             "category_boosts": context["category_boosts"],
             "active_elevations_count": len(elevated_rows),
@@ -851,14 +945,18 @@ def chat_with_buyer_agent(req: ChatRequest):
             conversation_history=req.conversation_history
         )
 
-        proposed_items = final_state.get("proposed_items") or []
-        cart_total = final_state.get("cart_total_paise", 0)
+        guardrail_status = final_state.get("guardrail_status", "approved")
+        guardrail_reason = final_state.get("guardrail_reason", "")
+        is_blocked = guardrail_status == "blocked"
+
+        proposed_items = [] if is_blocked else (final_state.get("proposed_items") or [])
+        cart_total = 0 if is_blocked else final_state.get("cart_total_paise", 0)
         mandate_id = final_state.get("payment_mandate_id") or final_state.get("cart_id") or "MANDATE_AUTH_01"
 
         reply_text = final_state.get("assistant_message")
         if not reply_text:
-            if final_state.get("guardrail_status") == "blocked":
-                reply_text = f"⚠️ Order exceeds merchant policy guardrail: {final_state.get('guardrail_reason') or 'Spend cap exceeded'}"
+            if is_blocked:
+                reply_text = f"⚠️ Order restricted by merchant policy: {guardrail_reason or 'Category or item not permitted'}"
             elif proposed_items:
                 item_names = [f"{it.get('qty', 1)}x {it.get('name')}" for it in proposed_items]
                 reply_text = f"I've added {', '.join(item_names)} to your cart (Total: ₹{cart_total/100:.2f}). All items pass merchant guardrails."
@@ -917,15 +1015,15 @@ def chat_with_buyer_agent(req: ChatRequest):
                 "items": proposed_items,
                 "total_paise": cart_total,
                 "spend_cap_paise": final_state.get("spend_cap_paise", req.spend_cap_paise or 1000000),
-                "guardrail_status": final_state.get("guardrail_status", "approved"),
-                "guardrail_reason": final_state.get("guardrail_reason", ""),
+                "guardrail_status": guardrail_status,
+                "guardrail_reason": guardrail_reason,
                 "mandate_id": mandate_id,
-            },
+            } if (proposed_items or is_blocked) else None,
             "recommendations": recs,
             "decision_trace": final_state.get("decision_trace") or [],
             "payment_link": final_state.get("payment_link_url") or "https://rzp.io/l/demo_cartpilot",
             "payment_mandate": mandate_id,
-            "status": final_state.get("guardrail_status", "approved")
+            "status": guardrail_status
         }
     except Exception as e:
         import traceback
@@ -935,8 +1033,15 @@ def chat_with_buyer_agent(req: ChatRequest):
 
 
 # Serve static frontend assets & SPA fallback (for unified Docker container deployments)
-frontend_dist = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "dist")
-if os.path.exists(frontend_dist):
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+frontend_candidates = [
+    os.path.join(project_root, "cartpilot-merchant", "dist", "public"),
+    os.path.join(project_root, "cartpilot-merchant", "dist"),
+    os.path.join(project_root, "frontend", "dist"),
+]
+frontend_dist = next((p for p in frontend_candidates if os.path.exists(p)), None)
+
+if frontend_dist and os.path.exists(frontend_dist):
     assets_dir = os.path.join(frontend_dist, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")

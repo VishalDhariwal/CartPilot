@@ -426,11 +426,60 @@ def add_item_to_cart(
 
 
 @buyer_mcp.tool()
-def checkout(cart_id: str) -> Dict[str, Any]:
+def check_recovery_offer(
+    session_id: Optional[str] = None,
+    cart_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Check if the buyer has an active, time-limited cart recovery discount offer.
+    Call this tool at the beginning of a buyer session or when greeting returning buyers.
+    Returns offer details along with a natural 'ai_nudge_message' for the agent to proactively present.
+    """
+    from backend.agents.cart_recovery_offer_engine import get_active_offer_for_cart, get_active_offer_for_session
+
+    offer = None
+    if cart_id:
+        offer = get_active_offer_for_cart(cart_id)
+    if not offer and session_id:
+        offer = get_active_offer_for_session(session_id)
+    if not offer:
+        offer = get_active_offer_for_session(None)
+
+    if not offer:
+        return {
+            "has_recovery_offer": False,
+            "offer": None,
+            "message": "No active recovery offers found."
+        }
+
+    return {
+        "has_recovery_offer": True,
+        "offer": offer,
+        "coupon_code": offer["coupon_code"],
+        "discount_pct": offer["discount_pct"],
+        "discount_rupees": offer["discount_rupees"],
+        "discounted_total_rupees": offer["discounted_total_rupees"],
+        "ai_nudge_message": offer["ai_nudge_message"],
+        "expires_at": offer["expires_at"],
+        "instruction_to_agent": (
+            f"Proactively share this special recovery offer with the buyer: "
+            f"\"{offer['ai_nudge_message']}\""
+        )
+    }
+
+
+@buyer_mcp.tool()
+def checkout(
+    cart_id: str,
+    coupon_code: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Finalize an approved cart mandate: creates a real Razorpay test-mode Order and Payment Link.
+    Optionally accepts a recovery coupon_code to apply time-limited recovery discounts.
     Returns the URL for the user/agent to complete test payment.
     """
+    from backend.agents.cart_recovery_offer_engine import apply_offer_at_checkout, get_active_offer_for_cart
+
     state = get_cart_state(cart_id)
     if not state or not state["cart"]:
         return {"error": f"Cart '{cart_id}' not found."}
@@ -439,11 +488,24 @@ def checkout(cart_id: str) -> Dict[str, Any]:
     if cart["status"] not in ["approved", "pending_confirmation"]:
         return {"error": f"Cannot checkout cart with status '{cart['status']}'. Reason: {cart['reason']}"}
 
+    # Check and apply recovery offer if available
+    applied_offer = None
+    if coupon_code:
+        applied_offer = apply_offer_at_checkout(cart_id, coupon_code)
+    else:
+        active_offer = get_active_offer_for_cart(cart_id)
+        if active_offer:
+            applied_offer = apply_offer_at_checkout(cart_id, active_offer["coupon_code"])
+
     try:
         pay_res = execute_payment_mandate(
             cart_id=cart["id"],
-            description=f"CartPilot Order: {cart['id']}",
-            notes={"cart_id": cart["id"], "channel": "mcp_agent"}
+            description=f"CartPilot Order: {cart['id']}" + (f" (Promo: {applied_offer['coupon_code']})" if applied_offer and applied_offer.get("applied") else ""),
+            notes={
+                "cart_id": cart["id"],
+                "channel": "mcp_agent",
+                "recovery_offer": applied_offer["coupon_code"] if applied_offer and applied_offer.get("applied") else "none"
+            }
         )
         payment_mandate_id = pay_res["payment_mandate_id"]
         razorpay_order_id = pay_res["razorpay_order_id"]
@@ -467,17 +529,27 @@ def checkout(cart_id: str) -> Dict[str, Any]:
     except Exception:
         post_addons = []
 
-    return {
+    res: Dict[str, Any] = {
         "status": "pending_payment",
         "cart_id": cart["id"],
-        "payment_mandate_id": payment_mandate["id"],
-        "razorpay_order_id": order["id"],
+        "payment_mandate_id": payment_mandate_id,
+        "razorpay_order_id": razorpay_order_id,
         "amount_paise": total_paise,
         "amount_rupees": round(total_paise / 100, 2),
-        "payment_url": payment_link["short_url"],
+        "payment_url": payment_link_url,
         "post_checkout_addons": post_addons,
         "instructions": "Present the payment_url to the buyer. You can also mention the 'post_checkout_addons' as 1-click add-on items they can add before or after paying."
     }
+
+    if applied_offer and applied_offer.get("applied"):
+        res["recovery_discount_applied"] = {
+            "coupon_code": applied_offer["coupon_code"],
+            "discount_pct": applied_offer["discount_pct"],
+            "savings_rupees": applied_offer["discount_rupees"],
+            "discounted_total_rupees": applied_offer["discounted_total_rupees"]
+        }
+
+    return res
 
 
 @buyer_mcp.tool()

@@ -1,4 +1,5 @@
 import json
+import math
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
@@ -39,7 +40,11 @@ class AddCategoryCompatRequest(BaseModel):
 
 class LivePreviewRequest(BaseModel):
     sku: str
-    top_k: int = 4
+    top_k: int = 3
+    weight_association: float = 0.40
+    weight_item2vec: float = 0.30
+    weight_category: float = 0.20
+    weight_revenue: float = 0.10
 
 
 # ─── Helper: Audit Log Writer ───────────────────────────────────────────────
@@ -545,9 +550,13 @@ def get_growth_rules(
 @router.post("/growth-rules/live-preview", tags=["Merchant Console"])
 def preview_live_recommendations(req: LivePreviewRequest):
     """
-    Live Recommendation Preview Sandbox for merchants.
-    Runs find_live_category_candidates directly in real-time for any catalog product,
-    and returns candidates along with the complete category-graph traversal path.
+    Live Multi-Engine Recommendation Reranker Sandbox.
+    Collects top-5 candidates across 3 distinct engines:
+      1. Engine 1: Association Rules (basket_pairs)
+      2. Engine 2: Item2Vec Neural Vector Embeddings
+      3. Engine 3: Category Compatibility Graph & Semantic Matching
+    Fuses multi-engine signals, applies merchant configurable weights (Association, Item2Vec, Category, Revenue),
+    reranks the pooled candidates, and returns top_k results with complete score attribution.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -561,6 +570,7 @@ def preview_live_recommendations(req: LivePreviewRequest):
             raise HTTPException(status_code=404, detail=f"SKU '{req.sku}' not found in catalog.")
 
         trigger_item = dict(row)
+        trigger_sku = trigger_item["sku"]
         trigger_category = trigger_item["category"]
 
         # Fetch category compatibility connections for this category
@@ -585,8 +595,232 @@ def preview_live_recommendations(req: LivePreviewRequest):
             for r in cursor.fetchall()
         ]
 
+        # ── 1. Engine 1: Association Rules (basket_pairs) - Top 5 ──
+        cursor.execute(
+            """
+            SELECT 
+                bp.sku_b,
+                bp.lift,
+                bp.support,
+                bp.confidence,
+                bp.source,
+                bp.reasoning,
+                bp.co_occurrence_count,
+                c.name AS candidate_name,
+                c.price_paise AS candidate_price,
+                c.category AS candidate_category,
+                c.stock AS candidate_stock,
+                c.boosted AS candidate_boosted,
+                c.image_url AS candidate_image_url,
+                c.description AS candidate_description
+            FROM basket_pairs bp
+            JOIN catalog c ON c.sku = bp.sku_b
+            WHERE bp.sku_a = ?
+              AND c.stock > 0
+              AND bp.sku_b != ?
+              AND (bp.muted IS NULL OR bp.muted = 0)
+              AND (bp.retired IS NULL OR bp.retired = 0)
+            ORDER BY bp.lift DESC, bp.co_occurrence_count DESC
+            LIMIT 5
+            """,
+            (trigger_sku, trigger_sku)
+        )
+        assoc_rows = cursor.fetchall()
+
+        # ── 2. Engine 2: Item2Vec Neural Embeddings - Top 5 ──
+        from backend.recommendations.scalable_engine import find_co_purchase_neighbors
+        try:
+            item2vec_candidates = find_co_purchase_neighbors([trigger_item], exclude_skus={trigger_sku}, top_k=5)
+        except Exception as e:
+            print(f"⚠️ Item2Vec lookup fallback: {e}")
+            item2vec_candidates = []
+
+        # ── 3. Engine 3: Category Graph & Semantic Matching - Top 5 ──
         from backend.recommendations.scalable_engine import find_live_category_candidates
-        candidates = find_live_category_candidates([trigger_item], top_k=req.top_k)
+        try:
+            category_candidates = find_live_category_candidates([trigger_item], exclude_skus={trigger_sku}, top_k=5)
+        except Exception as e:
+            print(f"⚠️ Category candidates fallback: {e}")
+            category_candidates = []
+
+        # ── Pool & Multi-Signal Fusion ──
+        candidate_pool = {}
+
+        # Ingest Engine 1
+        for r in assoc_rows:
+            sku = r["sku_b"]
+            lift_val = float(r["lift"]) if r["lift"] is not None else 1.0
+            # Normalized association score between 0.2 and 1.0 based on lift
+            assoc_score = min(max((lift_val - 1.0) / 3.0, 0.2), 1.0)
+            candidate_pool[sku] = {
+                "sku": sku,
+                "name": r["candidate_name"],
+                "price_paise": r["candidate_price"],
+                "category": r["candidate_category"],
+                "image_url": r["candidate_image_url"] or "",
+                "description": r["candidate_description"] or "",
+                "boosted": bool(r["candidate_boosted"]),
+                "signals": {
+                    "association": assoc_score,
+                    "item2vec": 0.0,
+                    "category": 0.0,
+                    "revenue": 0.0,
+                },
+                "engines": ["Association Rules"],
+                "raw_reasons": [f"Frequently bought together with {trigger_item['name']} ({lift_val:.1f}x lift)."],
+                "lift": lift_val,
+                "co_occurrence_count": r["co_occurrence_count"] or 0,
+            }
+
+        # Ingest Engine 2
+        for cand in item2vec_candidates:
+            sku = cand["sku"]
+            sim_score = float(cand.get("cosine_similarity", 0.75))
+            if sku not in candidate_pool:
+                candidate_pool[sku] = {
+                    "sku": sku,
+                    "name": cand.get("name", sku),
+                    "price_paise": cand.get("price_paise", 0),
+                    "category": cand.get("category", ""),
+                    "image_url": cand.get("image_url", ""),
+                    "description": cand.get("description", ""),
+                    "boosted": bool(cand.get("boosted", False)),
+                    "signals": {
+                        "association": 0.0,
+                        "item2vec": sim_score,
+                        "category": 0.0,
+                        "revenue": 0.0,
+                    },
+                    "engines": ["Item2Vec Vectors"],
+                    "raw_reasons": [cand.get("reason", "Neural basket embedding match.")],
+                    "lift": None,
+                    "co_occurrence_count": cand.get("co_occurrence_count", 0),
+                }
+            else:
+                candidate_pool[sku]["signals"]["item2vec"] = sim_score
+                if "Item2Vec Vectors" not in candidate_pool[sku]["engines"]:
+                    candidate_pool[sku]["engines"].append("Item2Vec Vectors")
+                candidate_pool[sku]["raw_reasons"].append(cand.get("reason", "Neural vector match."))
+
+        # Ingest Engine 3
+        for cand in category_candidates:
+            sku = cand["sku"]
+            cat_score = float(cand.get("semantic_similarity", 0.80)) if "semantic_similarity" in cand else 0.85
+            if sku not in candidate_pool:
+                candidate_pool[sku] = {
+                    "sku": sku,
+                    "name": cand.get("name", sku),
+                    "price_paise": cand.get("price_paise", 0),
+                    "category": cand.get("category", ""),
+                    "image_url": cand.get("image_url", ""),
+                    "description": cand.get("description", ""),
+                    "boosted": bool(cand.get("boosted", False)),
+                    "signals": {
+                        "association": 0.0,
+                        "item2vec": 0.0,
+                        "category": cat_score,
+                        "revenue": 0.0,
+                    },
+                    "engines": ["Category Graph"],
+                    "raw_reasons": [cand.get("reason", f"Complementary {cand.get('category', '')} match.")],
+                    "lift": None,
+                    "co_occurrence_count": 0,
+                }
+            else:
+                candidate_pool[sku]["signals"]["category"] = cat_score
+                if "Category Graph" not in candidate_pool[sku]["engines"]:
+                    candidate_pool[sku]["engines"].append("Category Graph")
+                candidate_pool[sku]["raw_reasons"].append(cand.get("reason", "Category compatibility match."))
+
+        # Normalize merchant weights so total weight = 1.0
+        total_w = req.weight_association + req.weight_item2vec + req.weight_category + req.weight_revenue
+        if total_w <= 0:
+            total_w = 1.0
+        w_assoc = req.weight_association / total_w
+        w_vec = req.weight_item2vec / total_w
+        w_cat = req.weight_category / total_w
+        w_rev = req.weight_revenue / total_w
+
+        trigger_price = float(trigger_item["price_paise"] or 1000)
+
+        # Score & Rerank all pooled candidates
+        scored_candidates = []
+        for cand in candidate_pool.values():
+            # Revenue score based on ideal complementary basket ratio (0.2x - 3.0x trigger price)
+            cand_price = float(cand["price_paise"] or 1000)
+            ratio = cand_price / trigger_price if trigger_price > 0 else 1.0
+
+            if 0.2 <= ratio <= 3.5:
+                rev_score = min(0.6 + (ratio / 7.0), 1.0)
+            elif ratio < 0.2:
+                rev_score = max((ratio / 0.2) * 0.6, 0.1)
+            else:
+                rev_score = max(1.0 - (math.log10(ratio) * 0.4), 0.1)
+
+            cand["signals"]["revenue"] = rev_score
+
+            # Composite weighted calculation
+            s_assoc = cand["signals"]["association"]
+            s_vec = cand["signals"]["item2vec"]
+            s_cat = cand["signals"]["category"]
+            s_rev = cand["signals"]["revenue"]
+
+            raw_composite = (
+                (w_assoc * s_assoc) +
+                (w_vec * s_vec) +
+                (w_cat * s_cat) +
+                (w_rev * s_rev)
+            )
+
+            # Boost multiplier if featured partner
+            boost_mul = 1.25 if cand["boosted"] else 1.0
+            final_composite = min(raw_composite * boost_mul, 1.0)
+            score_points = round(final_composite * 100, 1)
+
+            # Build readable summary rationale
+            combined_reason = " · ".join(cand["raw_reasons"][:2])
+
+            scored_candidates.append({
+                "sku": cand["sku"],
+                "name": cand["name"],
+                "category": cand["category"],
+                "price_paise": cand["price_paise"],
+                "price_rupees": round(cand["price_paise"] / 100, 2),
+                "image_url": cand["image_url"],
+                "description": cand["description"],
+                "boosted": cand["boosted"],
+                "composite_score": score_points,
+                "engines": cand["engines"],
+                "score_breakdown": {
+                    "association": round(s_assoc * 100, 1),
+                    "item2vec": round(s_vec * 100, 1),
+                    "category": round(s_cat * 100, 1),
+                    "revenue": round(s_rev * 100, 1),
+                },
+                "lift": cand["lift"],
+                "reason": combined_reason,
+                "multi_engine_match": len(cand["engines"]) > 1,
+            })
+
+        # Sort by composite score descending
+        scored_candidates.sort(key=lambda x: x["composite_score"], reverse=True)
+
+        # Apply policy allowed_categories guardrails
+        cursor.execute("SELECT allowed_categories FROM policy_config WHERE id = 1")
+        p_row = cursor.fetchone()
+        if p_row and p_row["allowed_categories"]:
+            try:
+                allowed_cats = json.loads(p_row["allowed_categories"])
+                if allowed_cats:
+                    from backend.engine.guardrail import is_category_allowed
+                    scored_candidates = [
+                        c for c in scored_candidates
+                        if is_category_allowed(c.get("category", ""), allowed_cats)
+                    ]
+            except Exception:
+                pass
+
+        top_candidates = scored_candidates[:req.top_k]
 
         return {
             "trigger_sku": trigger_item["sku"],
@@ -595,7 +829,14 @@ def preview_live_recommendations(req: LivePreviewRequest):
             "trigger_price_rupees": round(trigger_item["price_paise"] / 100, 2),
             "trigger_image": trigger_item["image_url"] or "",
             "compatible_categories": compat_paths,
-            "candidates": candidates,
+            "candidates": top_candidates,
+            "pool_size": len(candidate_pool),
+            "weights_applied": {
+                "association": round(w_assoc * 100, 0),
+                "item2vec": round(w_vec * 100, 0),
+                "category": round(w_cat * 100, 0),
+                "revenue": round(w_rev * 100, 0),
+            },
             "computed_at": datetime.utcnow().isoformat() + "Z",
             "is_live_computed": True
         }

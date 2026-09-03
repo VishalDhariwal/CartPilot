@@ -7,32 +7,31 @@ from backend.db import get_db
 from backend.engine.payment_engine import execute_payment_mandate
 from backend.engine.mandates import create_audit_log, append_audit_log
 
-class RecoveryMessage(BaseModel):
-    message: str
-
 def analyze_failure(raw_error_reason: str) -> dict:
     """
-    Translates raw payment errors into friendly, actionable recovery messages using LLM.
+    Translates raw payment gateway error codes into friendly, actionable recovery messages.
+    Zero token cost, instant execution, and consistent UX.
     """
-    from backend.engine.llm import generate_structured
-    
-    system_instruction = f"""
-    You are an AI Payment Recovery Agent for an e-commerce store.
-    A user's payment just failed. The raw error reason from the payment gateway is:
-    "{raw_error_reason}"
-    
-    Your job is to translate this technical error into a short, friendly, and actionable 1-2 sentence message for the user.
-    Do not use technical jargon. Tell them exactly what they should do next (e.g. try a different card, check balance, etc).
-    """
-    try:
-        data = generate_structured(
-            prompt="Generate the friendly recovery message.",
-            schema=RecoveryMessage,
-            system_prompt=system_instruction
-        )
-        return {"recommendation": data.message}
-    except Exception:
-        return {"recommendation": "Payment could not be completed. Please verify your payment details and retry checkout."}
+    err = (raw_error_reason or "").lower()
+
+    if any(k in err for k in ["cancel", "aborted", "closed"]):
+        msg = "Payment was cancelled. Your items are saved in your cart and ready for checkout whenever you're ready."
+    elif any(k in err for k in ["insufficient", "balance", "low_funds"]):
+        msg = "Your bank reported insufficient balance. Please try another card, UPI, or an alternative payment method."
+    elif any(k in err for k in ["otp", "auth", "authentication", "verification", "3d"]):
+        msg = "Authentication could not be verified or the OTP timed out. Please retry to receive a fresh verification code."
+    elif any(k in err for k in ["decline", "declined", "do_not_honor", "rejected"]):
+        msg = "Your card issuer declined the transaction. Please verify card permissions or use another payment option."
+    elif any(k in err for k in ["expired", "validity"]):
+        msg = "The card expiry date or payment session has expired. Please verify your payment details and try again."
+    elif any(k in err for k in ["network", "timeout", "timed_out", "connection"]):
+        msg = "A temporary network timeout occurred with the payment network. Please wait a moment and retry checkout."
+    elif any(k in err for k in ["limit", "exceeded"]):
+        msg = "Transaction limit reached for this payment method. Please select another card or split the purchase."
+    else:
+        msg = "Payment could not be completed at this time. Please verify your payment details and retry checkout."
+
+    return {"recommendation": msg}
 
 
 def detect_recoverable_carts(limit: int = 50) -> list[dict]:
