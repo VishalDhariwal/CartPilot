@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from backend.db import init_db, get_db
-from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery, routes_console, routes_growth
+from backend.api import routes_checkout, routes_webhook, routes_resolution, routes_recovery, routes_console, routes_growth, routes_ingest
 
 
 
@@ -33,19 +33,18 @@ def startup_event():
     print("🚀 Initializing Database...")
     init_db()
 
-    # Sync DummyJSON catalog if empty or missing images
+    # Check catalog status in PostgreSQL
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM catalog WHERE image_url IS NOT NULL AND image_url != ''")
+        cursor.execute("SELECT COUNT(*) FROM catalog")
         valid_items_count = cursor.fetchone()[0]
         conn.close()
 
-        if valid_items_count < 150:
-            print("📦 Syncing live catalog from DummyJSON...")
-            from backend.integrations.dummyjson_sync import sync_dummyjson_catalog
-            sync_dummyjson_catalog()
+        if valid_items_count == 0:
+            print("ℹ️ PostgreSQL Catalog is currently empty. Ready for API Key or CSV data ingestion.")
         else:
+            print(f"📦 PostgreSQL Database connected with {valid_items_count} catalog items.")
             # Compute empirical rules for any pairs with >= 8 real orders
             from backend.recommendations.lift_engine import compute_lift_pairs
             compute_lift_pairs(min_co_occurrence=8)
@@ -68,23 +67,20 @@ def startup_event():
             print(f"⚠️ Error warming embedding model: {e}")
 
     except Exception as e:
-        print(f"⚠️ Error during startup sync: {e}")
+        print(f"⚠️ Error during startup check: {e}")
 
     # Precompute missing catalog embeddings & train item2vec in background thread
     import threading
     def _bg_embeddings():
         try:
+            import time
+            time.sleep(2)
             from backend.recommendations.embedding_engine import precompute_catalog_embeddings
-            precompute_catalog_embeddings(force=False)
-        except Exception as e:
-            print(f"⚠️ Error precomputing catalog embeddings: {e}")
-
-        try:
+            precompute_catalog_embeddings()
             from backend.recommendations.scalable_engine import train_co_purchase_embeddings
             train_co_purchase_embeddings(min_orders=50)
         except Exception as e:
-            print(f"⚠️ Error training co-purchase embeddings: {e}")
-
+            print(f"⚠️ Non-blocking recommendation precomputation note: {e}")
     threading.Thread(target=_bg_embeddings, daemon=True).start()
 
     # Start Autonomous AI Growth Worker (5-minute background loop)
@@ -95,11 +91,13 @@ def startup_event():
 
 # Include routers
 app.include_router(routes_checkout.router, prefix="/checkout", tags=["Checkout"])
+app.include_router(routes_checkout.router, prefix="/api/checkout", tags=["Checkout"])
 app.include_router(routes_webhook.router, prefix="/webhook", tags=["Webhook"])
 app.include_router(routes_resolution.router, prefix="/resolution", tags=["Resolution"])
 app.include_router(routes_recovery.router, prefix="/recovery", tags=["Recovery"])
 app.include_router(routes_console.router, prefix="/api/console", tags=["Merchant Console"])
 app.include_router(routes_growth.router, prefix="/api/growth", tags=["AI Growth Agent"])
+app.include_router(routes_ingest.router, tags=["Data Ingestion"])
 
 # Mount Remote Model Context Protocol (MCP) Servers
 from backend.mcp_server import buyer_mcp, merchant_mcp
@@ -549,6 +547,15 @@ def get_lift_pairs(limit: int = 20):
         conn.close()
 
 
+@app.get("/api/catalog/compatibility", tags=["Catalog"])
+def get_catalog_compatibility_route():
+    """
+    Returns category compatibility graph pairs (alias for console endpoint).
+    """
+    from backend.api.routes_console import get_category_compatibility
+    return get_category_compatibility()
+
+
 @app.get("/api/dashboard", tags=["Dashboard"])
 def get_dashboard():
     conn = get_db()
@@ -942,7 +949,8 @@ def chat_with_buyer_agent(req: ChatRequest):
             query=user_query,
             spend_cap_paise=req.spend_cap_paise or 1000000,
             session_id=req.session_id,
-            conversation_history=req.conversation_history
+            conversation_history=req.conversation_history,
+            current_cart=req.current_cart
         )
 
         guardrail_status = final_state.get("guardrail_status", "approved")
@@ -955,7 +963,7 @@ def chat_with_buyer_agent(req: ChatRequest):
 
         reply_text = final_state.get("assistant_message")
         if not reply_text:
-            if is_blocked:
+            if is_blocked and "empty" not in guardrail_reason.lower():
                 reply_text = f"⚠️ Order restricted by merchant policy: {guardrail_reason or 'Category or item not permitted'}"
             elif proposed_items:
                 item_names = [f"{it.get('qty', 1)}x {it.get('name')}" for it in proposed_items]
@@ -982,7 +990,7 @@ def chat_with_buyer_agent(req: ChatRequest):
                     SELECT sku, name, price_paise, category, image_url, description, metadata, stock
                     FROM catalog 
                     WHERE stock > 0 AND image_url IS NOT NULL AND image_url != '' {cat_clause}
-                    ORDER BY boosted DESC, rating DESC LIMIT 4
+                    ORDER BY boosted DESC, price_paise ASC LIMIT 4
                 """, params)
                 fallback_rows = cursor.fetchall()
                 conn.close()
@@ -1021,10 +1029,12 @@ def chat_with_buyer_agent(req: ChatRequest):
             } if (proposed_items or is_blocked) else None,
             "recommendations": recs,
             "decision_trace": final_state.get("decision_trace") or [],
-            "payment_link": final_state.get("payment_link_url") or "https://rzp.io/l/demo_cartpilot",
+            "payment_link": final_state.get("payment_link_url") or f"/pay?cart_id={final_state.get('cart_id') or mandate_id or ''}&amount={cart_total}",
+            "razorpay_order_id": final_state.get("razorpay_order_id"),
             "payment_mandate": mandate_id,
             "status": guardrail_status
         }
+
     except Exception as e:
         import traceback
         traceback.print_exc()

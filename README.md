@@ -44,41 +44,39 @@ Unlike black-box AI chatbots, CartPilot enforces **cryptographic mandate chains*
 
 ```
 CartPilot/
-├── backend/
+├── backend/                        # Python FastAPI backend & agents
 │   ├── main.py                     # FastAPI entrypoint, routes, and startup hooks
 │   ├── mcp_server.py               # FastMCP Server (Claude Desktop & Cursor integration)
 │   ├── db.py                       # SQLite database connection & initialization
-│   ├── agents/
-│   │   ├── buyer_agent.py          # Intent parser & autonomous cart builder
-│   │   ├── growth_agent.py         # Autonomous merchant growth & recovery agent
-│   │   └── resolution_agent.py     # AI dispute resolution & refund handler
-│   ├── api/
-│   │   ├── routes_chat.py          # Interactive Buyer Chat API
-│   │   ├── routes_checkout.py      # Razorpay payment & webhook endpoints
-│   │   ├── routes_console.py       # Merchant Growth Console & Embedding training APIs
-│   │   └── routes_growth.py        # Growth telemetry, NBA execution, & recovery rules
-│   ├── engine/
-│   │   ├── guardrail.py            # Deterministic policy validation engine
-│   │   ├── llm.py                  # Dual-provider LLM adapter (Gemini & OpenAI fallback)
-│   │   └── mandates.py             # Cryptographic mandate chain generator & audit logger
-│   ├── integrations/
-│   │   └── razorpay_client.py      # Razorpay Order, Payment Link, & Refund client
-│   └── recommendations/
-│       ├── scalable_engine.py      # 4-Tier RecSys & Item2Vec neural training engine
-│       └── lift_engine.py          # Cross-sell scoring & rank-boost calculator
+│   ├── agents/                     # BuyerGraph, GrowthAgent, RecoveryAgent, ResolutionAgent
+│   ├── api/                        # Routes for Checkout, Console, Growth, Webhooks
+│   ├── engine/                     # Deterministic Guardrails, Mandates, & LLM Adapters
+│   ├── integrations/               # Razorpay Order, Payment Link, & Refund client
+│   └── recommendations/           # 4-Tier RecSys & Item2Vec neural training engine
 │
 ├── cartpilot-merchant/             # Unified React + TypeScript + Vite SPA
 │   ├── client/
 │   │   └── src/
 │   │       ├── pages/
-│   │       │   ├── buyer/BuyerApp.tsx   # Interactive AI Buyer Shopping Chat & Cart
-│   │       │   ├── merchant/            # Merchant Growth Console & Rules Engine
-│   │       │   ├── Home.tsx             # Merchant Command Center & Audit Ledger
-│   │       │   └── Auth.tsx             # Role Switcher (Merchant / Buyer)
+│   │       │   ├── buyer/BuyerApp.tsx       # Interactive AI Buyer Storefront & Chat
+│   │       │   ├── merchant/                # Merchant Growth Console & Rules Engine
+│   │       │   ├── checkout/                # Razorpay Test Checkout Simulation (/pay)
+│   │       │   ├── Home.tsx                 # Command Center & Forensic Audit Ledger
+│   │       │   └── Auth.tsx                 # Role Switcher (Merchant / Buyer)
+│   │       └── contexts/                    # AuthContext, ThemeContext
 │   ├── package.json
 │   └── vite.config.ts
 │
+├── docs/                           # Documentation Hub
+│   ├── README.md                   # Master Documentation Index
+│   ├── specs/                      # Buildathon specifications (00_ to 04_)
+│   ├── architecture/               # Audit trail explanation & Azure deployment specs
+│   └── scripts/                    # Merchant pitch & video presentation scripts
+│
+├── tests/                          # Automated Pytest validation test suite
+├── ops/                            # Database migrations & verification scripts
 ├── requirements.txt                # Python backend dependencies
+├── package.json                    # Root convenience workspace scripts
 ├── .env.example                    # Environment variable template
 └── README.md                       # Documentation & setup guide
 ```
@@ -122,22 +120,29 @@ cd CartPilot
    ```
    Open `.env` and fill in your credentials:
    ```ini
-   # Razorpay API Credentials (or leave BYPASS_RAZORPAY=true for instant testing)
-   RAZORPAY_KEY_ID=rzp_test_your_key_id
-   RAZORPAY_KEY_SECRET=your_key_secret
-   RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
-   BYPASS_RAZORPAY=true
+    # Database Configuration (Enterprise PostgreSQL Native)
+    DATABASE_URL=postgresql://localhost:5432/cartpilot
 
-   # AI LLM Provider Key (Google Gemini)
-   GEMINI_API_KEY=your_gemini_api_key
+    # Razorpay API Credentials (or leave BYPASS_RAZORPAY=true for instant testing)
+    RAZORPAY_KEY_ID=rzp_test_your_key_id
+    RAZORPAY_KEY_SECRET=your_key_secret
+    RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
+    BYPASS_RAZORPAY=true
 
-   # Merchant Secret Key
-   CARTPILOT_MERCHANT_KEY=cartpilot_merchant_secret_key_v1
-   ```
+    # AI LLM Provider Key (Google Gemini)
+    GEMINI_API_KEY=your_gemini_api_key
 
-4. **Initialize Database & Seed Catalog**:
+    # Merchant Secret Key
+    CARTPILOT_MERCHANT_KEY=cartpilot_merchant_secret_key_v1
+    ```
+
+4. **Initialize PostgreSQL Database Schema**:
    ```bash
    python3 backend/db.py
+   ```
+   Or migrate existing data from SQLite to PostgreSQL:
+   ```bash
+   python3 ops/migrate_sqlite_to_postgres.py
    ```
 
 5. **Start the FastAPI Backend Server**:
@@ -145,6 +150,24 @@ cd CartPilot
    python3 -m uvicorn backend.main:app --reload --port 8000
    ```
    The backend API will be live at `http://127.0.0.1:8000`. Interactive Swagger API docs are available at `http://127.0.0.1:8000/docs`.
+
+---
+
+### 4. Catalog Ingestion & Onboarding Workflow
+
+CartPilot features an autonomous, deployment-ready data ingestion engine:
+
+- **Deployment Auto-Prompt**: When deployed with a clean PostgreSQL database, CartPilot automatically opens the **Database Catalog Ingestion** modal on first visit.
+- **Option A — API Key Ingestion**:
+  - Provide your store API key, supplier token, or DummyJSON API key.
+  - The engine authenticates via HTTP headers, fetches products, generates 384-dimensional dense embeddings (`SentenceTransformer('all-MiniLM-L6-v2')`), and seeds category compatibility rules.
+- **Option B — CSV File Upload**:
+  - Upload any `.csv` catalog (columns: `sku, name, price, stock, category, merchant, description, image_url, tags`).
+  - Includes real-time client-side preview and downloadable template (`/api/catalog/ingest/template`).
+- **Option C — 1-Click Demo Seed**:
+  - Instant one-click trigger to seed 194 rich e-commerce products for evaluators.
+- **Live Status & Re-Ingestion**:
+  - The Merchant Console top navigation bar features a live **PostgreSQL: Connected** badge with an **"Ingest Data"** button to upload new CSVs or re-sync with external APIs anytime.
 
 ---
 
@@ -214,6 +237,19 @@ CartPilot includes a native FastMCP server for Claude Desktop and Cursor.
 
 ---
 
+## 🚀 CI/CD & Azure Cloud Deployment
+
+CartPilot includes automated, standalone GitHub Actions workflows for continuous integration, automated semantic release tagging, and container publishing to **Azure Container Registry (ACR)**:
+
+- **`.github/workflows/ci.yml`**: Pre-merge gatekeeper running Python unit tests (`pytest`) and frontend build checks.
+- **`.github/workflows/release-tag-on-merge.yml`**: Automatically generates sequential/semver release tags on merge to `main` and creates official GitHub Releases.
+- **`.github/workflows/azure-container-publish.yml`**: Multi-stage Docker build pushing to your private Azure Container Registry with commit SHA, semver, and `latest` tags.
+
+For complete step-by-step instructions on setting up your Azure Container Registry, configuring GitHub Secrets, and deploying to Azure Container Apps, see the [Azure CI/CD & Production Deployment Guide](docs/deployment/azure_cicd_setup.md).
+
+---
+
 ## 🛡️ License
 
 Built with ❤️ for explainable agentic commerce. Distributed under the MIT License.
+

@@ -179,7 +179,7 @@ def create_recovery_payment_link(cart_id: str) -> dict:
             pay_id = pm_row["id"]
             razorpay_order_id = pm_row["razorpay_order_id"]
             total_paise = pm_row["amount_paise"]
-            payment_url = f"https://rzp.io/i/mock_{pay_id[-8:]}"
+            payment_url = f"/pay?cart_id={cart_id}&order_id={razorpay_order_id}&amount={total_paise}"
             now_str = datetime.utcnow().isoformat() + "Z"
             cursor.execute(
                 "UPDATE payment_mandates SET recovery_action = 'recovery_link_sent', updated_at = ? WHERE id = ?",

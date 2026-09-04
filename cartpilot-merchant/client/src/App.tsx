@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Auth from "./pages/Auth";
 import BuyerApp from "./pages/buyer/BuyerApp";
 import Home from "./pages/Home";
+import FakeRazorpayCheckout from "./pages/checkout/FakeRazorpayCheckout";
 import { useEffect } from "react";
 
 function ProtectedRouter() {
@@ -14,7 +15,8 @@ function ProtectedRouter() {
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!isAuthenticated && location !== "/auth") {
+    const isPublicPaymentRoute = location.startsWith("/pay") || location.startsWith("/checkout/pay");
+    if (!isAuthenticated && location !== "/auth" && !isPublicPaymentRoute) {
       setLocation("/auth");
     } else if (isAuthenticated && location === "/") {
       if (user?.role === "merchant") {
@@ -31,6 +33,8 @@ function ProtectedRouter() {
       <Route path="/buyer" component={BuyerApp} />
       <Route path="/merchant" component={Home} />
       <Route path="/merchant/*" component={Home} />
+      <Route path="/pay" component={FakeRazorpayCheckout} />
+      <Route path="/checkout/pay" component={FakeRazorpayCheckout} />
       <Route path="/" component={isAuthenticated ? (user?.role === "merchant" ? Home : BuyerApp) : Auth} />
       <Route path="*" component={isAuthenticated ? (user?.role === "merchant" ? Home : BuyerApp) : Auth} />
     </Switch>

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const SUGGESTIONS = [
   'need a Hand Blender and a Honey Jar for my morning smoothies',
@@ -706,7 +706,7 @@ export default function BuyerApp() {
     {
       role: 'agent',
       isWelcome: true,
-      content: 'Hello! I am your CartPilot personal shopping assistant. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will find the right items, verify your budget, and curate your cart with live receipts and smart recommendations.',
+      content: "Welcome to CartPilot! I'm your AI personal shopper. Tell me what you need, or choose a suggestion below to get started.",
       timestamp: Date.now()
     }
   ]);
@@ -739,6 +739,8 @@ export default function BuyerApp() {
   const [showSpendCapModal, setShowSpendCapModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const processedPaymentIdsRef = useRef<Set<string>>(new Set());
+  const cartTotalRupeesRef = useRef<number>(0);
 
   // Load chat sessions & starter curated recommendations from backend & localStorage on mount
   useEffect(() => {
@@ -858,7 +860,7 @@ export default function BuyerApp() {
       {
         role: 'agent',
         isWelcome: true,
-        content: 'Hello! I am your CartPilot personal shopping assistant. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will find the right items, verify your budget, and curate your cart with live receipts and smart recommendations.',
+        content: "Welcome to CartPilot! I'm your AI personal shopper. Tell me what you need, or choose a suggestion below to get started.",
         timestamp: Date.now()
       }
     ]);
@@ -866,6 +868,7 @@ export default function BuyerApp() {
     setRecommendations([]);
     setDecisionTrace([]);
     setPaymentData(null);
+    processedPaymentIdsRef.current.clear();
     toast.success('Started a fresh shopping session');
   };
 
@@ -942,15 +945,19 @@ export default function BuyerApp() {
         if (data.cart?.guardrail_reason) {
           toast.warning(`Policy notice: ${data.cart.guardrail_reason}`);
         }
-      } else if (data.cart && data.cart.items && data.cart.items.length > 0) {
-        setActiveCart({
-          items: data.cart.items || [],
-          total_paise: data.cart.total_paise || 0,
-          spend_cap_paise: data.cart.spend_cap_paise || spendCapPaise,
-          guardrail_status: data.cart.guardrail_status || 'approved',
-          guardrail_reason: data.cart.guardrail_reason,
-          mandate_id: data.cart.mandate_id,
-        });
+      } else if (data.cart && Array.isArray(data.cart.items)) {
+        if (data.cart.items.length === 0) {
+          setActiveCart(null);
+        } else {
+          setActiveCart({
+            items: data.cart.items || [],
+            total_paise: data.cart.total_paise || 0,
+            spend_cap_paise: data.cart.spend_cap_paise || spendCapPaise,
+            guardrail_status: data.cart.guardrail_status || 'approved',
+            guardrail_reason: data.cart.guardrail_reason,
+            mandate_id: data.cart.mandate_id,
+          });
+        }
       }
 
       if (data.recommendations && Array.isArray(data.recommendations)) {
@@ -961,11 +968,15 @@ export default function BuyerApp() {
         setDecisionTrace(data.decision_trace);
       }
 
-      if (data.payment_link || data.payment_mandate) {
+      if (data.payment_link || data.payment_mandate || (data.cart && data.cart.items?.length > 0)) {
+        const cartId = data.cart?.id || data.cart?.mandate_id || data.mandate_id || '';
+        const amtPaise = data.cart?.total_paise || 0;
+        const pLink = data.payment_link || `/pay?cart_id=${encodeURIComponent(cartId)}&amount=${amtPaise}`;
         setPaymentData({
-          payment_link: data.payment_link || 'https://rzp.io/l/demo_cartpilot',
-          mandate_id: data.mandate_id || data.cart?.mandate_id || 'MANDATE_AUTH_01',
-          amount_rupees: Math.round((data.cart?.total_paise || 0) / 100),
+
+          payment_link: pLink,
+          mandate_id: cartId || 'MANDATE_AUTH_01',
+          amount_rupees: Math.round(amtPaise / 100),
           status: 'READY',
         });
       }
@@ -1116,9 +1127,187 @@ export default function BuyerApp() {
   };
 
   const cartTotalRupees = activeCart ? activeCart.total_paise / 100 : 0;
+  cartTotalRupeesRef.current = cartTotalRupees;
   const spendCapRupees = spendCapPaise / 100;
   const remainingBudget = Math.max(0, spendCapRupees - cartTotalRupees);
   const capPercentUsed = Math.min(100, Math.round((cartTotalRupees / spendCapRupees) * 100));
+
+  const handlePaymentCompleted = (eventData: any) => {
+    const pid = eventData?.payment_id;
+    if (!pid) return;
+
+    // 1. Deduplicate by payment ID across BroadcastChannel & localStorage
+    if (processedPaymentIdsRef.current.has(pid)) {
+      return;
+    }
+    processedPaymentIdsRef.current.add(pid);
+
+    const amt = eventData?.amount_rupees || cartTotalRupeesRef.current.toFixed(2);
+
+    setPaymentData((prev) => ({
+      payment_link: prev?.payment_link || `/pay?cart_id=${eventData?.cart_id || ''}&amount=${eventData?.amount_paise || 0}`,
+      mandate_id: eventData?.cart_id || prev?.mandate_id || 'MANDATE_AUTH_01',
+      amount_rupees: parseFloat(amt),
+      status: 'SUCCEEDED',
+    }));
+
+    toast.success(`🎉 Payment of ₹${amt} confirmed via Razorpay!`);
+
+    setMessages((prev) => {
+      // Prevent duplicate payment confirmation message in chat history
+      if (prev.some((m) => m.content?.includes(pid))) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          role: 'agent' as const,
+          content: `🎉 Payment Confirmed! ₹${amt} received via Razorpay (Payment ID: ${pid}). Your order is settled and recorded in the cryptographic audit ledger.`,
+          timestamp: Date.now(),
+        }
+      ];
+    });
+  };
+
+  const [isLaunchingCheckout, setIsLaunchingCheckout] = useState(false);
+
+  const handleLaunchRazorpayCheckout = async () => {
+    const cartId = (activeCart as any)?.id || activeCart?.mandate_id || paymentData?.mandate_id || '';
+    const amtPaise = activeCart?.total_paise || Math.round(cartTotalRupees * 100);
+    const amountStr = (amtPaise / 100).toFixed(2);
+
+    if (!cartId) {
+      toast.error('No active cart found to checkout.');
+      return;
+    }
+
+    setIsLaunchingCheckout(true);
+    toast.info(`Connecting to Razorpay for ₹${amountStr}...`);
+
+    try {
+      // 1. Create authoritative Razorpay order via backend PaymentEngine
+      const res = await fetch(`${API_BASE}/api/checkout/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cart_id: cartId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Could not initiate Razorpay order.');
+      }
+
+      const { key_id, razorpay_order_id, amount_paise } = data;
+
+      // 2. If window.Razorpay SDK is ready, launch official modal directly
+      if ((window as any).Razorpay && key_id) {
+        const options = {
+          key: key_id,
+          amount: amount_paise,
+          currency: data.currency || 'INR',
+          name: 'CartPilot Store',
+          description: `Order ${razorpay_order_id}`,
+          order_id: razorpay_order_id,
+          handler: async function (response: any) {
+            toast.info('Verifying payment signature with gateway...');
+            try {
+              const verifyRes = await fetch(`${API_BASE}/api/checkout/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cart_id: cartId,
+                  razorpay_order_id: response.razorpay_order_id || razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
+              });
+              const verifyData = await verifyRes.json();
+              if (!verifyRes.ok) {
+                throw new Error(verifyData.detail || 'Signature verification failed.');
+              }
+
+              handlePaymentCompleted({
+                cart_id: cartId,
+                order_id: response.razorpay_order_id || razorpay_order_id,
+                payment_id: response.razorpay_payment_id,
+                amount_rupees: (amount_paise / 100).toFixed(2),
+                amount_paise: amount_paise,
+                status: 'succeeded',
+              });
+            } catch (err: any) {
+              toast.error('Payment verification failed: ' + err.message);
+            }
+          },
+          prefill: {
+            name: 'Shopper',
+            email: 'shopper@cartpilot.demo',
+            contact: '9999999999',
+          },
+          theme: {
+            color: '#2a9a71',
+          },
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (resp: any) {
+          toast.error(`Payment failed: ${resp.error?.description || 'Declined'}`);
+        });
+        rzp.open();
+      } else {
+        // Fallback to standalone checkout page
+        const payUrl = `/pay?cart_id=${encodeURIComponent(cartId)}&order_id=${encodeURIComponent(razorpay_order_id || '')}&amount=${amount_paise}`;
+        window.open(payUrl, '_blank');
+      }
+
+      // Add chat message
+      const payLink = `/pay?cart_id=${encodeURIComponent(cartId)}&order_id=${encodeURIComponent(razorpay_order_id || '')}&amount=${amount_paise}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'agent' as const,
+          content: `Razorpay Order ${razorpay_order_id} created for ₹${amountStr}. Complete payment in the Razorpay checkout popup or via the link below.`,
+          paymentLink: payLink,
+          timestamp: Date.now(),
+        }
+      ]);
+    } catch (err: any) {
+      toast.error('Checkout error: ' + (err.message || 'Please retry'));
+    } finally {
+      setIsLaunchingCheckout(false);
+    }
+  };
+
+  // Listen for payment completion from /pay tab via BroadcastChannel & localStorage
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+
+    try {
+      bc = new BroadcastChannel('cartpilot_payment_events');
+      bc.onmessage = (event) => {
+        if (event.data?.status === 'succeeded' && event.data?.payment_id) {
+          handlePaymentCompleted(event.data);
+        }
+      };
+    } catch {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'cartpilot_payment_completed' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.status === 'succeeded' && parsed?.payment_id) {
+            handlePaymentCompleted(parsed);
+          }
+        } catch {}
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-[#f8f8fb] flex flex-col">
@@ -1277,13 +1466,54 @@ export default function BuyerApp() {
                 if (visibleMessages.length === 0) {
                   return (
                     <div className="flex-1 flex items-center justify-center p-6 text-center my-auto">
-                      <div className="max-w-lg bg-white border border-[#ebeaf0] rounded-2xl p-8 shadow-xs space-y-4 animate-in fade-in">
-                        <div className="w-12 h-12 rounded-2xl bg-[#efeaff] text-violet flex items-center justify-center mx-auto shadow-xs">
-                          <Sparkles size={22} />
+                      <div className="max-w-xl w-full bg-white border border-[#ebeaf0] rounded-3xl p-8 shadow-xs space-y-6 animate-in fade-in">
+                        {/* Header Badge & Icon */}
+                        <div className="space-y-3">
+                          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#efeaff] text-violet text-xs font-semibold tracking-wide shadow-xs">
+                            <Sparkles size={14} />
+                            <span>AI Shopping Concierge</span>
+                          </div>
+                          <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
+                            What can I help you find today?
+                          </h2>
+                          <p className="text-sm text-muted max-w-md mx-auto leading-relaxed">
+                            Tell me what you're looking for or set a budget cap. I'll discover the best matching products and curate your cart in real-time.
+                          </p>
                         </div>
-                        <p className="text-sm text-ink leading-relaxed font-medium">
-                          Hello! I am your CartPilot personal shopping assistant. Tell me what you need (e.g. "I want a Hand Blender and Honey Jar", "iPhone with case and charger"), and I will find the right items, verify your budget, and curate your cart with live receipts and smart recommendations.
-                        </p>
+
+                        {/* Quick-Start Suggestion Chips */}
+                        <div className="space-y-2 pt-1">
+                          <p className="text-[11px] font-semibold text-muted uppercase tracking-wider">
+                            Popular Requests
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                            {[
+                              { label: '🕶️ Sunglasses under ₹2,000', query: 'I want sunglasses under 2000' },
+                              { label: '👟 Red sneakers & shoes', query: 'looking for red shoes under 3000' },
+                              { label: '✨ Luxury perfume & fragrances', query: 'buy luxury perfume' },
+                              { label: '⌚ Designer watch for gifting', query: 'watch for gift under 5000' },
+                            ].map((item, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => handleSendMessage(item.query)}
+                                className="group flex items-center justify-between p-3 rounded-xl border border-[#ebeaf0] bg-[#faf9fc] hover:bg-[#efeaff] hover:border-violet/30 transition-all text-xs font-medium text-ink cursor-pointer"
+                              >
+                                <span>{item.label}</span>
+                                <span className="text-muted group-hover:text-violet group-hover:translate-x-0.5 transition-all">→</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Guardrail Micro-Badges */}
+                        <div className="pt-2 border-t border-[#f0eff5] flex items-center justify-center gap-4 text-[11px] text-muted">
+                          <span className="flex items-center gap-1">🛡️ Budget Guardrails</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="flex items-center gap-1">⚡ Instant Checkout</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="flex items-center gap-1">🎯 Tailored Picks</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1306,18 +1536,18 @@ export default function BuyerApp() {
                       {/* In-Chat Payment Link Action Button */}
                       {m.paymentLink && (
                         <div className="mt-3 pt-2.5 border-t border-[#ebeaf0] flex items-center gap-2">
-                          <a
-                            href={m.paymentLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2a9a71] text-white text-xs font-bold shadow-md hover:bg-[#23805e] transition-all"
+                          <button
+                            onClick={handleLaunchRazorpayCheckout}
+                            disabled={isLaunchingCheckout}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2a9a71] text-white text-xs font-bold shadow-md hover:bg-[#23805e] transition-all cursor-pointer disabled:opacity-50"
                           >
                             <CreditCard size={14} />
-                            <span>Complete Payment on Razorpay</span>
+                            <span>{isLaunchingCheckout ? 'Connecting to Razorpay...' : 'Complete Payment on Razorpay'}</span>
                             <ExternalLink size={13} />
-                          </a>
+                          </button>
                         </div>
                       )}
+
 
                       {/* In-Chat Interactive Recommendation Cards / Carousel */}
                       {m.recommendations && m.recommendations.length > 0 && (
@@ -1485,35 +1715,35 @@ export default function BuyerApp() {
                     </div>
                   </div>
 
-                  {/* Proceed to Payment Button */}
-                  <button
-                    onClick={() => {
-                      const amount = cartTotalRupees.toFixed(2);
-                      const link = paymentData?.payment_link || 'https://rzp.io/l/demo_cartpilot';
+                  {/* Proceed to Payment Button or Paid State */}
+                  {paymentData?.status === 'SUCCEEDED' ? (
+                    <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                      <div className="flex items-center justify-center gap-1.5 text-emerald-700 font-bold text-xs mb-1">
+                        <CheckCircle size={16} />
+                        <span>Payment Confirmed (₹{cartTotalRupees.toFixed(2)})</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-600 mb-3">
+                        Order settled and recorded in cryptographic ledger.
+                      </p>
+                      <button
+                        onClick={handleNewChat}
+                        className="text-xs font-bold text-emerald-700 bg-white border border-emerald-300 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors shadow-xs cursor-pointer"
+                      >
+                        Start New Cart
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleLaunchRazorpayCheckout}
+                      disabled={isLaunchingCheckout}
+                      className="w-full h-11 bg-[#2a9a71] text-white font-bold text-xs rounded-xl shadow-md hover:bg-[#23805e] transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer disabled:opacity-50"
+                    >
+                      <CreditCard size={16} />
+                      <span>{isLaunchingCheckout ? 'Connecting to Razorpay...' : `Proceed to Payment (₹${cartTotalRupees.toFixed(2)})`}</span>
+                      <ArrowRight size={14} />
+                    </button>
+                  )}
 
-                      // 1. Redirect to payment page in new window
-                      try {
-                        window.open(link, '_blank');
-                      } catch (e) {}
-
-                      // 2. Post payment awaiting message with clickable link in chat
-                      setMessages((prev) => [
-                        ...prev,
-                        {
-                          role: 'agent' as const,
-                          content: `Payment awaited for ₹${amount}. Your order has been placed and is pending payment confirmation.`,
-                          paymentLink: link,
-                          timestamp: Date.now(),
-                        }
-                      ]);
-                      toast.success(`Order placed! Redirecting to payment for ₹${amount}...`);
-                    }}
-                    className="w-full h-11 bg-[#2a9a71] text-white font-bold text-xs rounded-xl shadow-md hover:bg-[#23805e] transition-all flex items-center justify-center gap-2 mt-4"
-                  >
-                    <CreditCard size={16} />
-                    <span>Proceed to Payment (₹{cartTotalRupees.toFixed(2)})</span>
-                    <ArrowRight size={14} />
-                  </button>
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted">

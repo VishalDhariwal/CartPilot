@@ -33,6 +33,8 @@ TABLES_IN_ORDER = [
     "growth_actions",
     "growth_outcomes",
     "promotion_experiments",
+    "cart_recovery_offers",
+    "festival_calendar",
 ]
 
 def migrate():
@@ -75,6 +77,7 @@ def migrate():
         pg_conn.commit()
 
     # 3. Migrate each table in dependency order
+    pg_cur.execute("SET session_replication_role = 'replica';")
     for table in TABLES_IN_ORDER:
         try:
             sq_cur.execute(f"SELECT * FROM {table}")
@@ -106,9 +109,11 @@ def migrate():
         except Exception as e:
             pg_conn.rollback()
             print(f"  ⚠️ Error migrating table '{table}': {e}")
+    pg_cur.execute("SET session_replication_role = 'origin';")
+    pg_conn.commit()
 
     # 4. Sync PostgreSQL Auto-Increment Sequences
-    for seq_table, seq_col in [("audit_log", "id"), ("upsell_events", "id")]:
+    for seq_table, seq_col in [("audit_log", "id"), ("upsell_events", "id"), ("festival_calendar", "id")]:
         try:
             pg_cur.execute(f"SELECT COALESCE(MAX({seq_col}), 0) + 1 FROM {seq_table}")
             next_val = pg_cur.fetchone()[0]

@@ -1,4 +1,30 @@
 services:
+  # =========================================================================
+  # Dedicated PostgreSQL Database Service
+  # =========================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: cartpilot-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cartpilot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./ops/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cartpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # =========================================================================
+  # CartPilot Unified Application Service (FastAPI + React Merchant Console)
+  # =========================================================================
   cartpilot:
     build:
       context: .
@@ -11,16 +37,17 @@ services:
       - .env
     environment:
       - PORT=8000
-    volumes:
-      # Persist SQLite database across container restarts
-      - cartpilot_data:/app/data
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/cartpilot
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/catalog"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/catalog/ingest/status"]
+      interval: 20s
+      timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
 volumes:
-  cartpilot_data:
-    name: cartpilot_data
+  postgres_data:
+    name: cartpilot_postgres_data

@@ -1,9 +1,9 @@
 -- ============================================================================
--- CartPilot Enterprise PostgreSQL Schema (Azure Flexible Server)
+-- CartPilot Enterprise PostgreSQL Schema (Azure Flexible Server / Local Postgres)
 -- Migration: 001_initial_schema.sql
 -- ============================================================================
 
--- Catalog table with metadata and vector embeddings
+-- Catalog table with rich metadata and vector embeddings
 CREATE TABLE IF NOT EXISTS catalog (
     sku VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -12,11 +12,15 @@ CREATE TABLE IF NOT EXISTS catalog (
     category VARCHAR(128) NOT NULL,
     merchant VARCHAR(128) NOT NULL,
     boosted INTEGER NOT NULL DEFAULT 0,
+    boost_weight REAL NOT NULL DEFAULT 1.0,
+    boost_reason TEXT,
+    boost_source VARCHAR(64) NOT NULL DEFAULT 'system',
     image_url TEXT,
     description TEXT,
     tags TEXT,
     metadata JSONB DEFAULT '{}'::jsonb,
-    embedding TEXT
+    embedding TEXT,
+    co_purchase_embedding TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_catalog_category ON catalog(category);
@@ -27,7 +31,11 @@ CREATE TABLE IF NOT EXISTS policy_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     spend_cap_paise BIGINT NOT NULL,
     allowed_categories TEXT NOT NULL,
-    autonomy_threshold_paise BIGINT NOT NULL DEFAULT 500000
+    autonomy_threshold_paise BIGINT NOT NULL DEFAULT 500000,
+    growth_mode VARCHAR(32) NOT NULL DEFAULT 'manual',
+    recovery_idle_threshold_minutes INTEGER NOT NULL DEFAULT 120,
+    recovery_attribution_percent INTEGER NOT NULL DEFAULT 60,
+    max_active_promotions INTEGER NOT NULL DEFAULT 5
 );
 
 -- Intent Mandates (Immutable capture of buyer procurement requests)
@@ -55,6 +63,9 @@ CREATE TABLE IF NOT EXISTS cart_mandates (
     cancellation_status VARCHAR(32) NOT NULL DEFAULT 'NONE',
     fulfillment_status VARCHAR(32) NOT NULL DEFAULT 'UNFULFILLED',
     return_status VARCHAR(32) NOT NULL DEFAULT 'NONE',
+    expires_at TIMESTAMPTZ,
+    consumed_at TIMESTAMPTZ,
+    consumed_by_payment_id VARCHAR(64),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -100,14 +111,16 @@ CREATE TABLE IF NOT EXISTS refunds (
 
 CREATE INDEX IF NOT EXISTS idx_refunds_payment ON refunds(payment_id);
 
--- Immutable Audit Log
+-- Immutable Audit Log with Hash Chaining
 CREATE TABLE IF NOT EXISTS audit_log (
     id BIGSERIAL PRIMARY KEY,
     ref_type VARCHAR(64) NOT NULL,
     ref_id VARCHAR(64) NOT NULL,
     event VARCHAR(128) NOT NULL,
     detail TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    prev_hash VARCHAR(64) NOT NULL DEFAULT 'GENESIS_00000000000000000000000000000000',
+    hash VARCHAR(64) NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT NOW()::text
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_ref ON audit_log(ref_id);
@@ -174,18 +187,18 @@ CREATE TABLE IF NOT EXISTS category_compatibility (
 
 -- AI Growth Agent: Actions & Opportunities Ledger
 CREATE TABLE IF NOT EXISTS growth_actions (
-    id VARCHAR(64) PRIMARY KEY,
-    action_type VARCHAR(64) NOT NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'detected',
-    opportunity_type VARCHAR(64) NOT NULL,
-    title VARCHAR(255) NOT NULL,
+    id TEXT PRIMARY KEY,
+    action_type VARCHAR(128) NOT NULL,
+    status VARCHAR(64) NOT NULL DEFAULT 'detected',
+    opportunity_type VARCHAR(128) NOT NULL,
+    title TEXT NOT NULL,
     explanation TEXT NOT NULL,
-    affected_ref VARCHAR(64),
+    affected_ref TEXT,
     est_revenue_paise BIGINT DEFAULT 0,
     confidence DOUBLE PRECISION DEFAULT 0.0,
     recommended_action TEXT,
-    execution_ref VARCHAR(64),
-    mode VARCHAR(32) DEFAULT 'manual',
+    execution_ref TEXT,
+    mode VARCHAR(64) DEFAULT 'manual',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     executed_at TIMESTAMPTZ,
     dismissed_at TIMESTAMPTZ,
@@ -258,3 +271,43 @@ CREATE TABLE IF NOT EXISTS promotion_experiments (
 
 CREATE INDEX IF NOT EXISTS idx_promotion_experiments_sku ON promotion_experiments(sku);
 CREATE INDEX IF NOT EXISTS idx_promotion_experiments_status ON promotion_experiments(status);
+
+-- Cart Abandonment Recovery Offers
+CREATE TABLE IF NOT EXISTS cart_recovery_offers (
+    id VARCHAR(64) PRIMARY KEY,
+    cart_id VARCHAR(64) NOT NULL,
+    coupon_code VARCHAR(64) NOT NULL UNIQUE,
+    discount_pct INTEGER NOT NULL,
+    discount_paise BIGINT NOT NULL,
+    original_total_paise BIGINT NOT NULL,
+    discounted_total_paise BIGINT NOT NULL,
+    session_id VARCHAR(64),
+    items_summary TEXT,
+    reason TEXT,
+    ai_nudge_message TEXT,
+    status VARCHAR(32) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    redeemed_at TIMESTAMPTZ,
+    redeemed_by_payment_id VARCHAR(64)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cro_cart_id ON cart_recovery_offers(cart_id);
+CREATE INDEX IF NOT EXISTS idx_cro_status_exp ON cart_recovery_offers(status, expires_at);
+
+-- Festival Calendar for Autonomous Merchandising
+CREATE TABLE IF NOT EXISTS festival_calendar (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    month INTEGER NOT NULL,
+    day INTEGER NOT NULL,
+    duration_days INTEGER NOT NULL DEFAULT 7,
+    themes JSONB NOT NULL DEFAULT '[]'::jsonb,
+    custom_categories JSONB,
+    lift_multiplier DOUBLE PRECISION NOT NULL DEFAULT 1.35,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fest_active_month ON festival_calendar(is_active, month);

@@ -1,0 +1,120 @@
+name: Build and Publish Azure Container Image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      image_name:
+        description: 'Image name inside Azure Container Registry'
+        required: false
+        type: string
+        default: 'cartpilot-app'
+      push_latest:
+        description: 'Also tag and push as latest'
+        required: false
+        type: boolean
+        default: true
+      platform:
+        description: 'Target platform for container'
+        required: false
+        type: string
+        default: 'linux/amd64'
+
+env:
+  DEFAULT_IMAGE_NAME: 'cartpilot-app'
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Image to ACR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Resolve Configuration
+        id: config
+        run: |
+          # Prioritize secret ACR_LOGIN_SERVER, fallback to repository variable
+          REGISTRY="${{ secrets.ACR_LOGIN_SERVER || vars.ACR_LOGIN_SERVER }}"
+          if [ -z "$REGISTRY" ]; then
+            echo "::error::Neither secrets.ACR_LOGIN_SERVER nor vars.ACR_LOGIN_SERVER is defined. Please set this in GitHub Repository Settings."
+            exit 1
+          fi
+
+          IMG_NAME="${{ inputs.image_name || env.DEFAULT_IMAGE_NAME }}"
+          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
+          echo "image_name=$IMG_NAME" >> $GITHUB_OUTPUT
+          echo "full_image=$REGISTRY/$IMG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Authentication Option 1: Azure Service Principal (if AZURE_CREDENTIALS secret is set)
+      - name: Azure CLI Login
+        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to ACR via Azure CLI
+        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        run: |
+          REGISTRY="${{ steps.config.outputs.registry }}"
+          ACR_NAME="${REGISTRY%%.*}"
+          az acr login --name "$ACR_NAME"
+
+      # Authentication Option 2: Direct ACR Credentials (if ACR_USERNAME & ACR_PASSWORD are set)
+      - name: Log in to ACR via Registry Credentials
+        if: ${{ secrets.AZURE_CREDENTIALS == '' && secrets.ACR_USERNAME != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.config.outputs.registry }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # Extract metadata (tags, labels) for Docker
+      - name: Docker Metadata & Tag Management
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.config.outputs.full_image }}
+          tags: |
+            type=raw,value=latest,enable=${{ inputs.push_latest == true || github.ref == 'refs/heads/main' }}
+            type=sha,format=short,prefix=
+            type=sha,format=long,prefix=sha-
+            type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=ref,event=tag
+
+      # Build and push the Docker image
+      - name: Build and Push Docker Image
+        id: build_push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ inputs.platform || 'linux/amd64' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish Action Summary
+        run: |
+          echo "### 🚀 Azure Container Registry Build Succeeded" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: \`${{ steps.config.outputs.registry }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ steps.config.outputs.image_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`${{ steps.build_push.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Published Image Tags:" >> $GITHUB_STEP_SUMMARY
+          for tag in ${{ steps.meta.outputs.tags }}; do
+            echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
+          done

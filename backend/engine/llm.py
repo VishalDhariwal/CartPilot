@@ -19,10 +19,30 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 T = TypeVar("T", bound=BaseModel)
 
-# Preferred Gemini models in priority order (fast lite model first to prevent quota delays)
-GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.6-flash"]
+# Preferred Gemini models in priority order (fastest stable models first)
+GEMINI_MODELS = ["gemini-3-flash-preview", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"]
 OPENAI_MODEL = "gpt-4o-mini"
-MAX_STRUCTURED_RETRIES = 2
+MAX_STRUCTURED_RETRIES = 1
+LLM_CALL_TIMEOUT_SECONDS = 8
+
+_gemini_client = None
+
+def get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        from google import genai
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is not set.")
+        _gemini_client = genai.Client(api_key=api_key)
+    return _gemini_client
+
+def _run_with_timeout(fn, timeout_seconds=LLM_CALL_TIMEOUT_SECONDS):
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(fn)
+        return future.result(timeout=timeout_seconds)
+
 
 
 class LLMValidationError(Exception):
@@ -98,14 +118,9 @@ def _call_gemini_structured(
     max_retries: int = MAX_STRUCTURED_RETRIES
 ) -> T:
     """Call Google Gemini with structured JSON output enforced and error-feedback retry loop."""
-    from google import genai
     from google.genai import types
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY is not set.")
-
-    client = genai.Client(api_key=api_key)
+    client = get_gemini_client()
     schema_json = json.dumps(schema.model_json_schema(), indent=2)
     current_prompt = prompt
     last_err = None
@@ -124,14 +139,16 @@ def _call_gemini_structured(
 
         for model_name in GEMINI_MODELS:
             try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=instruction,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.2
+                def _do_call(target_model=model_name):
+                    return client.models.generate_content(
+                        model=target_model,
+                        contents=instruction,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.2
+                        )
                     )
-                )
+                response = _run_with_timeout(_do_call, timeout_seconds=LLM_CALL_TIMEOUT_SECONDS)
                 raw_text = response.text.strip()
                 # Clean possible markdown block
                 if raw_text.startswith("```json"):
@@ -244,15 +261,17 @@ def generate_text(
                 res = client.chat.completions.create(model=OPENAI_MODEL, messages=msgs, temperature=0.3)
                 return res.choices[0].message.content or ""
             elif provider == "gemini":
-                from google import genai
-                client = genai.Client(api_key=gemini_key)
+                client = get_gemini_client()
                 full = prompt
                 if system_prompt:
                     full = f"{system_prompt}\n\n{prompt}"
                 for m in GEMINI_MODELS:
                     try:
-                        res = client.models.generate_content(model=m, contents=full)
-                        return res.text or ""
+                        def _do_text_call(target_model=m):
+                            return client.models.generate_content(model=target_model, contents=full)
+                        res = _run_with_timeout(_do_text_call, timeout_seconds=LLM_CALL_TIMEOUT_SECONDS)
+                        if res and res.text:
+                            return res.text.strip()
                     except Exception:
                         continue
         except Exception as e:

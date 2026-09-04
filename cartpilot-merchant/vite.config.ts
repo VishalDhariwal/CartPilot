@@ -237,5 +237,31 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/checkout": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/catalog": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/webhook": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/resolution": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/recovery": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
   },
 });

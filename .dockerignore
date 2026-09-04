@@ -1,14 +1,30 @@
-__pycache__
+# Python artifacts
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
-.pytest_cache
-venv
+.pytest_cache/
+venv/
 .env
-.DS_Store
-.git
+.env.local
+tests/
+# Databases & SQLite
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Node / Merchant Console Frontend
+cartpilot-merchant/node_modules/
+cartpilot-merchant/dist/
+cartpilot-merchant/.vite/
+cartpilot-merchant/.manus-logs/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Git & OS
+.git/
 .gitignore
-frontend/node_modules
-frontend/dist
-frontend/.vite
-scratch
+.DS_Store
+scratch/

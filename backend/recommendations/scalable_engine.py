@@ -77,6 +77,7 @@ def generate_category_compatibility() -> dict:
         "SELECT category_a, category_b FROM category_compatibility WHERE editable = 0"
     )
     locked_pairs = {(r["category_a"], r["category_b"]) for r in cursor.fetchall()}
+    conn.close()
 
     cat_list_str = "\n".join(f"- {c}" for c in categories)
 
@@ -107,8 +108,10 @@ RULES:
         pairs = data.pairs
     except Exception as e:
         print(f"⚠️ LLM call failed for category compatibility: {e}")
-        conn.close()
         return {"inserted": 0, "skipped_locked": 0, "total_categories": len(categories)}
+
+    conn = get_db()
+    cursor = conn.cursor()
 
     now_iso = datetime.utcnow().isoformat() + "Z"
     cat_set = set(categories)

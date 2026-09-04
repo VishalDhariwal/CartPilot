@@ -3,10 +3,15 @@ import json
 import sqlite3
 import re
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.environ.get("CARTPILOT_DB") or os.path.join(BASE_DIR, "cartpilot.db")
-DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL") or os.environ.get("AZURE_POSTGRESQL_CONNECTIONSTRING")
+
+def get_database_url() -> str:
+    return os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL") or os.environ.get("AZURE_POSTGRESQL_CONNECTIONSTRING") or ""
 
 # Optional psycopg2 import for PostgreSQL support
 try:
@@ -17,56 +22,113 @@ except ImportError:
     PSYCOPG2_AVAILABLE = False
 
 
+class PostgresRow(dict):
+    """
+    Transparent dictionary row subclass for PostgreSQL that supports both dict key access
+    (row['sku']) and integer indexing (row[0]), perfectly mirroring sqlite3.Row.
+    """
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        if isinstance(key, int):
+            vals = list(self.values())
+            return vals[key] if 0 <= key < len(vals) else default
+        return super().get(key, default)
+
+
 class PostgresCursorWrapper:
     """
     Transparent cursor wrapper for PostgreSQL that provides SQLite-compatible
-    parameter translation (? -> %s) and dictionary row access.
+    parameter translation (? -> %s), upsert translation, and hybrid dictionary/index row access.
     """
     def __init__(self, raw_cursor, conn):
         self._cursor = raw_cursor
         self._conn = conn
 
     def _translate_query(self, query: str) -> str:
-        # Translate '?' placeholders to '%s'
-        # Also translate 'INSERT OR REPLACE INTO table' to PostgreSQL UPSERT if standard
         q = query
         if "?" in q:
             # Replace ? with %s safely
             q = re.sub(r'\?', '%s', q)
         if "INSERT OR REPLACE INTO" in q:
-            # Replace with standard INSERT (tables have ON CONFLICT or fallback)
-            q = q.replace("INSERT OR REPLACE INTO", "INSERT INTO")
+            if "INSERT OR REPLACE INTO catalog" in q and "ON CONFLICT" not in q:
+                q = q.replace("INSERT OR REPLACE INTO catalog", "INSERT INTO catalog")
+                q += " ON CONFLICT (sku) DO UPDATE SET name=EXCLUDED.name, price_paise=EXCLUDED.price_paise, stock=EXCLUDED.stock, category=EXCLUDED.category, merchant=EXCLUDED.merchant, boosted=EXCLUDED.boosted, image_url=EXCLUDED.image_url, description=EXCLUDED.description, tags=EXCLUDED.tags, metadata=EXCLUDED.metadata"
+            elif "INSERT OR REPLACE INTO policy_config" in q and "ON CONFLICT" not in q:
+                q = q.replace("INSERT OR REPLACE INTO policy_config", "INSERT INTO policy_config")
+                q += " ON CONFLICT (id) DO UPDATE SET spend_cap_paise=EXCLUDED.spend_cap_paise, allowed_categories=EXCLUDED.allowed_categories, autonomy_threshold_paise=EXCLUDED.autonomy_threshold_paise"
+            elif "INSERT OR REPLACE INTO basket_pairs" in q and "ON CONFLICT" not in q:
+                q = q.replace("INSERT OR REPLACE INTO basket_pairs", "INSERT INTO basket_pairs")
+                q += " ON CONFLICT (sku_a, sku_b) DO UPDATE SET lift=EXCLUDED.lift, support=EXCLUDED.support, confidence=EXCLUDED.confidence, reasoning=EXCLUDED.reasoning, co_occurrence_count=EXCLUDED.co_occurrence_count"
+            else:
+                q = q.replace("INSERT OR REPLACE INTO", "INSERT INTO")
+        if "cm.items != ''" in q or "cm.items != '[]'" in q:
+            q = q.replace("AND cm.items != '[]'", "").replace("AND cm.items != ''", "AND (cm.items::text NOT IN ('[]', '\"\"', 'null', ''))")
+        if "items LIKE" in q:
+            q = q.replace("items LIKE", "items::text LIKE")
+        if "rowid" in q:
+            q = q.replace("rowid", "sku")
         return q
 
     def execute(self, query, params=None):
         translated = self._translate_query(query)
-        if params is not None:
-            if isinstance(params, (list, tuple)):
-                # Convert list to tuple for psycopg2
-                return self._cursor.execute(translated, tuple(params))
-            return self._cursor.execute(translated, params)
-        return self._cursor.execute(translated)
+        try:
+            if params is not None:
+                if isinstance(params, (list, tuple)):
+                    return self._cursor.execute(translated, tuple(params))
+                return self._cursor.execute(translated, params)
+            return self._cursor.execute(translated)
+        except Exception:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+            raise
 
     def executemany(self, query, params_list):
         translated = self._translate_query(query)
-        return self._cursor.executemany(translated, params_list)
+        try:
+            return self._cursor.executemany(translated, params_list)
+        except Exception:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+            raise
 
     def executescript(self, script: str):
-        # Execute semicolon separated statements
-        for stmt in script.strip().split(";"):
-            cleaned = stmt.strip()
-            if cleaned:
-                self._cursor.execute(cleaned)
+        # Execute script directly or statement by statement
+        try:
+            self._cursor.execute(script)
+        except Exception:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+            for stmt in script.strip().split(";"):
+                cleaned = stmt.strip()
+                if cleaned:
+                    try:
+                        self._cursor.execute(cleaned)
+                        self._conn.commit()
+                    except Exception:
+                        try:
+                            self._conn.rollback()
+                        except Exception:
+                            pass
 
     def fetchone(self):
         row = self._cursor.fetchone()
         if row is None:
             return None
-        return dict(row)
+        return PostgresRow(row)
 
     def fetchall(self):
         rows = self._cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [PostgresRow(r) for r in rows]
 
     @property
     def rowcount(self):
@@ -75,6 +137,10 @@ class PostgresCursorWrapper:
     @property
     def lastrowid(self):
         return getattr(self._cursor, "lastrowid", None)
+
+    @property
+    def description(self):
+        return self._cursor.description
 
     def close(self):
         return self._cursor.close()
@@ -106,11 +172,34 @@ class PostgresConnectionWrapper:
         return cur
 
 
+import time
+
+def connect_postgres(db_url: str, max_retries: int = 1, delay: float = 2.0):
+    """
+    Connects to PostgreSQL with automatic retry loop for Docker / cloud startup resilience.
+    """
+    last_err = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return psycopg2.connect(db_url)
+        except psycopg2.OperationalError as e:
+            last_err = e
+            if attempt < max_retries:
+                print(f"⏳ Waiting for PostgreSQL ({attempt}/{max_retries})... retrying in {delay}s")
+                time.sleep(delay)
+            else:
+                print(f"❌ Could not connect to PostgreSQL after {max_retries} attempts: {e}")
+                raise last_err
+
 def is_postgres() -> bool:
-    return bool(DATABASE_URL and (DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://")))
+    cartpilot_db = os.environ.get("CARTPILOT_DB")
+    if cartpilot_db and ("/tmp" in cartpilot_db or "test" in cartpilot_db):
+        return False
+    db_url = get_database_url()
+    return bool(db_url and (db_url.startswith("postgres://") or db_url.startswith("postgresql://")))
 
 
-def get_db():
+def get_db(retries: int = 3):
     """
     Returns a unified database connection:
     - PostgreSQL connection when DATABASE_URL is configured.
@@ -119,7 +208,8 @@ def get_db():
     if is_postgres():
         if not PSYCOPG2_AVAILABLE:
             raise RuntimeError("psycopg2 is required for PostgreSQL. Run: pip install psycopg2-binary")
-        raw_conn = psycopg2.connect(DATABASE_URL)
+        db_url = get_database_url()
+        raw_conn = connect_postgres(db_url, max_retries=retries)
         return PostgresConnectionWrapper(raw_conn)
 
     # SQLite fallback with WAL and timeout
@@ -132,12 +222,13 @@ def get_db():
     return conn
 
 
-def init_db():
+def init_db(max_retries: int = 10):
     """
     Initializes database schema and baseline catalog / policy seeds.
     Automatically applies PostgreSQL DDL or SQLite DDL depending on the active engine.
+    Uses retries to wait for database container readiness on cold start.
     """
-    conn = get_db()
+    conn = get_db(retries=max_retries)
     cursor = conn.cursor()
 
     if is_postgres():
@@ -146,6 +237,8 @@ def init_db():
             with open(migration_file, "r") as f:
                 cursor.executescript(f.read())
             conn.commit()
+        else:
+            print(f"ℹ️ Migration file {migration_file} not found; assuming database initialized externally.")
     else:
         # SQLite Schema Initialization
         cursor.executescript('''
@@ -409,51 +502,52 @@ def init_db():
         ''')
         conn.commit()
 
-    # ── Safe Column Alterations for Existing Databases ───────────────────
-    for table_name, col_name, col_type in [
-        ("catalog", "boosted", "INTEGER NOT NULL DEFAULT 0"),
-        ("catalog", "boost_weight", "REAL NOT NULL DEFAULT 1.0"),
-        ("catalog", "boost_reason", "TEXT"),
-        ("catalog", "boost_source", "TEXT NOT NULL DEFAULT 'system'"),
-        ("catalog", "image_url", "TEXT"),
-        ("catalog", "description", "TEXT"),
-        ("catalog", "tags", "TEXT"),
-        ("catalog", "metadata", "TEXT"),
-        ("catalog", "embedding", "TEXT"),
-        ("catalog", "co_purchase_embedding", "TEXT"),
-        ("intent_mandates", "channel", "TEXT NOT NULL DEFAULT 'web_chat'"),
-        ("policy_config", "autonomy_threshold_paise", "INTEGER NOT NULL DEFAULT 500000"),
-        ("policy_config", "growth_mode", "TEXT NOT NULL DEFAULT 'manual'"),
-        ("policy_config", "recovery_idle_threshold_minutes", "INTEGER NOT NULL DEFAULT 120"),
-        ("policy_config", "recovery_attribution_percent", "INTEGER NOT NULL DEFAULT 60"),
-        ("policy_config", "max_active_promotions", "INTEGER NOT NULL DEFAULT 5"),
-        ("payment_mandates", "recovery_action", "TEXT"),
-        ("upsell_events", "action_id", "TEXT"),
-        ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0"),
-        ("basket_pairs", "retired", "INTEGER NOT NULL DEFAULT 0"),
-        ("basket_pairs", "source", "TEXT NOT NULL DEFAULT 'ai_suggested'"),
-        ("basket_pairs", "reasoning", "TEXT"),
-        ("basket_pairs", "co_occurrence_count", "INTEGER DEFAULT 0"),
-        ("basket_pairs", "confidence", "REAL"),
-        ("cart_mandates", "order_status", "TEXT NOT NULL DEFAULT 'CREATED'"),
-        ("cart_mandates", "cancellation_status", "TEXT NOT NULL DEFAULT 'NONE'"),
-        ("cart_mandates", "fulfillment_status", "TEXT NOT NULL DEFAULT 'UNFULFILLED'"),
-        ("cart_mandates", "return_status", "TEXT NOT NULL DEFAULT 'NONE'"),
-        ("cart_mandates", "expires_at", "TEXT"),
-        ("cart_mandates", "consumed_at", "TEXT"),
-        ("cart_mandates", "consumed_by_payment_id", "TEXT"),
-        ("audit_log", "prev_hash", "TEXT NOT NULL DEFAULT 'GENESIS_00000000000000000000000000000000'"),
-        ("audit_log", "hash", "TEXT NOT NULL DEFAULT ''"),
-        ("payment_mandates", "refund_status", "TEXT NOT NULL DEFAULT 'NONE'"),
-        ("payment_mandates", "refund_amount_paise", "INTEGER NOT NULL DEFAULT 0"),
-        ("payment_mandates", "refunded_amount_paise", "INTEGER NOT NULL DEFAULT 0"),
-        ("payment_mandates", "razorpay_refund_id", "TEXT"),
-    ]:
-        try:
-            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
-            conn.commit()
-        except Exception:
-            pass
+    # ── Safe Column Alterations for Existing SQLite Databases ────────────
+    if not is_postgres():
+        for table_name, col_name, col_type in [
+            ("catalog", "boosted", "INTEGER NOT NULL DEFAULT 0"),
+            ("catalog", "boost_weight", "REAL NOT NULL DEFAULT 1.0"),
+            ("catalog", "boost_reason", "TEXT"),
+            ("catalog", "boost_source", "TEXT NOT NULL DEFAULT 'system'"),
+            ("catalog", "image_url", "TEXT"),
+            ("catalog", "description", "TEXT"),
+            ("catalog", "tags", "TEXT"),
+            ("catalog", "metadata", "TEXT"),
+            ("catalog", "embedding", "TEXT"),
+            ("catalog", "co_purchase_embedding", "TEXT"),
+            ("intent_mandates", "channel", "TEXT NOT NULL DEFAULT 'web_chat'"),
+            ("policy_config", "autonomy_threshold_paise", "INTEGER NOT NULL DEFAULT 500000"),
+            ("policy_config", "growth_mode", "TEXT NOT NULL DEFAULT 'manual'"),
+            ("policy_config", "recovery_idle_threshold_minutes", "INTEGER NOT NULL DEFAULT 120"),
+            ("policy_config", "recovery_attribution_percent", "INTEGER NOT NULL DEFAULT 60"),
+            ("policy_config", "max_active_promotions", "INTEGER NOT NULL DEFAULT 5"),
+            ("payment_mandates", "recovery_action", "TEXT"),
+            ("upsell_events", "action_id", "TEXT"),
+            ("basket_pairs", "muted", "INTEGER NOT NULL DEFAULT 0"),
+            ("basket_pairs", "retired", "INTEGER NOT NULL DEFAULT 0"),
+            ("basket_pairs", "source", "TEXT NOT NULL DEFAULT 'ai_suggested'"),
+            ("basket_pairs", "reasoning", "TEXT"),
+            ("basket_pairs", "co_occurrence_count", "INTEGER DEFAULT 0"),
+            ("basket_pairs", "confidence", "REAL"),
+            ("cart_mandates", "order_status", "TEXT NOT NULL DEFAULT 'CREATED'"),
+            ("cart_mandates", "cancellation_status", "TEXT NOT NULL DEFAULT 'NONE'"),
+            ("cart_mandates", "fulfillment_status", "TEXT NOT NULL DEFAULT 'UNFULFILLED'"),
+            ("cart_mandates", "return_status", "TEXT NOT NULL DEFAULT 'NONE'"),
+            ("cart_mandates", "expires_at", "TEXT"),
+            ("cart_mandates", "consumed_at", "TEXT"),
+            ("cart_mandates", "consumed_by_payment_id", "TEXT"),
+            ("audit_log", "prev_hash", "TEXT NOT NULL DEFAULT 'GENESIS_00000000000000000000000000000000'"),
+            ("audit_log", "hash", "TEXT NOT NULL DEFAULT ''"),
+            ("payment_mandates", "refund_status", "TEXT NOT NULL DEFAULT 'NONE'"),
+            ("payment_mandates", "refund_amount_paise", "INTEGER NOT NULL DEFAULT 0"),
+            ("payment_mandates", "refunded_amount_paise", "INTEGER NOT NULL DEFAULT 0"),
+            ("payment_mandates", "razorpay_refund_id", "TEXT"),
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+                conn.commit()
+            except Exception:
+                pass
 
     # ── Seed Policy Config ───────────────────────────────────────────────
     all_allowed = [

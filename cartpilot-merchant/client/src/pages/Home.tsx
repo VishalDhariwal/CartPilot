@@ -7,15 +7,17 @@ import {
   Network, Plus, Save, Search, Settings2, ShieldCheck,
   ShoppingCart, Store, Sun, TrendingUp, Users, X, Zap, LogOut, CheckCircle, Trash2,
   Lock, RefreshCw, Play, Sliders, FileText, Download, ChevronDown, Check, AlertCircle,
-  PanelLeftClose, PanelLeftOpen, Clock, ArrowRight, CloudRain, Cloud, Calendar, Sparkles
+  PanelLeftClose, PanelLeftOpen, Clock, ArrowRight, CloudRain, Cloud, Calendar, Sparkles,
+  Database
 } from "lucide-react";
 import { toast } from "sonner";
 import GrowthManager from "./merchant/GrowthManager";
 import GrowthRules from "./merchant/GrowthRules";
 import AuditTrail from "./merchant/AuditTrail";
 import CampaignStudio from "./merchant/CampaignStudio";
+import CatalogIngestModal from "../components/CatalogIngestModal";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 interface NavItem {
   label: string;
@@ -259,7 +261,7 @@ function Sidebar({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggle
 }
 
 // ── Top Navigation Header with Robot Autonomy Dropdown & Merchant Store Name ─
-function Header() {
+function Header({ onOpenIngestModal }: { onOpenIngestModal?: () => void }) {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -333,7 +335,19 @@ function Header() {
         </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2.5">
+        {/* PostgreSQL Database & Ingest Button */}
+        <button
+          onClick={onOpenIngestModal}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/90 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+          title="Manage PostgreSQL Database & Catalog Ingestion"
+        >
+          <Database size={13} className="text-emerald-600" />
+          <span className="hidden sm:inline">PostgreSQL</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[11px] font-medium text-emerald-700 hidden md:inline">Ingest Data</span>
+        </button>
+
         {/* Robot Agent Autonomy Dropdown Button */}
         <div className="relative" ref={dropdownRef}>
           <button
@@ -2035,7 +2049,7 @@ function Overview() {
 }
 
 // ── Catalog & Senses View (Clear, Intuitive Merchant Merchandising) ───────────
-function CatalogView() {
+function CatalogView({ onOpenIngestModal }: { onOpenIngestModal?: () => void }) {
   const [catalog, setCatalog] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -2089,6 +2103,9 @@ function CatalogView() {
 
   useEffect(() => {
     fetchCatalog();
+    const handleUpdate = () => fetchCatalog();
+    window.addEventListener("catalog-updated", handleUpdate);
+    return () => window.removeEventListener("catalog-updated", handleUpdate);
   }, []);
 
   const handleToggleBoost = async (sku: string, currentBoosted: boolean) => {
@@ -2260,6 +2277,15 @@ function CatalogView() {
             >
               <Zap size={13} />
               <span>Show Boosted ({boostedCount})</span>
+            </button>
+
+            <button
+              onClick={onOpenIngestModal}
+              className="text-xs font-bold px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 transition-all flex items-center gap-1.5 h-10 shadow-2xs cursor-pointer"
+              title="Ingest Catalog via API Key or CSV Upload"
+            >
+              <Database size={13} className="text-indigo-600" />
+              <span>Ingest / Sync</span>
             </button>
 
             <button
@@ -2844,7 +2870,8 @@ function CategoryManagementView() {
           setPairs(Array.isArray(data2) ? data2 : data2.pairs || []);
         }
       }
-    } catch {
+    } catch (err) {
+      console.error("Failed to load category data:", err);
       toast.error("Failed to load category data");
     } finally {
       setLoading(false);
@@ -3658,17 +3685,30 @@ function PolicyView() {
 export default function Home() {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [showIngestModal, setShowIngestModal] = useState(false);
+
+  // Automatic onboarding check on deployment: if catalog is empty, prompt merchant
+  useEffect(() => {
+    fetch(apiUrl("/api/catalog/ingest/status"))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && (data.is_empty || data.requires_ingestion)) {
+          setShowIngestModal(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="app-shell">
       <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed(!collapsed)} />
       <div className={`main-shell ${collapsed ? "collapsed" : ""}`}>
-        <Header />
+        <Header onOpenIngestModal={() => setShowIngestModal(true)} />
         <main className="main-content">
           {location === "/merchant/growth" && <GrowthManager />}
           {location === "/merchant/campaigns" && <CampaignStudio />}
           {location === "/merchant/rules" && <GrowthRules />}
-          {location === "/merchant/catalog" && <CatalogView />}
+          {location === "/merchant/catalog" && <CatalogView onOpenIngestModal={() => setShowIngestModal(true)} />}
           {location === "/merchant/experiments" && <ExperimentsView />}
           {(location === "/merchant/categories" || location === "/merchant/recommendations") && <CategoryManagementView />}
           {location === "/merchant/audit" && <AuditTrail />}
@@ -3676,6 +3716,14 @@ export default function Home() {
           {(location === "/merchant" || location === "/") && <Overview />}
         </main>
       </div>
+
+      <CatalogIngestModal
+        isOpen={showIngestModal}
+        onClose={() => setShowIngestModal(false)}
+        onIngestSuccess={() => {
+          window.dispatchEvent(new CustomEvent("catalog-updated"));
+        }}
+      />
     </div>
   );
 }

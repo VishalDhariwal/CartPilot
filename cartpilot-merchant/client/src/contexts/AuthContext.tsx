@@ -12,7 +12,8 @@ export interface UserProfile {
 
 interface AuthContextType {
   user: UserProfile | null;
-  login: (role: UserRole, profile: Partial<UserProfile>) => void;
+  login: (role: UserRole, profile?: Partial<UserProfile>) => void;
+  signup: (role: UserRole, profile?: Partial<UserProfile>) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -31,16 +32,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const login = (role: UserRole, profile: Partial<UserProfile>) => {
+  const login = (role: UserRole, profile?: Partial<UserProfile>) => {
     const newUser: UserProfile = {
       role,
-      name: profile.name || (role === 'merchant' ? 'Store Owner' : 'Shopper'),
-      email: profile.email || `${role}@cartpilot.io`,
-      storeName: profile.storeName || 'Northstar Supply',
-      spendCapPaise: profile.spendCapPaise || 1000000,
+      name: profile?.name || (role === 'merchant' ? 'Jamie Diaz (Store Owner)' : 'Alex Rivera (Shopper)'),
+      email: profile?.email || `${role === 'merchant' ? 'jamie@northstar.supply' : 'alex@example.com'}`,
+      storeName: profile?.storeName || 'Northstar Supply',
+      spendCapPaise: profile?.spendCapPaise || 1000000,
     };
     setUser(newUser);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+  };
+
+  const signup = (role: UserRole, profile?: Partial<UserProfile>) => {
+    login(role, profile);
   };
 
   const logout = () => {
@@ -49,11 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
 
 export function useAuth() {
   const context = useContext(AuthContext);

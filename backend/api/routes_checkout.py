@@ -3,18 +3,25 @@ from pydantic import BaseModel
 from typing import Optional, List
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from backend.engine.mandates import (
     create_intent_mandate, create_cart_mandate, create_payment_mandate,
-    append_audit_log, get_cart_state
+    append_audit_log, get_cart_state, update_payment_mandate_status
 )
 from backend.engine.guardrail import validate_cart
-from backend.engine.payment_engine import execute_payment_mandate
+from backend.engine.payment_engine import (
+    execute_payment_mandate,
+    verify_and_settle_payment,
+    get_public_checkout_config,
+    CartAlreadyConsumedError,
+)
+
 from backend.agents.buyer_agent import generate_cart_proposal
+
 from backend.agents.growth_agent import generate_upsell
 from backend.agents.substitution_agent import find_substitute
 from backend.db import get_db
@@ -110,7 +117,8 @@ def agent_checkout(req: AgentCheckoutRequest):
             query=req.query,
             spend_cap_paise=req.spend_cap_paise,
             conversation_history=history_dicts,
-            auto_authorize=False
+            auto_authorize=False,
+            current_cart=req.current_cart
         )
 
         intent_obj = {
@@ -585,7 +593,10 @@ def finalize_checkout(req: FinalizeRequest):
             "cart_id": final_cart_id,
             "payment_mandate_id": pay_res["payment_mandate_id"],
             "razorpay_order_id": pay_res["razorpay_order_id"],
-            "amount_paise": pay_res["amount_paise"]
+            "amount_paise": pay_res["amount_paise"],
+            "amount_rupees": pay_res.get("amount_rupees", round(pay_res["amount_paise"] / 100, 2)),
+            "key_id": pay_res.get("key_id", ""),
+            "currency": pay_res.get("currency", "INR")
         }
 
 
@@ -593,7 +604,94 @@ def finalize_checkout(req: FinalizeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class CreateOrderRequest(BaseModel):
+    cart_id: str
+
+
+class VerifyPaymentRequest(BaseModel):
+    cart_id: str
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+@router.post("/create-order")
+def create_checkout_order(req: CreateOrderRequest):
+    """
+    Creates a real Razorpay order for an approved cart mandate.
+    Returns key_id, razorpay_order_id, amount_paise, and currency for Razorpay Standard Checkout SDK.
+    """
+    try:
+        pay_res = execute_payment_mandate(
+            cart_id=req.cart_id,
+            description="CartPilot Order",
+            notes={"cart_id": req.cart_id}
+        )
+        return {
+            "success": True,
+            "cart_id": req.cart_id,
+            "razorpay_order_id": pay_res["razorpay_order_id"],
+            "amount_paise": pay_res["amount_paise"],
+            "amount_rupees": pay_res.get("amount_rupees", round(pay_res["amount_paise"] / 100, 2)),
+            "currency": pay_res.get("currency", "INR"),
+            "key_id": pay_res.get("key_id", ""),
+            "payment_mandate_id": pay_res["payment_mandate_id"],
+            "payment_link_url": pay_res["payment_link_url"]
+        }
+    except CartAlreadyConsumedError:
+        conn = get_db()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM payment_mandates WHERE cart_id = ?", (req.cart_id,))
+            existing_pm = cursor.fetchone()
+            if existing_pm and existing_pm["status"] == "created":
+                cfg = get_public_checkout_config()
+                return {
+                    "success": True,
+                    "cart_id": req.cart_id,
+                    "razorpay_order_id": existing_pm["razorpay_order_id"],
+                    "amount_paise": existing_pm["amount_paise"],
+                    "amount_rupees": round(existing_pm["amount_paise"] / 100, 2),
+                    "currency": "INR",
+                    "key_id": cfg["key_id"],
+                    "payment_mandate_id": existing_pm["id"],
+                    "payment_link_url": f"/pay?cart_id={req.cart_id}&order_id={existing_pm['razorpay_order_id']}&amount={existing_pm['amount_paise']}"
+                }
+            raise HTTPException(status_code=400, detail="Cart has already been consumed or settled.")
+        finally:
+            conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+@router.post("/verify")
+def verify_payment(req: VerifyPaymentRequest):
+    """
+    Verifies cryptographic Razorpay payment signature and settles order.
+    """
+    try:
+        res = verify_and_settle_payment(
+            cart_id=req.cart_id,
+            razorpay_order_id=req.razorpay_order_id,
+            razorpay_payment_id=req.razorpay_payment_id,
+            razorpay_signature=req.razorpay_signature
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/config")
+def get_checkout_config():
+    """
+    Returns public Razorpay configuration (Key ID only) for client-side checkout.
+    """
+    return get_public_checkout_config()
+
+
 class PostPurchaseAddRequest(BaseModel):
+
     parent_cart_id: str
     sku: str
     qty: int = 1
@@ -709,6 +807,7 @@ class OrchestratedCheckoutRequest(BaseModel):
     session_id: Optional[str] = None
     auto_authorize: bool = False
     conversation_history: Optional[list[ChatHistoryMessage]] = None
+    current_cart: Optional[list[dict]] = None
 
 
 @router.post("/orchestrated-checkout")
@@ -727,7 +826,8 @@ def orchestrated_checkout(req: OrchestratedCheckoutRequest):
             spend_cap_paise=req.spend_cap_paise,
             session_id=req.session_id,
             auto_authorize=req.auto_authorize,
-            conversation_history=history_dicts
+            conversation_history=history_dicts,
+            current_cart=req.current_cart
         )
         
         return {
@@ -859,5 +959,162 @@ def get_trending_prompts(refresh: bool = False):
             }
         ]
         return {"prompts": _TRENDING_PROMPTS_CACHE["data"] or fallback}
+
+
+# ─── Mock Razorpay Payment Simulator & Auto-Settlement ──────────────────────
+
+class MockPayPayload(BaseModel):
+    cart_id: Optional[str] = None
+    order_id: Optional[str] = None
+    amount_paise: Optional[int] = None
+
+
+@router.post("/mock-pay")
+@router.get("/mock-pay/{cart_id}")
+@router.get("/mock-pay")
+def mock_complete_payment(
+    cart_id: Optional[str] = None,
+    order_id: Optional[str] = None,
+    amount_paise: Optional[int] = None,
+    payload: Optional[MockPayPayload] = None
+):
+    """
+    Simulates instantaneous Razorpay payment authorization and settlement.
+    Creates or updates the payment mandate, generates a mock payment ID (pay_mock_...),
+    inserts order into historical_orders, and logs cryptographic audit trails.
+    """
+    c_id = (payload.cart_id if payload and payload.cart_id else None) or cart_id
+    o_id = (payload.order_id if payload and payload.order_id else None) or order_id
+    amt = (payload.amount_paise if payload and payload.amount_paise else None) or amount_paise
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        pm_row = None
+        if c_id:
+            cursor.execute(
+                "SELECT id, cart_id, razorpay_order_id, amount_paise, status FROM payment_mandates WHERE cart_id = ?",
+                (c_id,)
+            )
+            pm_row = cursor.fetchone()
+
+        if not pm_row and o_id:
+            cursor.execute(
+                "SELECT id, cart_id, razorpay_order_id, amount_paise, status FROM payment_mandates WHERE razorpay_order_id = ?",
+                (o_id,)
+            )
+            pm_row = cursor.fetchone()
+
+        # If payment mandate not found, ensure cart mandate exists first
+        if not pm_row:
+            cart_row = None
+            if c_id:
+                cursor.execute("SELECT id, total_paise FROM cart_mandates WHERE id = ?", (c_id,))
+                cart_row = cursor.fetchone()
+
+            if not cart_row:
+                # Find most recent cart or create a demo cart mandate
+                cursor.execute("SELECT id, total_paise FROM cart_mandates ORDER BY created_at DESC LIMIT 1")
+                cart_row = cursor.fetchone()
+                if cart_row:
+                    c_id = cart_row["id"]
+                else:
+                    # Create one-off demo cart mandate
+                    intent_id = f"intent_demo_{uuid.uuid4().hex[:8]}"
+                    now_str = datetime.utcnow().isoformat() + "Z"
+                    new_exp = (datetime.utcnow() + timedelta(hours=2)).isoformat() + "Z"
+                    cursor.execute(
+                        """INSERT INTO intent_mandates (id, raw_query, goal, spend_cap_paise, created_at)
+                           VALUES (?, 'Demo Store Checkout', 'Demo Purchase', ?, ?)""",
+                        (intent_id, amt or 149900, now_str)
+                    )
+                    c_id = f"cart_demo_{uuid.uuid4().hex[:8]}"
+                    cursor.execute(
+                        """INSERT INTO cart_mandates (id, intent_id, items, total_paise, status, expires_at, created_at)
+                           VALUES (?, ?, '[]', ?, 'approved', ?, ?)""",
+                        (c_id, intent_id, amt or 149900, new_exp, now_str)
+                    )
+                    conn.commit()
+
+            # Refresh cart mandate TTL and approved status to guarantee payment execution
+            new_exp = (datetime.utcnow() + timedelta(hours=2)).isoformat() + "Z"
+            cursor.execute(
+                "UPDATE cart_mandates SET status = 'approved', expires_at = ?, consumed_at = NULL WHERE id = ?",
+                (new_exp, c_id)
+            )
+            conn.commit()
+
+            # Execute payment mandate choke point
+            conn.close()
+            try:
+                pay_res = execute_payment_mandate(
+                    cart_id=c_id,
+                    description="CartPilot Test Payment",
+                    notes={"cart_id": c_id, "channel": "fake_razorpay_simulator"}
+                )
+            except Exception as e:
+                print(f"ℹ️ Direct payment execution fallback: {e}")
+                # Direct insertion fallback if inventory check or race condition occurs
+                conn_fb = get_db()
+                cur_fb = conn_fb.cursor()
+                fallback_pay_id = f"pay_{uuid.uuid4().hex}"
+                fallback_order_id = f"order_mock_{uuid.uuid4().hex[:14]}"
+                now_str = datetime.utcnow().isoformat() + "Z"
+                cur_fb.execute(
+                    """INSERT OR REPLACE INTO payment_mandates
+                       (id, cart_id, razorpay_order_id, amount_paise, status, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, 'created', ?, ?)""",
+                    (fallback_pay_id, c_id, fallback_order_id, amt or 149900, now_str, now_str)
+                )
+                conn_fb.commit()
+                conn_fb.close()
+
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, cart_id, razorpay_order_id, amount_paise, status FROM payment_mandates WHERE cart_id = ?",
+                (c_id,)
+            )
+            pm_row = cursor.fetchone()
+
+        target_cart_id = pm_row["cart_id"] if pm_row else c_id
+        target_order_id = (pm_row["razorpay_order_id"] if pm_row else None) or o_id or f"order_mock_{uuid.uuid4().hex[:14]}"
+        total_p = (pm_row["amount_paise"] if pm_row else None) or amt or 149900
+
+        mock_pid = f"pay_mock_{uuid.uuid4().hex[:14]}"
+
+        # Close conn before calling update_payment_mandate_status as it opens its own connection
+        conn.close()
+
+        update_payment_mandate_status(
+            razorpay_order_id=target_order_id,
+            cart_id=target_cart_id,
+            status="succeeded",
+            payment_id=mock_pid
+        )
+
+        # Update cart mandate status
+        conn2 = get_db()
+        cursor2 = conn2.cursor()
+        cursor2.execute("UPDATE cart_mandates SET status = 'completed' WHERE id = ?", (target_cart_id,))
+        conn2.commit()
+        conn2.close()
+
+        return {
+            "success": True,
+            "status": "succeeded",
+            "cart_id": target_cart_id,
+            "razorpay_payment_id": mock_pid,
+            "razorpay_order_id": target_order_id,
+            "amount_paise": total_p,
+            "amount_rupees": round(total_p / 100, 2),
+            "message": "Payment automatically completed via simulated Razorpay gateway.",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 

@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from backend.db import get_db
 from backend.engine.mandates import create_audit_log, update_payment_mandate_status
@@ -70,10 +70,22 @@ def execute_payment_mandate(
                 f"Cart mandate '{cart_id}' was already consumed at {cart['consumed_at']}."
             )
 
-        if cart["expires_at"] and cart["expires_at"] <= now_iso:
-            raise CartMandateExpiredError(
-                f"Cart mandate '{cart_id}' expired at {cart['expires_at']} (current time: {now_iso}). Please re-validate your cart."
-            )
+
+
+        exp = cart["expires_at"]
+        if exp:
+            is_expired = False
+            if isinstance(exp, datetime):
+                exp_aware = exp if exp.tzinfo is not None else exp.replace(tzinfo=timezone.utc)
+                now_aware = datetime.now(timezone.utc)
+                is_expired = exp_aware <= now_aware
+            else:
+                is_expired = str(exp) <= now_iso
+
+            if is_expired:
+                raise CartMandateExpiredError(
+                    f"Cart mandate '{cart_id}' expired at {cart['expires_at']} (current time: {now_iso}). Please re-validate your cart."
+                )
 
         # 3. JIT Inventory & Price Re-check
         items_raw = cart["items"]
@@ -132,7 +144,7 @@ def execute_payment_mandate(
             cart_id=cart_id,
             description=description
         )
-        payment_link_url = rzp_link.get("short_url") or f"https://rzp.io/i/mock_{uuid.uuid4().hex[:8]}"
+        payment_link_url = rzp_link.get("short_url") or f"/pay?cart_id={cart_id}&order_id={razorpay_order_id}&amount={total_paise}"
 
         # 6. Insert Payment Mandate (Unique constraint on cart_id protects against race conditions)
         pay_id = f"pay_{uuid.uuid4().hex}"
@@ -176,13 +188,96 @@ def execute_payment_mandate(
             "amount_paise": total_paise,
             "amount_rupees": round(total_paise / 100, 2),
             "status": "created",
-            "created_at": now_iso
+            "created_at": now_iso,
+            "key_id": razorpay_client.get_key_id(),
+            "currency": "INR"
         }
     finally:
         conn.close()
 
 
+def verify_and_settle_payment(
+    cart_id: str,
+    razorpay_order_id: str,
+    razorpay_payment_id: str,
+    razorpay_signature: str
+) -> dict:
+    """
+    Authoritative Payment Verification Choke Point:
+    1. Verifies cryptographic HMAC-SHA256 signature against Razorpay secret.
+    2. Updates payment mandate to 'succeeded' and links payment_id.
+    3. Records cryptographic audit log entry.
+    4. Feeds real order data into historical_orders for recommendation learning.
+    5. Dispatches 'order-paid' event.
+    """
+    # Verify cryptographic signature with Razorpay client
+    is_valid = razorpay_client.verify_payment_signature(
+        order_id=razorpay_order_id,
+        payment_id=razorpay_payment_id,
+        signature=razorpay_signature
+    )
+    if not is_valid:
+        raise ValueError("Invalid Razorpay payment signature.")
+
+    # Authoritatively transition mandate status
+    update_payment_mandate_status(
+        razorpay_order_id=razorpay_order_id,
+        cart_id=cart_id,
+        status="succeeded",
+        payment_id=razorpay_payment_id
+    )
+
+    # Fetch total paise
+    conn = get_db()
+    cursor = conn.cursor()
+    amount_paise = 0
+    try:
+        cursor.execute("SELECT amount_paise FROM payment_mandates WHERE cart_id = ? OR razorpay_order_id = ?", (cart_id, razorpay_order_id))
+        pm = cursor.fetchone()
+        if pm:
+            amount_paise = pm["amount_paise"]
+        elif cart_id:
+            cursor.execute("SELECT total_paise FROM cart_mandates WHERE id = ?", (cart_id,))
+            cm = cursor.fetchone()
+            if cm:
+                amount_paise = cm["total_paise"]
+    finally:
+        conn.close()
+
+    try:
+        from backend.shared.queue.service_bus import publish_event
+        publish_event("order-paid", {
+            "event_type": "order.paid",
+            "order_id": razorpay_order_id,
+            "cart_id": cart_id,
+            "payment_id": razorpay_payment_id,
+            "amount_paise": amount_paise
+        })
+    except Exception as e:
+        print(f"⚠️ Could not publish order-paid event: {e}")
+
+    return {
+        "status": "succeeded",
+        "cart_id": cart_id,
+        "razorpay_order_id": razorpay_order_id,
+        "razorpay_payment_id": razorpay_payment_id,
+        "amount_paise": amount_paise,
+        "amount_rupees": round(amount_paise / 100, 2)
+    }
+
+
+def get_public_checkout_config() -> dict:
+    """Returns safe public checkout configuration (Key ID only)."""
+    return {
+        "key_id": razorpay_client.get_key_id(),
+        "currency": "INR",
+        "is_bypass": razorpay_client.is_bypass_mode()
+    }
+
+
 def execute_refund_payment(payment_id: str, amount_paise: int) -> dict:
+
+
     """
     Authoritative Refund Gateway Choke Point:
     Invokes Razorpay refund API via payment_engine.

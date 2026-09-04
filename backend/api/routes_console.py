@@ -1036,7 +1036,7 @@ def get_category_compatibility():
             """
             SELECT category_a, category_b, reasoning, editable, created_at
             FROM category_compatibility
-            ORDER BY rowid DESC
+            ORDER BY created_at DESC
             """
         )
         pairs = [
