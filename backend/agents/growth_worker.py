@@ -8,7 +8,8 @@ from backend.agents.growth_agent import (
     detect_all_opportunities,
     score_next_best_actions,
     execute_growth_action,
-    evaluate_active_promotion_experiments
+    evaluate_active_promotion_experiments,
+    apply_seasonal_boosts
 )
 
 logger = logging.getLogger("cartpilot.growth_worker")
@@ -68,31 +69,35 @@ def get_worker_status() -> Dict[str, Any]:
 def check_action_idempotency(action_type: str, target_id: str, cursor) -> tuple[bool, str]:
     """
     Ensures that an action is not duplicated across autonomous cycles.
-    - RECOVER_CART: Check if cart was already dispatched a recovery link within last 24 hours.
+    - OFFER_RECOVERY_INCENTIVE / RECOVER_CART: Check if cart already has an active, unexpired recovery offer or dispatched action.
     - PROMOTE_PRODUCT: Check if SKU is already boosted in the catalog.
     - CROSS_SELL: Check if cross-sell priority action was already executed recently.
     """
     now = datetime.utcnow()
+    now_str = now.isoformat() + "Z"
     cutoff_24h = (now - timedelta(hours=24)).isoformat() + "Z"
 
-    if action_type == "RECOVER_CART":
-        # Check payment_mandates recovery_action
+    if action_type in ("OFFER_RECOVERY_INCENTIVE", "RECOVER_CART"):
+        # 1. Primary Check: Active, unexpired recovery offer in cart_recovery_offers
         cursor.execute("""
-            SELECT id, status, recovery_action, updated_at 
-            FROM payment_mandates 
-            WHERE cart_id = ? AND recovery_action = 'recovery_link_sent' AND updated_at >= ?
-        """, (target_id, cutoff_24h))
-        if cursor.fetchone():
-            return False, f"Recovery link for cart {target_id[-8:]} already dispatched within last 24h"
+            SELECT id, coupon_code, expires_at 
+            FROM cart_recovery_offers 
+            WHERE cart_id = ? AND status = 'active' AND expires_at > ?
+        """, (target_id, now_str))
+        active_offer = cursor.fetchone()
+        if active_offer:
+            return False, f"Recovery offer {active_offer['coupon_code']} already active for cart {target_id[-8:]} (valid until {active_offer['expires_at']})"
 
-        # Check growth_actions records
+        # 2. Secondary Check: Check if offer was already redeemed or dispatched within last 24h
         cursor.execute("""
             SELECT id, created_at, status 
             FROM growth_actions 
-            WHERE action_type = 'RECOVER_CART' AND execution_ref LIKE ? AND created_at >= ?
-        """, (f"%{target_id}%", cutoff_24h))
+            WHERE (action_type = 'OFFER_RECOVERY_INCENTIVE' OR action_type = 'RECOVER_CART')
+              AND (execution_ref = ? OR affected_ref LIKE ?)
+              AND created_at >= ?
+        """, (target_id, f"%{target_id}%", cutoff_24h))
         if cursor.fetchone():
-            return False, f"Recovery action for cart {target_id[-8:]} already logged in last 24h"
+            return False, f"Recovery action for cart {target_id[-8:]} already dispatched in last 24h"
 
         return True, "Idempotency check passed"
 
@@ -225,6 +230,12 @@ def execute_autonomous_cycle(max_actions_per_cycle: int = 2) -> Dict[str, Any]:
         # Step 1b: Evaluate active promotion experiments and record telemetry
         evaluate_active_promotion_experiments(cursor)
         conn.commit()
+
+        # Step 1c: Synchronize seasonal, weather & festival merchandise weights
+        try:
+            apply_seasonal_boosts()
+        except Exception as e:
+            logger.warning(f"Seasonal boost synchronization skipped: {e}")
 
         # Step 2: Only execute if growth_mode == 'autonomous'
         if growth_mode != "autonomous":

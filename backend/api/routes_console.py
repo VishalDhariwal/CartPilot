@@ -1,4 +1,5 @@
 import json
+import math
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
@@ -22,6 +23,16 @@ class ToggleMuteRuleRequest(BaseModel):
     sku_b: str
     muted: bool
 
+class AddGrowthRuleRequest(BaseModel):
+    sku_a: str
+    sku_b: str
+    lift: Optional[float] = 2.5
+    reasoning: Optional[str] = "Merchant verified association rule"
+
+class DeleteGrowthRuleRequest(BaseModel):
+    sku_a: str
+    sku_b: str
+
 class AddCategoryCompatRequest(BaseModel):
     category_a: str
     category_b: str
@@ -29,7 +40,11 @@ class AddCategoryCompatRequest(BaseModel):
 
 class LivePreviewRequest(BaseModel):
     sku: str
-    top_k: int = 4
+    top_k: int = 3
+    weight_association: float = 0.40
+    weight_item2vec: float = 0.30
+    weight_category: float = 0.20
+    weight_revenue: float = 0.10
 
 
 # ─── Helper: Audit Log Writer ───────────────────────────────────────────────
@@ -318,9 +333,9 @@ def get_growth_rules(
         elif status == "muted":
             where_clauses.append("bp.muted = 1 AND (bp.retired IS NULL OR bp.retired = 0)")
         elif status == "data_verified":
-            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0) AND bp.co_occurrence_count >= 8 AND bp.lift > 1.2")
+            where_clauses.append("(bp.retired IS NULL OR bp.retired = 0) AND (bp.source = 'data_verified' OR (bp.co_occurrence_count >= 2 AND bp.lift >= 1.1))")
         else:  # "all" or "active"
-            where_clauses.append("bp.source = 'data_verified' AND (bp.retired IS NULL OR bp.retired = 0) AND bp.co_occurrence_count >= 8 AND bp.lift > 1.2")
+            where_clauses.append("(bp.retired IS NULL OR bp.retired = 0) AND (bp.source = 'data_verified' OR (bp.co_occurrence_count >= 2 AND bp.lift >= 1.1))")
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
@@ -334,6 +349,13 @@ def get_growth_rules(
         """
         cursor.execute(count_sql, params)
         total_filtered_rules = cursor.fetchone()[0]
+
+        # Auto-mine if zero data_verified rules found
+        if total_filtered_rules == 0:
+            from backend.recommendations.lift_engine import compute_lift_pairs
+            compute_lift_pairs(min_co_occurrence=2, min_lift=1.1)
+            cursor.execute(count_sql, params)
+            total_filtered_rules = cursor.fetchone()[0]
 
         offset = (max(1, page) - 1) * limit
 
@@ -528,9 +550,13 @@ def get_growth_rules(
 @router.post("/growth-rules/live-preview", tags=["Merchant Console"])
 def preview_live_recommendations(req: LivePreviewRequest):
     """
-    Live Recommendation Preview Sandbox for merchants.
-    Runs find_live_category_candidates directly in real-time for any catalog product,
-    and returns candidates along with the complete category-graph traversal path.
+    Live Multi-Engine Recommendation Reranker Sandbox.
+    Collects top-5 candidates across 3 distinct engines:
+      1. Engine 1: Association Rules (basket_pairs)
+      2. Engine 2: Item2Vec Neural Vector Embeddings
+      3. Engine 3: Category Compatibility Graph & Semantic Matching
+    Fuses multi-engine signals, applies merchant configurable weights (Association, Item2Vec, Category, Revenue),
+    reranks the pooled candidates, and returns top_k results with complete score attribution.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -544,6 +570,7 @@ def preview_live_recommendations(req: LivePreviewRequest):
             raise HTTPException(status_code=404, detail=f"SKU '{req.sku}' not found in catalog.")
 
         trigger_item = dict(row)
+        trigger_sku = trigger_item["sku"]
         trigger_category = trigger_item["category"]
 
         # Fetch category compatibility connections for this category
@@ -568,8 +595,232 @@ def preview_live_recommendations(req: LivePreviewRequest):
             for r in cursor.fetchall()
         ]
 
+        # ── 1. Engine 1: Association Rules (basket_pairs) - Top 5 ──
+        cursor.execute(
+            """
+            SELECT 
+                bp.sku_b,
+                bp.lift,
+                bp.support,
+                bp.confidence,
+                bp.source,
+                bp.reasoning,
+                bp.co_occurrence_count,
+                c.name AS candidate_name,
+                c.price_paise AS candidate_price,
+                c.category AS candidate_category,
+                c.stock AS candidate_stock,
+                c.boosted AS candidate_boosted,
+                c.image_url AS candidate_image_url,
+                c.description AS candidate_description
+            FROM basket_pairs bp
+            JOIN catalog c ON c.sku = bp.sku_b
+            WHERE bp.sku_a = ?
+              AND c.stock > 0
+              AND bp.sku_b != ?
+              AND (bp.muted IS NULL OR bp.muted = 0)
+              AND (bp.retired IS NULL OR bp.retired = 0)
+            ORDER BY bp.lift DESC, bp.co_occurrence_count DESC
+            LIMIT 5
+            """,
+            (trigger_sku, trigger_sku)
+        )
+        assoc_rows = cursor.fetchall()
+
+        # ── 2. Engine 2: Item2Vec Neural Embeddings - Top 5 ──
+        from backend.recommendations.scalable_engine import find_co_purchase_neighbors
+        try:
+            item2vec_candidates = find_co_purchase_neighbors([trigger_item], exclude_skus={trigger_sku}, top_k=5)
+        except Exception as e:
+            print(f"⚠️ Item2Vec lookup fallback: {e}")
+            item2vec_candidates = []
+
+        # ── 3. Engine 3: Category Graph & Semantic Matching - Top 5 ──
         from backend.recommendations.scalable_engine import find_live_category_candidates
-        candidates = find_live_category_candidates([trigger_item], top_k=req.top_k)
+        try:
+            category_candidates = find_live_category_candidates([trigger_item], exclude_skus={trigger_sku}, top_k=5)
+        except Exception as e:
+            print(f"⚠️ Category candidates fallback: {e}")
+            category_candidates = []
+
+        # ── Pool & Multi-Signal Fusion ──
+        candidate_pool = {}
+
+        # Ingest Engine 1
+        for r in assoc_rows:
+            sku = r["sku_b"]
+            lift_val = float(r["lift"]) if r["lift"] is not None else 1.0
+            # Normalized association score between 0.2 and 1.0 based on lift
+            assoc_score = min(max((lift_val - 1.0) / 3.0, 0.2), 1.0)
+            candidate_pool[sku] = {
+                "sku": sku,
+                "name": r["candidate_name"],
+                "price_paise": r["candidate_price"],
+                "category": r["candidate_category"],
+                "image_url": r["candidate_image_url"] or "",
+                "description": r["candidate_description"] or "",
+                "boosted": bool(r["candidate_boosted"]),
+                "signals": {
+                    "association": assoc_score,
+                    "item2vec": 0.0,
+                    "category": 0.0,
+                    "revenue": 0.0,
+                },
+                "engines": ["Association Rules"],
+                "raw_reasons": [f"Frequently bought together with {trigger_item['name']} ({lift_val:.1f}x lift)."],
+                "lift": lift_val,
+                "co_occurrence_count": r["co_occurrence_count"] or 0,
+            }
+
+        # Ingest Engine 2
+        for cand in item2vec_candidates:
+            sku = cand["sku"]
+            sim_score = float(cand.get("cosine_similarity", 0.75))
+            if sku not in candidate_pool:
+                candidate_pool[sku] = {
+                    "sku": sku,
+                    "name": cand.get("name", sku),
+                    "price_paise": cand.get("price_paise", 0),
+                    "category": cand.get("category", ""),
+                    "image_url": cand.get("image_url", ""),
+                    "description": cand.get("description", ""),
+                    "boosted": bool(cand.get("boosted", False)),
+                    "signals": {
+                        "association": 0.0,
+                        "item2vec": sim_score,
+                        "category": 0.0,
+                        "revenue": 0.0,
+                    },
+                    "engines": ["Item2Vec Vectors"],
+                    "raw_reasons": [cand.get("reason", "Neural basket embedding match.")],
+                    "lift": None,
+                    "co_occurrence_count": cand.get("co_occurrence_count", 0),
+                }
+            else:
+                candidate_pool[sku]["signals"]["item2vec"] = sim_score
+                if "Item2Vec Vectors" not in candidate_pool[sku]["engines"]:
+                    candidate_pool[sku]["engines"].append("Item2Vec Vectors")
+                candidate_pool[sku]["raw_reasons"].append(cand.get("reason", "Neural vector match."))
+
+        # Ingest Engine 3
+        for cand in category_candidates:
+            sku = cand["sku"]
+            cat_score = float(cand.get("semantic_similarity", 0.80)) if "semantic_similarity" in cand else 0.85
+            if sku not in candidate_pool:
+                candidate_pool[sku] = {
+                    "sku": sku,
+                    "name": cand.get("name", sku),
+                    "price_paise": cand.get("price_paise", 0),
+                    "category": cand.get("category", ""),
+                    "image_url": cand.get("image_url", ""),
+                    "description": cand.get("description", ""),
+                    "boosted": bool(cand.get("boosted", False)),
+                    "signals": {
+                        "association": 0.0,
+                        "item2vec": 0.0,
+                        "category": cat_score,
+                        "revenue": 0.0,
+                    },
+                    "engines": ["Category Graph"],
+                    "raw_reasons": [cand.get("reason", f"Complementary {cand.get('category', '')} match.")],
+                    "lift": None,
+                    "co_occurrence_count": 0,
+                }
+            else:
+                candidate_pool[sku]["signals"]["category"] = cat_score
+                if "Category Graph" not in candidate_pool[sku]["engines"]:
+                    candidate_pool[sku]["engines"].append("Category Graph")
+                candidate_pool[sku]["raw_reasons"].append(cand.get("reason", "Category compatibility match."))
+
+        # Normalize merchant weights so total weight = 1.0
+        total_w = req.weight_association + req.weight_item2vec + req.weight_category + req.weight_revenue
+        if total_w <= 0:
+            total_w = 1.0
+        w_assoc = req.weight_association / total_w
+        w_vec = req.weight_item2vec / total_w
+        w_cat = req.weight_category / total_w
+        w_rev = req.weight_revenue / total_w
+
+        trigger_price = float(trigger_item["price_paise"] or 1000)
+
+        # Score & Rerank all pooled candidates
+        scored_candidates = []
+        for cand in candidate_pool.values():
+            # Revenue score based on ideal complementary basket ratio (0.2x - 3.0x trigger price)
+            cand_price = float(cand["price_paise"] or 1000)
+            ratio = cand_price / trigger_price if trigger_price > 0 else 1.0
+
+            if 0.2 <= ratio <= 3.5:
+                rev_score = min(0.6 + (ratio / 7.0), 1.0)
+            elif ratio < 0.2:
+                rev_score = max((ratio / 0.2) * 0.6, 0.1)
+            else:
+                rev_score = max(1.0 - (math.log10(ratio) * 0.4), 0.1)
+
+            cand["signals"]["revenue"] = rev_score
+
+            # Composite weighted calculation
+            s_assoc = cand["signals"]["association"]
+            s_vec = cand["signals"]["item2vec"]
+            s_cat = cand["signals"]["category"]
+            s_rev = cand["signals"]["revenue"]
+
+            raw_composite = (
+                (w_assoc * s_assoc) +
+                (w_vec * s_vec) +
+                (w_cat * s_cat) +
+                (w_rev * s_rev)
+            )
+
+            # Boost multiplier if featured partner
+            boost_mul = 1.25 if cand["boosted"] else 1.0
+            final_composite = min(raw_composite * boost_mul, 1.0)
+            score_points = round(final_composite * 100, 1)
+
+            # Build readable summary rationale
+            combined_reason = " · ".join(cand["raw_reasons"][:2])
+
+            scored_candidates.append({
+                "sku": cand["sku"],
+                "name": cand["name"],
+                "category": cand["category"],
+                "price_paise": cand["price_paise"],
+                "price_rupees": round(cand["price_paise"] / 100, 2),
+                "image_url": cand["image_url"],
+                "description": cand["description"],
+                "boosted": cand["boosted"],
+                "composite_score": score_points,
+                "engines": cand["engines"],
+                "score_breakdown": {
+                    "association": round(s_assoc * 100, 1),
+                    "item2vec": round(s_vec * 100, 1),
+                    "category": round(s_cat * 100, 1),
+                    "revenue": round(s_rev * 100, 1),
+                },
+                "lift": cand["lift"],
+                "reason": combined_reason,
+                "multi_engine_match": len(cand["engines"]) > 1,
+            })
+
+        # Sort by composite score descending
+        scored_candidates.sort(key=lambda x: x["composite_score"], reverse=True)
+
+        # Apply policy allowed_categories guardrails
+        cursor.execute("SELECT allowed_categories FROM policy_config WHERE id = 1")
+        p_row = cursor.fetchone()
+        if p_row and p_row["allowed_categories"]:
+            try:
+                allowed_cats = json.loads(p_row["allowed_categories"])
+                if allowed_cats:
+                    from backend.engine.guardrail import is_category_allowed
+                    scored_candidates = [
+                        c for c in scored_candidates
+                        if is_category_allowed(c.get("category", ""), allowed_cats)
+                    ]
+            except Exception:
+                pass
+
+        top_candidates = scored_candidates[:req.top_k]
 
         return {
             "trigger_sku": trigger_item["sku"],
@@ -578,7 +829,14 @@ def preview_live_recommendations(req: LivePreviewRequest):
             "trigger_price_rupees": round(trigger_item["price_paise"] / 100, 2),
             "trigger_image": trigger_item["image_url"] or "",
             "compatible_categories": compat_paths,
-            "candidates": candidates,
+            "candidates": top_candidates,
+            "pool_size": len(candidate_pool),
+            "weights_applied": {
+                "association": round(w_assoc * 100, 0),
+                "item2vec": round(w_vec * 100, 0),
+                "category": round(w_cat * 100, 0),
+                "revenue": round(w_rev * 100, 0),
+            },
             "computed_at": datetime.utcnow().isoformat() + "Z",
             "is_live_computed": True
         }
@@ -643,21 +901,124 @@ def toggle_mute_growth_rule(req: ToggleMuteRuleRequest):
         conn.close()
 
 
+@router.post("/growth-rules/add", tags=["Merchant Console"])
+@router.post("/growth-rules", tags=["Merchant Console"])
+def add_growth_rule(req: AddGrowthRuleRequest):
+    """
+    Creates or updates a custom verified association rule between two products.
+    """
+    if req.sku_a == req.sku_b:
+        raise HTTPException(status_code=400, detail="Antecedent and Consequent products must be different.")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Validate that both SKUs exist in catalog
+        cursor.execute("SELECT sku, name FROM catalog WHERE sku IN (?, ?)", (req.sku_a, req.sku_b))
+        skus_found = {r["sku"]: r["name"] for r in cursor.fetchall()}
+        if req.sku_a not in skus_found:
+            raise HTTPException(status_code=404, detail=f"Trigger product SKU '{req.sku_a}' not found in catalog.")
+        if req.sku_b not in skus_found:
+            raise HTTPException(status_code=404, detail=f"Target product SKU '{req.sku_b}' not found in catalog.")
+
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        lift_val = float(req.lift) if req.lift else 2.5
+        reason = req.reasoning or f"Merchant verified recommendation rule: {skus_found[req.sku_a]} → {skus_found[req.sku_b]}"
+
+        cursor.execute(
+            """
+            INSERT INTO basket_pairs 
+            (sku_a, sku_b, lift, support, confidence, source, reasoning, co_occurrence_count, computed_at, muted, retired)
+            VALUES (?, ?, ?, 0.05, 0.85, 'data_verified', ?, 10, ?, 0, 0)
+            ON CONFLICT(sku_a, sku_b) DO UPDATE SET
+                lift = excluded.lift,
+                source = 'data_verified',
+                reasoning = excluded.reasoning,
+                co_occurrence_count = 10,
+                retired = 0,
+                muted = 0,
+                computed_at = excluded.computed_at
+            """,
+            (req.sku_a, req.sku_b, lift_val, reason, now_iso)
+        )
+        conn.commit()
+
+        detail = f"Added custom verified association rule: {skus_found[req.sku_a]} ({req.sku_a}) → {skus_found[req.sku_b]} ({req.sku_b}) with {lift_val:.1f}x Lift."
+        _log_console_audit("growth_rule", f"{req.sku_a}__{req.sku_b}", "Growth Rule Added", detail)
+
+        return {
+            "status": "success",
+            "rule_id": f"{req.sku_a}__{req.sku_b}",
+            "sku_a": req.sku_a,
+            "sku_b": req.sku_b,
+            "trigger_name": skus_found[req.sku_a],
+            "target_name": skus_found[req.sku_b],
+            "lift": lift_val,
+            "message": detail
+        }
+    finally:
+        conn.close()
+
+
+@router.post("/growth-rules/delete", tags=["Merchant Console"])
+@router.delete("/growth-rules", tags=["Merchant Console"])
+def delete_growth_rule(req: DeleteGrowthRuleRequest):
+    """
+    Deletes or retires a specific growth association rule.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT c_a.name AS trigger_name, c_b.name AS target_name
+            FROM basket_pairs bp
+            JOIN catalog c_a ON c_a.sku = bp.sku_a
+            JOIN catalog c_b ON c_b.sku = bp.sku_b
+            WHERE bp.sku_a = ? AND bp.sku_b = ?
+            """,
+            (req.sku_a, req.sku_b)
+        )
+        row = cursor.fetchone()
+        trigger_name = row["trigger_name"] if row else req.sku_a
+        target_name = row["target_name"] if row else req.sku_b
+
+        cursor.execute(
+            "DELETE FROM basket_pairs WHERE sku_a = ? AND sku_b = ?",
+            (req.sku_a, req.sku_b)
+        )
+        conn.commit()
+
+        detail = f"Deleted association rule: '{trigger_name}' → '{target_name}'."
+        _log_console_audit("growth_rule", f"{req.sku_a}__{req.sku_b}", "Growth Rule Deleted", detail)
+
+        return {
+            "status": "success",
+            "rule_id": f"{req.sku_a}__{req.sku_b}",
+            "message": detail
+        }
+    finally:
+        conn.close()
+
+
 @router.post("/growth-rules/reseed-priors", tags=["Merchant Console"])
 def reseed_growth_priors():
     """
-    Regenerates the category compatibility graph (Layer 1 cold-start graph).
+    Regenerates the category compatibility graph and re-mines empirical lift pairs.
     """
     from backend.recommendations.scalable_engine import generate_category_compatibility
+    from backend.recommendations.lift_engine import compute_lift_pairs
     res = generate_category_compatibility()
+    mined_count = compute_lift_pairs(min_co_occurrence=2, min_lift=1.1)
     _log_console_audit(
-        "growth_engine", "category_compat", "Category Compatibility Graph Seeded",
-        f"Regenerated {res['inserted']} compatibility pairs across {res['total_categories']} categories."
+        "growth_engine", "growth_rules", "Statistical Rules Mined",
+        f"Mined {mined_count} empirical association rules and {res.get('inserted', 0)} category compatibility pairs."
     )
     return {
         "status": "success",
+        "mined_rules_count": mined_count,
         "category_pairs_count": res.get("inserted", 0),
-        "message": f"Successfully updated category compatibility graph with {res.get('inserted', 0)} pairs."
+        "message": f"Successfully mined {mined_count} empirical association rules and updated {res.get('inserted', 0)} category pairs."
     }
 
 
@@ -675,7 +1036,7 @@ def get_category_compatibility():
             """
             SELECT category_a, category_b, reasoning, editable, created_at
             FROM category_compatibility
-            ORDER BY rowid DESC
+            ORDER BY created_at DESC
             """
         )
         pairs = [

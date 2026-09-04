@@ -1,0 +1,15 @@
+{
+  "name": "cartpilot-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CartPilot explainable agentic commerce platform workspace",
+  "scripts": {
+    "dev": "npm --prefix cartpilot-merchant run dev",
+    "dev:frontend": "npm --prefix cartpilot-merchant run dev",
+    "dev:backend": "./venv/bin/uvicorn backend.main:app --reload --port 8000",
+    "build": "npm --prefix cartpilot-merchant run build",
+    "check": "npm --prefix cartpilot-merchant run check",
+    "test": "./venv/bin/pytest tests/",
+    "test:backend": "./venv/bin/pytest tests/"
+  }
+}

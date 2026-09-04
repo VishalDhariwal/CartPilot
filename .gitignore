@@ -1,5 +1,38 @@
+# Python
 venv/
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+tests/
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+.manus-logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Databases & Local State
 *.db
+*.sqlite3
+!seed_catalog.json
+
+# Environment Secrets
+.env
+.env.local
+.env.*.local
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

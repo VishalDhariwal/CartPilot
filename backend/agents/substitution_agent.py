@@ -54,70 +54,12 @@ def find_substitute(original_item: dict, budget_remaining_paise: int = None) -> 
             "original_name": original_name,
         }
 
-    from backend.engine.llm import generate_structured, get_available_providers
-    if not get_available_providers():
-        c = candidates[0]
-        return {
-            "sku": c["sku"],
-            "name": c["name"],
-            "price_paise": c["price_paise"],
-            "category": c["category"],
-            "similarity_score": c.get("similarity_score", 0.0),
-            "final_score": c.get("final_score", 0.0),
-            "reason": c.get("reason", f"Best semantic match for {original_name}."),
-            "candidates": candidates,
-            "original_sku": original_sku,
-            "original_name": original_name,
-        }
-
-    candidate_str = "\n".join(
-        f"- SKU: {c['sku']}, Name: {c['name']}, Price: ₹{c['price_paise']/100:.0f}, "
-        f"Similarity: {c.get('similarity_score', 0)*100:.0f}%"
-        + (" [BOOSTED PARTNER]" if c.get("boosted") else "")
-        for c in candidates
-    )
-
-    system_instruction = f"""
-    You are an AI Substitution Agent for an e-commerce store.
-    The customer's requested item is unavailable or out of stock:
-    - Item: {original_name} ({original_sku})
-
-    Here are the top semantic in-stock alternatives identified by our embedding engine:
-    {candidate_str}
-
-    Rules:
-    1. You MUST choose EXACTLY ONE SKU from the list above. Never invent any other SKU.
-    2. Prefer higher similarity and boosted partner items when quality/suitability is comparable.
-    3. Write a single, helpful 1-sentence reason explaining why this replacement fits the customer's need.
-    """
-
-    try:
-        choice = generate_structured(
-            prompt=f"Pick the best substitute for {original_name}.",
-            schema=SubstituteChoice,
-            system_prompt=system_instruction
-        )
-        candidate_map = {c["sku"]: c for c in candidates}
-
-        if choice.sku in candidate_map:
-            chosen = candidate_map[choice.sku]
-            return {
-                "sku": chosen["sku"],
-                "name": chosen["name"],
-                "price_paise": chosen["price_paise"],
-                "category": chosen["category"],
-                "similarity_score": chosen.get("similarity_score", 0.0),
-                "final_score": chosen.get("final_score", 0.0),
-                "reason": choice.reason,
-                "candidates": candidates,
-                "original_sku": original_sku,
-                "original_name": original_name,
-            }
-    except Exception as e:
-        print(f"Error in substitution LLM selection: {e}")
-
-    # Fallback to top ranked candidate
+    # Candidate 0 is mathematically the top vector embedding match
     c = candidates[0]
+    sim_pct = int(c.get("similarity_score", 0.9) * 100)
+    boost_note = " (partner item)" if c.get("boosted") else ""
+    reason = f"Best in-stock alternative for {original_name} with {sim_pct}% catalog similarity{boost_note}."
+
     return {
         "sku": c["sku"],
         "name": c["name"],
@@ -125,7 +67,7 @@ def find_substitute(original_item: dict, budget_remaining_paise: int = None) -> 
         "category": c["category"],
         "similarity_score": c.get("similarity_score", 0.0),
         "final_score": c.get("final_score", 0.0),
-        "reason": c.get("reason", f"Closest semantic in-stock match for {original_name}."),
+        "reason": reason,
         "candidates": candidates,
         "original_sku": original_sku,
         "original_name": original_name,

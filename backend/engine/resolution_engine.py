@@ -95,10 +95,8 @@ def _now_iso() -> str:
 
 
 def _create_audit(cursor, ref_type: str, ref_id: str, event: str, detail: str):
-    cursor.execute(
-        "INSERT INTO audit_log (ref_type, ref_id, event, detail, created_at) VALUES (?, ?, ?, ?, ?)",
-        (ref_type, ref_id, event, detail, _now_iso())
-    )
+    from backend.engine.mandates import create_audit_log
+    create_audit_log(cursor, ref_type, ref_id, event, detail)
 
 
 def get_refundable_balance(cursor, payment_id: str, captured_amount_paise: int) -> int:
@@ -427,7 +425,7 @@ def create_and_execute_refund(
     Executes the authorized cancellation / refund action based on deterministic evaluation.
     Updates the refunds ledger, payment mandates, and cart mandates.
     """
-    from backend.integrations.razorpay_client import refund_payment
+    from backend.engine.payment_engine import execute_refund_payment as refund_payment
 
     # 1. Evaluate first (safe, isolated DB read)
     eval_result = evaluate_resolution_eligibility(cart_id, "CANCEL_ORDER", requested_amount_paise)

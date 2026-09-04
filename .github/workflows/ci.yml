@@ -1,0 +1,60 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+      - 'vishal-*'
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend-tests:
+    name: Backend Tests (Python 3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run Pytest Suite
+        env:
+          DATABASE_URL: sqlite:///./cartpilot_test.db
+          MERCHANT_HMAC_SECRET: test-secret-key-12345
+        run: |
+          pytest -v tests/test_audit_hash_chain.py tests/test_catalog_ingest.py
+
+  frontend-build:
+    name: Frontend Build Check (Node 20)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: cartpilot-merchant/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: cartpilot-merchant
+        run: npm ci || npm install
+
+      - name: Build Unified Merchant Console
+        working-directory: cartpilot-merchant
+        run: npm run build

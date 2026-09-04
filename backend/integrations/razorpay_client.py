@@ -4,12 +4,12 @@ import uuid
 import razorpay
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
-BYPASS_RAZORPAY = os.getenv("BYPASS_RAZORPAY", "true").strip().lower() in ("true", "1", "yes")
+BYPASS_RAZORPAY = os.getenv("BYPASS_RAZORPAY", "false").strip().lower() in ("true", "1", "yes")
 
 client = None
 if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
@@ -18,9 +18,14 @@ if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     except Exception as e:
         print(f"⚠️ Could not initialize Razorpay client: {e}")
 
+def get_key_id() -> str:
+    """Returns the public Razorpay Key ID for client-side checkout initialization."""
+    return RAZORPAY_KEY_ID or ""
+
 def is_bypass_mode() -> bool:
     """Returns True if Razorpay should be simulated/bypassed."""
     return BYPASS_RAZORPAY or client is None
+
 
 def create_order(amount_paise: int, receipt_id: str, notes: dict) -> dict:
     if is_bypass_mode():
@@ -62,7 +67,7 @@ def create_order(amount_paise: int, receipt_id: str, notes: dict) -> dict:
 def create_payment_link(amount_paise: int, order_id: str, cart_id: str = None, description: str = "CartPilot Order") -> dict:
     if is_bypass_mode() or str(order_id).startswith("order_mock_"):
         plink_id = f"plink_mock_{uuid.uuid4().hex[:14]}"
-        short_url = f"https://rzp.io/i/mock_{uuid.uuid4().hex[:8]}"
+        short_url = f"/pay?cart_id={cart_id or ''}&order_id={order_id}&amount={amount_paise}"
         print(f"⚡ [Bypass Mode] Generated mock Razorpay payment link: {short_url}")
         return {
             "id": plink_id,
@@ -100,7 +105,7 @@ def create_payment_link(amount_paise: int, order_id: str, cart_id: str = None, d
     except Exception as e:
         print(f"⚠️ Razorpay payment link creation failed ({e}) — falling back to mock link.")
         plink_id = f"plink_mock_{uuid.uuid4().hex[:14]}"
-        short_url = f"https://rzp.io/i/mock_{uuid.uuid4().hex[:8]}"
+        short_url = f"/pay?cart_id={cart_id or ''}&order_id={order_id}&amount={amount_paise}"
         return {
             "id": plink_id,
             "short_url": short_url,
@@ -118,6 +123,24 @@ def verify_webhook_signature(body: str, signature: str):
         signature,
         RAZORPAY_WEBHOOK_SECRET
     )
+
+def verify_payment_signature(order_id: str, payment_id: str, signature: str) -> bool:
+    """
+    Verifies the HMAC-SHA256 signature returned by Razorpay Standard Checkout SDK.
+    """
+    if is_bypass_mode() or str(payment_id).startswith("pay_mock_"):
+        return True
+    if not client:
+        raise ValueError("Razorpay client not configured.")
+    
+    params = {
+        "razorpay_order_id": order_id,
+        "razorpay_payment_id": payment_id,
+        "razorpay_signature": signature
+    }
+    client.utility.verify_payment_signature(params)
+    return True
+
 
 def refund_payment(payment_id: str, amount_paise: int) -> dict:
     """

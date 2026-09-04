@@ -43,6 +43,7 @@ TEST_DB_PATH = "/tmp/test_buyer_graph.db"
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
+    orig_db = os.environ.get("CARTPILOT_DB")
     if os.path.exists(TEST_DB_PATH):
         try:
             os.remove(TEST_DB_PATH)
@@ -87,6 +88,19 @@ def setup_test_db():
 
     conn.commit()
     conn.close()
+
+    yield
+
+    if os.path.exists(TEST_DB_PATH):
+        try:
+            os.remove(TEST_DB_PATH)
+        except Exception:
+            pass
+    if orig_db is not None:
+        os.environ["CARTPILOT_DB"] = orig_db
+    else:
+        os.environ.pop("CARTPILOT_DB", None)
+    backend.db.DB_PATH = os.environ.get("CARTPILOT_DB") or os.path.join(backend.db.BASE_DIR, "cartpilot.db")
 
 
 # ─── 1. OVER-BUDGET AUTONOMOUS SELF-CORRECTION TEST ─────────────────────────
@@ -288,6 +302,18 @@ def test_auto_authorized_flow_executes_checkout():
     When buyer explicitly pre-authorizes (auto_authorize=True),
     checkout proceeds and generates real/mock Razorpay order & payment link.
     """
+    from backend.engine.mandates import create_intent_mandate, create_cart_mandate
+    intent = create_intent_mandate("Buy laptop", "Buy laptop", 500000)
+    items = [{"sku": "TEST_LAPTOP_1", "name": "Budget Laptop 14-inch", "price_paise": 170000, "qty": 1, "category": "electronics"}]
+    cart = create_cart_mandate(
+        intent_id=intent["id"],
+        items=items,
+        total_paise=170000,
+        status="approved",
+        reason="Within spend cap",
+        reversible=True
+    )
+
     authorized_state = {
         "session_id": "test_sess_auth_ok",
         "graph_execution_id": "test_exec_4",
@@ -300,13 +326,11 @@ def test_auto_authorized_flow_executes_checkout():
         "optional_items": [],
         "category_preferences": ["electronics"],
         "candidate_products": [],
-        "proposed_items": [
-            {"sku": "TEST_LAPTOP_1", "name": "Budget Laptop 14-inch", "price_paise": 170000, "qty": 1, "category": "electronics"}
-        ],
+        "proposed_items": items,
         "oos_items": [],
         "cart_total_paise": 170000,
-        "intent_id": "test_intent_auth_ok",
-        "cart_id": "cart_test_auth_2",
+        "intent_id": intent["id"],
+        "cart_id": cart["id"],
         "guardrail_status": "approved",
         "guardrail_reason": "Within spend cap",
         "revision_count": 0,

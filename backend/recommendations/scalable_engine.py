@@ -77,6 +77,7 @@ def generate_category_compatibility() -> dict:
         "SELECT category_a, category_b FROM category_compatibility WHERE editable = 0"
     )
     locked_pairs = {(r["category_a"], r["category_b"]) for r in cursor.fetchall()}
+    conn.close()
 
     cat_list_str = "\n".join(f"- {c}" for c in categories)
 
@@ -107,8 +108,10 @@ RULES:
         pairs = data.pairs
     except Exception as e:
         print(f"⚠️ LLM call failed for category compatibility: {e}")
-        conn.close()
         return {"inserted": 0, "skipped_locked": 0, "total_categories": len(categories)}
+
+    conn = get_db()
+    cursor = conn.cursor()
 
     now_iso = datetime.utcnow().isoformat() + "Z"
     cat_set = set(categories)
@@ -336,7 +339,7 @@ def find_co_purchase_neighbors(
     cursor.execute("SELECT COUNT(*) FROM historical_orders WHERE is_synthetic = 0")
     real_order_count = cursor.fetchone()[0]
 
-    # Load cart item embeddings
+    # Load cart item metadata & embeddings
     cart_skus = [i["sku"] for i in cart_items if "sku" in i]
     if not cart_skus:
         conn.close()
@@ -344,17 +347,26 @@ def find_co_purchase_neighbors(
 
     placeholders = ",".join(["?"] * len(cart_skus))
     cursor.execute(
-        f"SELECT sku, co_purchase_embedding FROM catalog WHERE sku IN ({placeholders})",
+        f"SELECT sku, name, category, price_paise, co_purchase_embedding FROM catalog WHERE sku IN ({placeholders})",
         cart_skus
     )
     cart_rows = cursor.fetchall()
 
     cart_vecs = []
+    cart_cats = set()
+    cart_prices = []
+
     for row in cart_rows:
+        if row["category"]:
+            cart_cats.add(row["category"])
+        if row["price_paise"]:
+            cart_prices.append(row["price_paise"])
         if row["co_purchase_embedding"]:
             try:
                 vec = np.array(json.loads(row["co_purchase_embedding"]), dtype=np.float32)
-                cart_vecs.append(vec)
+                norm = np.linalg.norm(vec)
+                if norm > 0:
+                    cart_vecs.append(vec / norm)
             except Exception:
                 pass
 
@@ -362,7 +374,22 @@ def find_co_purchase_neighbors(
         conn.close()
         return []
 
-    # Average cart vector
+    # Verify if these cart SKUs actually participated in real co-purchase orders.
+    # If a cart SKU has < 2 real orders, its vector is untrained random noise.
+    # Falling back cleanly to Tier 3 (Category Graph + Dense MiniLM Semantic Embeddings)
+    # guarantees relevant, high-quality recommendations.
+    order_placeholders = " OR ".join(["items LIKE ?" for _ in cart_skus])
+    order_params = [f"%{sku}%" for sku in cart_skus]
+    cursor.execute(
+        f"SELECT COUNT(*) FROM historical_orders WHERE is_synthetic = 0 AND ({order_placeholders})",
+        order_params
+    )
+    matching_orders = cursor.fetchone()[0]
+    if matching_orders < 2:
+        conn.close()
+        return []
+
+    # Average normalized cart vector
     query_vec = np.mean(cart_vecs, axis=0)
     query_norm = np.linalg.norm(query_vec)
     if query_norm == 0:
@@ -370,19 +397,45 @@ def find_co_purchase_neighbors(
         return []
     query_vec = query_vec / query_norm
 
-    # Load all in-stock catalog embeddings (excluding cart & already-seen SKUs)
+    # Determine compatible categories for the cart items
+    target_categories = set(cart_cats)
+    if cart_cats:
+        cat_placeholders = ",".join(["?"] * len(cart_cats))
+        cursor.execute(
+            f"""
+            SELECT category_b FROM category_compatibility WHERE category_a IN ({cat_placeholders})
+            UNION
+            SELECT category_a FROM category_compatibility WHERE category_b IN ({cat_placeholders})
+            """,
+            list(cart_cats) + list(cart_cats)
+        )
+        for r in cursor.fetchall():
+            if r[0]:
+                target_categories.add(r[0])
+
+    if not target_categories:
+        target_categories = set(cart_cats)
+
+    # Price plausibility: prevent exorbitant upsells (e.g. ₹25,000 car for a ₹20 slipper)
+    max_cart_price = max(cart_prices) if cart_prices else 200000
+    price_cap = max(max_cart_price * 4, 250000)
+
+    # Load in-stock catalog candidates within compatible categories and price limits
     excluded = list(exclude_skus | set(cart_skus))
     exc_placeholders = ",".join(["?"] * len(excluded)) if excluded else "NULL"
-    cursor.execute(
-        f"""
-        SELECT sku, name, price_paise, category, boosted, image_url, description, metadata, co_purchase_embedding
+    compat_placeholders = ",".join(["?"] * len(target_categories))
+
+    sql = f"""
+        SELECT sku, name, price_paise, category, boosted, boost_weight, boost_source, boost_reason, image_url, description, metadata, co_purchase_embedding
         FROM catalog
         WHERE stock > 0
           AND co_purchase_embedding IS NOT NULL
+          AND price_paise <= ?
+          AND category IN ({compat_placeholders})
           {"AND sku NOT IN (" + exc_placeholders + ")" if excluded else ""}
-        """,
-        excluded if excluded else []
-    )
+    """
+    params = [price_cap] + list(target_categories) + (excluded if excluded else [])
+    cursor.execute(sql, params)
     cand_rows = cursor.fetchall()
     conn.close()
 
@@ -411,14 +464,27 @@ def find_co_purchase_neighbors(
     cand_matrix = np.stack(cand_vecs, axis=0)  # (N, D)
     similarities = cand_matrix @ query_vec       # (N,)
 
-    top_indices = np.argsort(-similarities)[:top_k]
+    # Only accept candidates with high affinity (>= 0.65) to reject uncorrelated noise
+    qual_indices = [i for i in range(len(similarities)) if similarities[i] >= 0.65]
+    if not qual_indices:
+        return []
+
+    top_indices = sorted(qual_indices, key=lambda i: similarities[i], reverse=True)[:top_k]
 
     results = []
     for i in top_indices:
         row = cand_meta[i]
         sim = float(similarities[i])
         boosted = bool(row["boosted"])
-        boost_mul = 1.35 if boosted else 1.0
+        boost_weight = float(row["boost_weight"]) if ("boost_weight" in row.keys() and row["boost_weight"] is not None) else 1.0
+        boost_source = str(row["boost_source"]) if ("boost_source" in row.keys() and row["boost_source"]) else "system"
+        boost_reason = str(row["boost_reason"]) if ("boost_reason" in row.keys() and row["boost_reason"]) else ""
+
+        if boost_source == "manual" and boosted:
+            boost_mul = 1.35
+        else:
+            boost_mul = boost_weight if boost_weight != 1.0 else (1.35 if boosted else 1.0)
+
         final_score = round(sim * boost_mul, 6)
 
         meta_obj = {}
@@ -429,7 +495,9 @@ def find_co_purchase_neighbors(
                 pass
 
         reason = f"Learned from {real_order_count} real orders' co-purchase patterns."
-        if boosted:
+        if boost_reason:
+            reason += f" Seasonal merchandising: {boost_reason}."
+        elif boosted:
             reason += " Featured partner recommendation."
 
         results.append({
@@ -444,10 +512,14 @@ def find_co_purchase_neighbors(
             "lift": None,
             "support": None,
             "confidence": None,
-            "reasoning": None,
-            "co_occurrence_count": real_order_count,
+            "reasoning": f"Co-purchase vector similarity: {sim:.2f}",
+            "co_occurrence_count": matching_orders,
             "final_score": final_score,
+            "similarity_score": round(sim, 4),
             "boosted": boosted,
+            "boost_weight": boost_weight,
+            "boost_source": boost_source,
+            "boost_reason": boost_reason,
             "trigger_sku": cart_skus[0] if cart_skus else "",
             "trigger_name": "your cart",
             "reason": reason,
@@ -527,24 +599,34 @@ def find_live_category_candidates(
         SELECT category_b AS compat_cat, category_a AS trigger_cat, reasoning
         FROM category_compatibility
         WHERE category_a IN ({cat_placeholders})
-          AND category_b NOT IN ({cat_placeholders})
         UNION
         SELECT category_a AS compat_cat, category_b AS trigger_cat, reasoning
         FROM category_compatibility
         WHERE category_b IN ({cat_placeholders})
-          AND category_a NOT IN ({cat_placeholders})
         """,
-        cart_categories + cart_categories + cart_categories + cart_categories
+        cart_categories + cart_categories
     )
     compat_rows = cursor.fetchall()
 
-    if not compat_rows:
+    # Target categories include cart's own categories (intra-category complements) + compatible partner categories
+    target_category_set = set(cart_categories)
+    compat_reasoning = {}
+    compat_triggers = {}
+
+    for cat in cart_categories:
+        clean_name = cat.replace('-', ' ')
+        compat_reasoning[cat] = f"Complementary {clean_name} selection to complete your cart."
+        compat_triggers[cat] = cat
+
+    for r in compat_rows:
+        target_category_set.add(r["compat_cat"])
+        compat_reasoning[r["compat_cat"]] = r["reasoning"]
+        compat_triggers[r["compat_cat"]] = r["trigger_cat"]
+
+    compat_categories = list(target_category_set)
+    if not compat_categories:
         conn.close()
         return []
-
-    compat_categories = list({r["compat_cat"] for r in compat_rows})
-    compat_reasoning = {r["compat_cat"]: r["reasoning"] for r in compat_rows}
-    compat_triggers = {r["compat_cat"]: r["trigger_cat"] for r in compat_rows}
 
     # Extract cart embedding representation (average normalized 384-d dense vector)
     cart_vecs = []
@@ -574,7 +656,7 @@ def find_live_category_candidates(
 
     cursor.execute(
         f"""
-        SELECT sku, name, price_paise, category, boosted, image_url, description, metadata, embedding
+        SELECT sku, name, price_paise, category, boosted, boost_weight, boost_source, boost_reason, image_url, description, metadata, embedding
         FROM catalog
         WHERE stock > 0
           AND category IN ({cat_in})
@@ -588,7 +670,7 @@ def find_live_category_candidates(
     if not candidate_rows:
         return []
 
-    # Score candidates using cosine similarity, price tier proximity, and merchant boost
+    # Score candidates using cosine similarity, price tier proximity, and merchant/seasonal boost
     scored = []
     for row in candidate_rows:
         cat = row["category"]
@@ -609,15 +691,24 @@ def find_live_category_candidates(
         price_diff_ratio = abs(cand_price - avg_cart_price) / max(1.0, avg_cart_price)
         price_factor = 1.0 / (1.0 + 0.15 * min(price_diff_ratio, 10.0))
 
-        # Promotion boost lever (1.35x)
+        # Promotion & Seasonal boost multiplier
         boosted = bool(row["boosted"])
-        boost_mul = 1.35 if boosted else 1.0
+        boost_weight = float(row["boost_weight"]) if ("boost_weight" in row.keys() and row["boost_weight"] is not None) else 1.0
+        boost_source = str(row["boost_source"]) if ("boost_source" in row.keys() and row["boost_source"]) else "system"
+        boost_reason = str(row["boost_reason"]) if ("boost_reason" in row.keys() and row["boost_reason"]) else ""
+
+        if boost_source == "manual" and boosted:
+            boost_mul = 1.35
+        else:
+            boost_mul = boost_weight if boost_weight != 1.0 else (1.35 if boosted else 1.0)
 
         final_score = round(raw_sim * price_factor * boost_mul, 4)
 
         cat_reason = compat_reasoning.get(cat, f"Complementary {cat} selection for your cart.")
         reason = f"Category match: {cat_reason}"
-        if boosted:
+        if boost_reason:
+            reason += f" Seasonal merchandising: {boost_reason}."
+        elif boosted:
             reason += " Featured partner recommendation."
 
         meta_obj = {}
@@ -646,6 +737,9 @@ def find_live_category_candidates(
             "co_occurrence_count": 0,
             "final_score": final_score,
             "boosted": boosted,
+            "boost_weight": boost_weight,
+            "boost_source": boost_source,
+            "boost_reason": boost_reason,
             "trigger_sku": trigger_sku,
             "trigger_name": trigger_name,
             "reason": reason,

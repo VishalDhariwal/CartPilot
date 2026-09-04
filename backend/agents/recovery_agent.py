@@ -4,35 +4,34 @@ import uuid
 from datetime import datetime
 from pydantic import BaseModel
 from backend.db import get_db
-from backend.integrations.razorpay_client import create_order, create_payment_link
+from backend.engine.payment_engine import execute_payment_mandate
 from backend.engine.mandates import create_audit_log, append_audit_log
-
-class RecoveryMessage(BaseModel):
-    message: str
 
 def analyze_failure(raw_error_reason: str) -> dict:
     """
-    Translates raw payment errors into friendly, actionable recovery messages using LLM.
+    Translates raw payment gateway error codes into friendly, actionable recovery messages.
+    Zero token cost, instant execution, and consistent UX.
     """
-    from backend.engine.llm import generate_structured
-    
-    system_instruction = f"""
-    You are an AI Payment Recovery Agent for an e-commerce store.
-    A user's payment just failed. The raw error reason from the payment gateway is:
-    "{raw_error_reason}"
-    
-    Your job is to translate this technical error into a short, friendly, and actionable 1-2 sentence message for the user.
-    Do not use technical jargon. Tell them exactly what they should do next (e.g. try a different card, check balance, etc).
-    """
-    try:
-        data = generate_structured(
-            prompt="Generate the friendly recovery message.",
-            schema=RecoveryMessage,
-            system_prompt=system_instruction
-        )
-        return {"recommendation": data.message}
-    except Exception:
-        return {"recommendation": "Payment could not be completed. Please verify your payment details and retry checkout."}
+    err = (raw_error_reason or "").lower()
+
+    if any(k in err for k in ["cancel", "aborted", "closed"]):
+        msg = "Payment was cancelled. Your items are saved in your cart and ready for checkout whenever you're ready."
+    elif any(k in err for k in ["insufficient", "balance", "low_funds"]):
+        msg = "Your bank reported insufficient balance. Please try another card, UPI, or an alternative payment method."
+    elif any(k in err for k in ["otp", "auth", "authentication", "verification", "3d"]):
+        msg = "Authentication could not be verified or the OTP timed out. Please retry to receive a fresh verification code."
+    elif any(k in err for k in ["decline", "declined", "do_not_honor", "rejected"]):
+        msg = "Your card issuer declined the transaction. Please verify card permissions or use another payment option."
+    elif any(k in err for k in ["expired", "validity"]):
+        msg = "The card expiry date or payment session has expired. Please verify your payment details and try again."
+    elif any(k in err for k in ["network", "timeout", "timed_out", "connection"]):
+        msg = "A temporary network timeout occurred with the payment network. Please wait a moment and retry checkout."
+    elif any(k in err for k in ["limit", "exceeded"]):
+        msg = "Transaction limit reached for this payment method. Please select another card or split the purchase."
+    else:
+        msg = "Payment could not be completed at this time. Please verify your payment details and retry checkout."
+
+    return {"recommendation": msg}
 
 
 def detect_recoverable_carts(limit: int = 50) -> list[dict]:
@@ -168,75 +167,57 @@ def detect_recoverable_carts(limit: int = 50) -> list[dict]:
 def create_recovery_payment_link(cart_id: str) -> dict:
     """
     Prepares a clean Razorpay test-mode Payment Link for a recoverable cart.
-    Reuses existing Razorpay client and payment mandates.
+    Reuses existing PaymentEngine choke point.
     """
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT id, total_paise, items, status FROM cart_mandates WHERE id = ?", (cart_id,))
-        cart = cursor.fetchone()
-        if not cart:
-            raise ValueError(f"Cart {cart_id} not found.")
-
-        total_paise = cart["total_paise"]
-
-        # Check existing payment mandate
-        cursor.execute("SELECT id, razorpay_order_id, status FROM payment_mandates WHERE cart_id = ?", (cart_id,))
+        # Check if an existing payment mandate exists
+        cursor.execute("SELECT id, razorpay_order_id, amount_paise FROM payment_mandates WHERE cart_id = ?", (cart_id,))
         pm_row = cursor.fetchone()
-
-        razorpay_order_id = pm_row["razorpay_order_id"] if pm_row else None
-
-        if not razorpay_order_id:
-            # Create Razorpay order
-            order_data = create_order(
-                amount_paise=total_paise,
-                receipt_id=f"rcpt_recov_{cart_id[-8:]}",
-                notes={"cart_id": cart_id, "source": "ai_growth_recovery"}
-            )
-            razorpay_order_id = order_data["id"]
-
-        # Generate Payment Link
-        plink = create_payment_link(
-            amount_paise=total_paise,
-            order_id=razorpay_order_id,
-            cart_id=cart_id,
-            description="CartPilot Payment Recovery Reminder"
-        )
-        payment_url = plink.get("short_url") or f"https://rzp.io/i/mock_{uuid.uuid4().hex[:8]}"
-
-        # Upsert payment_mandates record
-        now_str = datetime.utcnow().isoformat() + "Z"
         if pm_row:
-            cursor.execute("""
-                UPDATE payment_mandates 
-                SET razorpay_order_id = ?, recovery_action = 'recovery_link_sent', updated_at = ?
-                WHERE id = ?
-            """, (razorpay_order_id, now_str, pm_row["id"]))
             pay_id = pm_row["id"]
-        else:
-            pay_id = f"pay_{uuid.uuid4().hex}"
-            cursor.execute("""
-                INSERT INTO payment_mandates (id, cart_id, razorpay_order_id, amount_paise, status, recovery_action, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 'created', 'recovery_link_sent', ?, ?)
-            """, (pay_id, cart_id, razorpay_order_id, total_paise, now_str, now_str))
+            razorpay_order_id = pm_row["razorpay_order_id"]
+            total_paise = pm_row["amount_paise"]
+            payment_url = f"/pay?cart_id={cart_id}&order_id={razorpay_order_id}&amount={total_paise}"
+            now_str = datetime.utcnow().isoformat() + "Z"
+            cursor.execute(
+                "UPDATE payment_mandates SET recovery_action = 'recovery_link_sent', updated_at = ? WHERE id = ?",
+                (now_str, pay_id)
+            )
+            create_audit_log(
+                cursor,
+                "payment",
+                pay_id,
+                "Cart Recovery Link Reissued",
+                f"Reissued existing Razorpay checkout link {payment_url} for abandoned cart {cart_id} (₹{total_paise/100:.2f})"
+            )
+            conn.commit()
+            return {
+                "success": True,
+                "cart_id": cart_id,
+                "payment_id": pay_id,
+                "razorpay_order_id": razorpay_order_id,
+                "payment_link": payment_url,
+                "amount_paise": total_paise,
+                "amount_rupees": round(total_paise / 100, 2),
+                "message": "Payment recovery reminder link reissued successfully."
+            }
 
-        create_audit_log(
-            cursor,
-            "payment",
-            pay_id,
-            "Cart Recovery Link Reissued",
-            f"Reissued Razorpay checkout link {payment_url} for abandoned cart {cart_id} (₹{total_paise/100:.2f})"
+        # Otherwise execute fresh payment mandate through PaymentEngine
+        pay_res = execute_payment_mandate(
+            cart_id=cart_id,
+            description="CartPilot Payment Recovery Reminder",
+            notes={"cart_id": cart_id, "source": "ai_growth_recovery"}
         )
-        conn.commit()
-
         return {
             "success": True,
             "cart_id": cart_id,
-            "payment_id": pay_id,
-            "razorpay_order_id": razorpay_order_id,
-            "payment_link": payment_url,
-            "amount_paise": total_paise,
-            "amount_rupees": round(total_paise / 100, 2),
+            "payment_id": pay_res["payment_mandate_id"],
+            "razorpay_order_id": pay_res["razorpay_order_id"],
+            "payment_link": pay_res["payment_link_url"],
+            "amount_paise": pay_res["amount_paise"],
+            "amount_rupees": pay_res["amount_rupees"],
             "message": "Payment recovery reminder link created successfully."
         }
     finally:
