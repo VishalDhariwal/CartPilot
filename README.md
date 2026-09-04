@@ -1,5 +1,5 @@
 # 🛒 CartPilot: Explainable Agentic Commerce Platform
-
+**Currently working on azure deployment 
 > **Autonomous AI Shopping Agents with Deterministic Guardrails, 4-Tier Hybrid Recommendations, Cryptographic Mandate Chains, and Merchant Autonomy Levers.**
 
 ---
