@@ -2,6 +2,7 @@
   "name": "cartpilot-workspace",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "CartPilot explainable agentic commerce platform workspace",
   "scripts": {
     "dev": "npm --prefix cartpilot-merchant run dev",
