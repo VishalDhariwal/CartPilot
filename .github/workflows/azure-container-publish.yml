@@ -133,6 +133,8 @@ jobs:
           APP_NAME: ${{ secrets.CONTAINER_APP_NAME || vars.CONTAINER_APP_NAME || 'cartpilot-app' }}
           RG_NAME: ${{ secrets.RESOURCE_GROUP || vars.RESOURCE_GROUP || 'cartpilot-rg' }}
           REGISTRY: ${{ secrets.ACR_LOGIN_SERVER || vars.ACR_LOGIN_SERVER }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           IMG_NAME: ${{ inputs.image_name || env.DEFAULT_IMAGE_NAME }}
           COMMIT_SHA: ${{ github.sha }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -155,6 +157,17 @@ jobs:
 
             # Check if Azure Container App exists
             if az containerapp show --name "$APP_NAME" --resource-group "$RG_NAME" &>/dev/null; then
+              # Ensure ACR credentials are set on Container App
+              if [ -n "$ACR_USERNAME" ] && [ -n "$ACR_PASSWORD" ]; then
+                echo "🔑 Ensuring ACR credentials on Container App..."
+                az containerapp registry set \
+                  --name "$APP_NAME" \
+                  --resource-group "$RG_NAME" \
+                  --server "$REGISTRY" \
+                  --username "$ACR_USERNAME" \
+                  --password "$ACR_PASSWORD" || true
+              fi
+
               echo "🔄 Updating Container App image to $TARGET_IMAGE..."
               ENV_ARGS=()
               [ -n "$GEMINI_API_KEY" ] && ENV_ARGS+=("GEMINI_API_KEY=$GEMINI_API_KEY")
