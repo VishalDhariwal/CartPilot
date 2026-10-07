@@ -294,11 +294,10 @@ export default function CatalogIngestModal({
         {/* Result Notification Banner */}
         {lastResult && (
           <div
-            className={`mx-6 mt-4 p-3.5 rounded-xl border flex items-start gap-3 text-xs leading-relaxed ${
-              lastResult.type === "success"
+            className={`mx-6 mt-4 p-3.5 rounded-xl border flex items-start gap-3 text-xs leading-relaxed ${lastResult.type === "success"
                 ? "bg-emerald-50/90 border-emerald-200 text-emerald-900"
                 : "bg-rose-50/90 border-rose-200 text-rose-900"
-            }`}
+              }`}
           >
             {lastResult.type === "success" ? (
               <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
@@ -318,33 +317,30 @@ export default function CatalogIngestModal({
         <div className="flex border-b border-border px-6 pt-3 gap-2 bg-white">
           <button
             onClick={() => { setActiveTab("api"); setLastResult(null); }}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-              activeTab === "api"
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${activeTab === "api"
                 ? "border-indigo-600 text-indigo-600"
                 : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             <Key size={14} />
             API Key Ingestion
           </button>
           <button
             onClick={() => { setActiveTab("csv"); setLastResult(null); }}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-              activeTab === "csv"
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${activeTab === "csv"
                 ? "border-indigo-600 text-indigo-600"
                 : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             <FileSpreadsheet size={14} />
             Upload CSV File
           </button>
           <button
             onClick={() => { setActiveTab("demo"); setLastResult(null); }}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
-              activeTab === "demo"
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${activeTab === "demo"
                 ? "border-indigo-600 text-indigo-600"
                 : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             <Sparkles size={14} />
             Quick Demo Seed
@@ -485,13 +481,12 @@ export default function CatalogIngestModal({
                   }
                 }}
                 onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                  dragOver
+                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${dragOver
                     ? "border-indigo-500 bg-indigo-50/50"
                     : file
-                    ? "border-emerald-500 bg-emerald-50/30"
-                    : "border-slate-300 hover:border-slate-400 bg-slate-50/50"
-                }`}
+                      ? "border-emerald-500 bg-emerald-50/30"
+                      : "border-slate-300 hover:border-slate-400 bg-slate-50/50"
+                  }`}
               >
                 <input
                   ref={fileInputRef}
