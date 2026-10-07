@@ -102,15 +102,22 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Publish Build Action Summary
+        env:
+          REGISTRY: ${{ steps.config.outputs.registry }}
+          IMAGE_NAME: ${{ steps.config.outputs.image_name }}
+          DIGEST: ${{ steps.build_push.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           echo "### 🚀 Azure Container Registry Build Succeeded" >> $GITHUB_STEP_SUMMARY
-          echo "- **Registry**: \`${{ steps.config.outputs.registry }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image**: \`${{ steps.config.outputs.image_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Digest**: \`${{ steps.build_push.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Registry**: \`$REGISTRY\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`$IMAGE_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Digest**: \`$DIGEST\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### Published Image Tags:" >> $GITHUB_STEP_SUMMARY
-          for tag in ${{ steps.meta.outputs.tags }}; do
-            echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
+          echo "$TAGS" | while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
+            fi
           done
 
   deploy:
@@ -126,14 +133,20 @@ jobs:
 
       - name: Deploy / Update Azure Container App
         uses: azure/CLI@v2
+        env:
+          APP_NAME: ${{ secrets.CONTAINER_APP_NAME || vars.CONTAINER_APP_NAME || 'cartpilot-app' }}
+          RG_NAME: ${{ secrets.RESOURCE_GROUP || vars.RESOURCE_GROUP || 'cartpilot-rg' }}
+          REGISTRY: ${{ needs.build-and-push.outputs.registry }}
+          IMG_NAME: ${{ needs.build-and-push.outputs.image_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+          BYPASS_RAZORPAY: ${{ secrets.BYPASS_RAZORPAY }}
         with:
           inlineScript: |
             set -e
-            APP_NAME="${{ secrets.CONTAINER_APP_NAME || vars.CONTAINER_APP_NAME || 'cartpilot-app' }}"
-            RG_NAME="${{ secrets.RESOURCE_GROUP || vars.RESOURCE_GROUP || 'cartpilot-rg' }}"
-            REGISTRY="${{ needs.build-and-push.outputs.registry }}"
-            IMG_NAME="${{ needs.build-and-push.outputs.image_name }}"
-            TARGET_IMAGE="${REGISTRY}/${IMG_NAME}:${{ github.sha }}"
+            TARGET_IMAGE="${REGISTRY}/${IMG_NAME}:${COMMIT_SHA}"
 
             echo "🚀 Target Container App: $APP_NAME in Resource Group: $RG_NAME"
             echo "📦 Deploying Image: $TARGET_IMAGE"
@@ -142,10 +155,10 @@ jobs:
             if az containerapp show --name "$APP_NAME" --resource-group "$RG_NAME" &>/dev/null; then
               echo "🔄 Updating Container App image to $TARGET_IMAGE..."
               ENV_ARGS=()
-              [ -n "${{ secrets.GEMINI_API_KEY }}" ] && ENV_ARGS+=(GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}")
-              [ -n "${{ secrets.RAZORPAY_KEY_ID }}" ] && ENV_ARGS+=(RAZORPAY_KEY_ID="${{ secrets.RAZORPAY_KEY_ID }}")
-              [ -n "${{ secrets.RAZORPAY_KEY_SECRET }}" ] && ENV_ARGS+=(RAZORPAY_KEY_SECRET="${{ secrets.RAZORPAY_KEY_SECRET }}")
-              [ -n "${{ secrets.BYPASS_RAZORPAY }}" ] && ENV_ARGS+=(BYPASS_RAZORPAY="${{ secrets.BYPASS_RAZORPAY }}")
+              [ -n "$GEMINI_API_KEY" ] && ENV_ARGS+=("GEMINI_API_KEY=$GEMINI_API_KEY")
+              [ -n "$RAZORPAY_KEY_ID" ] && ENV_ARGS+=("RAZORPAY_KEY_ID=$RAZORPAY_KEY_ID")
+              [ -n "$RAZORPAY_KEY_SECRET" ] && ENV_ARGS+=("RAZORPAY_KEY_SECRET=$RAZORPAY_KEY_SECRET")
+              [ -n "$BYPASS_RAZORPAY" ] && ENV_ARGS+=("BYPASS_RAZORPAY=$BYPASS_RAZORPAY")
 
               if [ ${#ENV_ARGS[@]} -gt 0 ]; then
                 az containerapp update \
