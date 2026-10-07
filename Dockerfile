@@ -5,7 +5,7 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /app/cartpilot-merchant
 
 COPY cartpilot-merchant/package*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 COPY cartpilot-merchant/ ./
 RUN npm run build
