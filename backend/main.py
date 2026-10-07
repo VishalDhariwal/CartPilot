@@ -5,6 +5,14 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import os
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path for direct or module execution
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse

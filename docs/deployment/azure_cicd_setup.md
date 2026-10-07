@@ -12,15 +12,24 @@ CartPilot includes three independent GitHub Actions workflows located in `.githu
 | :--- | :--- | :--- |
 | **`ci.yml`** | Pull Requests, Pushes | Runs Python 3.11 unit tests (`pytest`) and verifies React frontend build (`npm run build`). |
 | **`release-tag-on-merge.yml`** | Push to `main`, Manual Dispatch | Automatically computes the next version tag (e.g. `v1.0.0`), tags the commit, and publishes an official GitHub Release with release notes. |
-| **`azure-container-publish.yml`** | Push to `main`, Tags `v*`, Manual Dispatch | Builds the optimized multi-stage Docker container (`Dockerfile`) using Docker Buildx and pushes to your private Azure Container Registry with commit SHA, semver, and `latest` tags. |
+| **`azure-container-publish.yml`** | Push to `main`, Tags `v*`, Manual Dispatch | Builds the optimized multi-stage Docker container (`Dockerfile`) using Docker Buildx, pushes to ACR, and **automatically deploys the live update to Azure Container Apps**. |
 
 ---
 
 ## 2. Setting Up Azure Container Registry (ACR)
 
-You can configure Azure Container Registry using the **Azure CLI** or the **Azure Portal**.
+### ⚡ Quick Option: 1-Click Automated Provisioning & GitHub Secrets Setup
 
-### Option A: Using Azure CLI
+CartPilot includes an automated setup script that creates the Azure Container Registry, Azure Container Apps Environment, and Container App, and automatically injects secrets directly into GitHub Actions via `gh`:
+
+```bash
+chmod +x ops/setup_azure.sh
+./ops/setup_azure.sh
+```
+
+---
+
+### Manual Option: Step-by-Step Azure CLI Setup
 
 1. **Log in to your Azure account:**
    ```bash

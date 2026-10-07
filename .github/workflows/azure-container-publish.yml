@@ -1,4 +1,4 @@
-name: Build and Publish Azure Container Image
+name: Build, Publish, and Deploy to Azure
 
 on:
   push:
@@ -18,6 +18,11 @@ on:
         required: false
         type: boolean
         default: true
+      deploy_to_azure:
+        description: 'Deploy to Azure Container Apps after pushing image'
+        required: false
+        type: boolean
+        default: true
       platform:
         description: 'Target platform for container'
         required: false
@@ -31,6 +36,11 @@ jobs:
   build-and-push:
     name: Build & Push Docker Image to ACR
     runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.config.outputs.registry }}
+      image_name: ${{ steps.config.outputs.image_name }}
+      full_image: ${{ steps.config.outputs.full_image }}
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -107,7 +117,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Publish Action Summary
+      - name: Publish Build Action Summary
         run: |
           echo "### 🚀 Azure Container Registry Build Succeeded" >> $GITHUB_STEP_SUMMARY
           echo "- **Registry**: \`${{ steps.config.outputs.registry }}\`" >> $GITHUB_STEP_SUMMARY
@@ -118,3 +128,65 @@ jobs:
           for tag in ${{ steps.meta.outputs.tags }}; do
             echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
           done
+
+  deploy:
+    name: Deploy to Azure Container Apps
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ always() && needs.build-and-push.result == 'success' && (inputs.deploy_to_azure == null || inputs.deploy_to_azure == true) && (secrets.AZURE_CREDENTIALS != '' || secrets.CONTAINER_APP_NAME != '' || vars.CONTAINER_APP_NAME != '') }}
+    steps:
+      - name: Azure CLI Login
+        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy / Update Azure Container App
+        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            set -e
+            APP_NAME="${{ secrets.CONTAINER_APP_NAME || vars.CONTAINER_APP_NAME || 'cartpilot-app' }}"
+            RG_NAME="${{ secrets.RESOURCE_GROUP || vars.RESOURCE_GROUP || 'cartpilot-rg' }}"
+            REGISTRY="${{ needs.build-and-push.outputs.registry }}"
+            IMG_NAME="${{ needs.build-and-push.outputs.image_name }}"
+            TARGET_IMAGE="${REGISTRY}/${IMG_NAME}:${{ github.sha }}"
+
+            echo "🚀 Target Container App: $APP_NAME in Resource Group: $RG_NAME"
+            echo "📦 Deploying Image: $TARGET_IMAGE"
+
+            # Check if Azure Container App exists
+            if az containerapp show --name "$APP_NAME" --resource-group "$RG_NAME" &>/dev/null; then
+              echo "🔄 Updating Container App image to $TARGET_IMAGE..."
+              ENV_ARGS=()
+              [ -n "${{ secrets.GEMINI_API_KEY }}" ] && ENV_ARGS+=(GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}")
+              [ -n "${{ secrets.RAZORPAY_KEY_ID }}" ] && ENV_ARGS+=(RAZORPAY_KEY_ID="${{ secrets.RAZORPAY_KEY_ID }}")
+              [ -n "${{ secrets.RAZORPAY_KEY_SECRET }}" ] && ENV_ARGS+=(RAZORPAY_KEY_SECRET="${{ secrets.RAZORPAY_KEY_SECRET }}")
+              [ -n "${{ secrets.BYPASS_RAZORPAY }}" ] && ENV_ARGS+=(BYPASS_RAZORPAY="${{ secrets.BYPASS_RAZORPAY }}")
+
+              if [ ${#ENV_ARGS[@]} -gt 0 ]; then
+                az containerapp update \
+                  --name "$APP_NAME" \
+                  --resource-group "$RG_NAME" \
+                  --image "$TARGET_IMAGE" \
+                  --set-env-vars "${ENV_ARGS[@]}"
+              else
+                az containerapp update \
+                  --name "$APP_NAME" \
+                  --resource-group "$RG_NAME" \
+                  --image "$TARGET_IMAGE"
+              fi
+
+              APP_URL=$(az containerapp show --name "$APP_NAME" --resource-group "$RG_NAME" --query "properties.configuration.ingress.fqdn" -o tsv)
+              echo "### ✅ Azure Container App Deployed Successfully" >> $GITHUB_STEP_SUMMARY
+              echo "- **Application URL**: [https://$APP_URL](https://$APP_URL)" >> $GITHUB_STEP_SUMMARY
+              echo "- **Resource Group**: \`$RG_NAME\`" >> $GITHUB_STEP_SUMMARY
+              echo "- **Container App**: \`$APP_NAME\`" >> $GITHUB_STEP_SUMMARY
+              echo "- **Image Tag**: \`$TARGET_IMAGE\`" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ Azure Container App '$APP_NAME' was not found in Resource Group '$RG_NAME'."
+              echo "### ⚠️ Azure Deployment Note" >> $GITHUB_STEP_SUMMARY
+              echo "The container image was successfully published to ACR (\`$TARGET_IMAGE\`), but Container App \`$APP_NAME\` does not yet exist in \`$RG_NAME\`." >> $GITHUB_STEP_SUMMARY
+              echo "Run \`ops/setup_azure.sh\` to provision the Container App in Azure." >> $GITHUB_STEP_SUMMARY
+            fi

@@ -1679,14 +1679,17 @@ def detect_all_opportunities() -> list[dict]:
 
         # ── 4. Low Conversion Proxy (Diagnostic Review Only, NO_ACTION) ──
         cursor.execute("""
-            SELECT ue.suggested_sku, c.name, c.price_paise,
-                   COUNT(*) as offers,
-                   SUM(ue.accepted) as accepted,
-                   ROUND(SUM(ue.accepted)*1.0 / COUNT(*), 2) as conv_rate
-            FROM upsell_events ue
-            LEFT JOIN catalog c ON c.sku = ue.suggested_sku
-            GROUP BY ue.suggested_sku
-            HAVING offers >= 5 AND conv_rate < 0.20
+            SELECT suggested_sku, name, price_paise, offers, accepted, conv_rate
+            FROM (
+                SELECT ue.suggested_sku, c.name, c.price_paise,
+                       COUNT(*) as offers,
+                       SUM(ue.accepted) as accepted,
+                       ROUND(SUM(ue.accepted)*1.0 / COUNT(*), 2) as conv_rate
+                FROM upsell_events ue
+                LEFT JOIN catalog c ON c.sku = ue.suggested_sku
+                GROUP BY ue.suggested_sku, c.name, c.price_paise
+            ) sub
+            WHERE offers >= 5 AND conv_rate < 0.20
             ORDER BY offers DESC LIMIT 1
         """)
         low_conv = cursor.fetchone()
@@ -2056,7 +2059,7 @@ def get_growth_metrics() -> dict:
             SELECT COUNT(*), 
                    SUM(CASE 
                        WHEN COALESCE(pm.refund_status, 'NONE') = 'REFUNDED' OR COALESCE(cm.order_status, 'CREATED') = 'CANCELLED' THEN 0
-                       WHEN COALESCE(pm.refund_status, 'NONE') = 'PARTIALLY_REFUNDED' THEN MAX(0, pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0))
+                       WHEN COALESCE(pm.refund_status, 'NONE') = 'PARTIALLY_REFUNDED' THEN CASE WHEN (pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0)) > 0 THEN (pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0)) ELSE 0 END
                        ELSE pm.amount_paise 
                    END)
             FROM payment_mandates pm
@@ -2124,7 +2127,7 @@ def get_growth_metrics() -> dict:
         # 9. Gross recovered cash (face value of settled recovery orders, excluding refunded/cancelled)
         cursor.execute("""
             SELECT SUM(CASE 
-                       WHEN COALESCE(pm.refund_status, 'NONE') = 'PARTIALLY_REFUNDED' THEN MAX(0, pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0))
+                       WHEN COALESCE(pm.refund_status, 'NONE') = 'PARTIALLY_REFUNDED' THEN CASE WHEN (pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0)) > 0 THEN (pm.amount_paise - COALESCE(pm.refunded_amount_paise, 0)) ELSE 0 END
                        ELSE pm.amount_paise 
                    END)
             FROM payment_mandates pm
@@ -2330,6 +2333,13 @@ def get_growth_timeline(limit: int = 100) -> list[dict]:
     cursor = conn.cursor()
     timeline = []
 
+    def _str_ts(val):
+        if val is None:
+            return ""
+        if hasattr(val, "isoformat"):
+            return val.isoformat()
+        return str(val)
+
     try:
         # 1. Real Growth Actions
         cursor.execute("""
@@ -2346,7 +2356,7 @@ def get_growth_timeline(limit: int = 100) -> list[dict]:
                 "title": r["title"],
                 "detail": r["explanation"],
                 "mode": r["mode"],
-                "timestamp": r["executed_at"] or r["created_at"]
+                "timestamp": _str_ts(r["executed_at"] or r["created_at"])
             })
 
         # 2. Real Revenue Outcomes (Settlements)
@@ -2365,7 +2375,7 @@ def get_growth_timeline(limit: int = 100) -> list[dict]:
                 "title": f"Captured Revenue Lift: +₹{r['incremental_paise']/100:.2f}",
                 "detail": f"Observed {r['revenue_type']} lift on settled transaction (₹{r['after_paise']/100:.2f} total paid).",
                 "mode": "automated",
-                "timestamp": r["created_at"]
+                "timestamp": _str_ts(r["created_at"])
             })
 
         # 3. Real Policy, Governance, Payment & Upsell Events from audit_log
@@ -2390,7 +2400,7 @@ def get_growth_timeline(limit: int = 100) -> list[dict]:
                 "title": r["event"],
                 "detail": r["detail"],
                 "mode": "governance" if r["ref_type"] == "policy" else "automated",
-                "timestamp": r["created_at"]
+                "timestamp": _str_ts(r["created_at"])
             })
 
         # Sort all events chronologically descending
