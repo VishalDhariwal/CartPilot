@@ -36,11 +36,6 @@ jobs:
   build-and-push:
     name: Build & Push Docker Image to ACR
     runs-on: ubuntu-latest
-    outputs:
-      registry: ${{ steps.config.outputs.registry }}
-      image_name: ${{ steps.config.outputs.image_name }}
-      full_image: ${{ steps.config.outputs.full_image }}
-      tags: ${{ steps.meta.outputs.tags }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -81,6 +76,7 @@ jobs:
           images: ${{ steps.config.outputs.full_image }}
           tags: |
             type=raw,value=latest,enable=${{ inputs.push_latest == true || github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ github.sha }}
             type=sha,format=short,prefix=
             type=sha,format=long,prefix=sha-
             type=semver,pattern={{version}}
@@ -136,8 +132,8 @@ jobs:
         env:
           APP_NAME: ${{ secrets.CONTAINER_APP_NAME || vars.CONTAINER_APP_NAME || 'cartpilot-app' }}
           RG_NAME: ${{ secrets.RESOURCE_GROUP || vars.RESOURCE_GROUP || 'cartpilot-rg' }}
-          REGISTRY: ${{ needs.build-and-push.outputs.registry }}
-          IMG_NAME: ${{ needs.build-and-push.outputs.image_name }}
+          REGISTRY: ${{ secrets.ACR_LOGIN_SERVER || vars.ACR_LOGIN_SERVER }}
+          IMG_NAME: ${{ inputs.image_name || env.DEFAULT_IMAGE_NAME }}
           COMMIT_SHA: ${{ github.sha }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
@@ -146,6 +142,12 @@ jobs:
         with:
           inlineScript: |
             set -e
+
+            # Resolve registry login server if not directly passed
+            if [ -z "$REGISTRY" ]; then
+              REGISTRY=$(az acr list --resource-group "$RG_NAME" --query "[0].loginServer" -o tsv)
+            fi
+
             TARGET_IMAGE="${REGISTRY}/${IMG_NAME}:${COMMIT_SHA}"
 
             echo "🚀 Target Container App: $APP_NAME in Resource Group: $RG_NAME"
