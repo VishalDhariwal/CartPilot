@@ -8,7 +8,6 @@ __pycache__/
 .coverage
 coverage/
 htmlcov/
-tests/
 
 # Node / Frontend
 node_modules/

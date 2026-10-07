@@ -66,23 +66,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Authentication Option 1: Azure Service Principal (if AZURE_CREDENTIALS secret is set)
-      - name: Azure CLI Login
-        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Log in to ACR via Azure CLI
-        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        run: |
-          REGISTRY="${{ steps.config.outputs.registry }}"
-          ACR_NAME="${REGISTRY%%.*}"
-          az acr login --name "$ACR_NAME"
-
-      # Authentication Option 2: Direct ACR Credentials (if ACR_USERNAME & ACR_PASSWORD are set)
-      - name: Log in to ACR via Registry Credentials
-        if: ${{ secrets.AZURE_CREDENTIALS == '' && secrets.ACR_USERNAME != '' }}
+      - name: Log in to Azure Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ steps.config.outputs.registry }}
@@ -133,16 +117,14 @@ jobs:
     name: Deploy to Azure Container Apps
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.build-and-push.result == 'success' && (inputs.deploy_to_azure == null || inputs.deploy_to_azure == true) && (secrets.AZURE_CREDENTIALS != '' || secrets.CONTAINER_APP_NAME != '' || vars.CONTAINER_APP_NAME != '') }}
+    if: needs.build-and-push.result == 'success' && (inputs.deploy_to_azure == null || inputs.deploy_to_azure == true)
     steps:
       - name: Azure CLI Login
-        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy / Update Azure Container App
-        if: ${{ secrets.AZURE_CREDENTIALS != '' }}
         uses: azure/CLI@v2
         with:
           inlineScript: |
